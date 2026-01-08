@@ -1,256 +1,270 @@
 "use client";
 
-import React, { useState } from "react";
 import { 
-  FileDown, 
+  TrendingUp, 
+  Download, 
   Printer, 
-  Filter, 
-  Calendar, 
-  BarChart3, 
-  PieChart,
-  Download,
-  Clock,
-  ChevronRight
+  AlertTriangle, 
+  Wrench, 
+  FileText
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { ChartsView } from "./charts-view";
-import { getStatusColor } from "@/lib/status-helper";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 
-// Мок-данные
-const REPORT_DATA = [
-  { id: "evt_1", type: "Падение пациента", category: "Безопасность", date: "24.11.2025", status: "В работе", department: "Терапия", duration: "2ч 15м" },
-  { id: "evt_2", type: "Ошибка в дозировке", category: "Лекарства", date: "23.11.2025", status: "Зарегистрировано", department: "Хирургия", duration: "—" },
-  { id: "evt_3", type: "Сбой инфузомата", category: "Оборудование", date: "22.11.2025", status: "Выполнено", department: "Реанимация", duration: "45м" },
-  { id: "evt_4", type: "Утеря анализов", category: "Документация", date: "22.11.2025", status: "Отказано", department: "Лаборатория", duration: "1д 2ч" },
-  { id: "evt_5", type: "Падение посетителя", category: "Безопасность", date: "21.11.2025", status: "Выполнено", department: "Приемный покой", duration: "1ч 10м" },
-  { id: "evt_6", type: "Сбой электропитания", category: "Инфраструктура", date: "20.11.2025", status: "Выполнено", department: "Все", duration: "30м" },
-];
+// Импортируем компонент графика (который мы создали ранее)
+import { DynamicChart } from "@/components/charts/dynamic-chart";
+
+// Импортируем данные и справочники
+import { 
+  MOCK_REQUESTS, 
+  MOCK_EVENTS, 
+  SEVERITY_MAP, 
+  SERVICE_TYPES_MAP, 
+  STATUS_MAP 
+} from "@/lib/mock-data";
 
 export default function ReportsPage() {
-  const [period, setPeriod] = useState("month");
-  const [statusFilter, setStatusFilter] = useState("all");
+  
+  // --- ПОДГОТОВКА ДАННЫХ (АГРЕГАЦИЯ) ---
 
-  const filteredData = REPORT_DATA.filter(item => 
-    statusFilter === "all" || item.status === statusFilter
-  );
+  // 1. Статус заявок (Сколько в работе, сколько выполнено)
+  const requestsByStatus = Object.values(
+    MOCK_REQUESTS.reduce((acc: any, curr) => {
+      const label = STATUS_MAP[curr.status] || curr.status;
+      acc[curr.status] = acc[curr.status] || { name: label, value: 0 };
+      acc[curr.status].value += 1;
+      return acc;
+    }, {})
+  ) as { name: string; value: number }[];
 
-  const total = filteredData.length;
-  const solved = filteredData.filter(i => i.status === "Выполнено").length;
-  const active = filteredData.filter(i => i.status === "В работе" || i.status === "Зарегистрировано").length;
+  // 2. Заявки по Категориям (Сантехника, ИТ и т.д.)
+  const requestsByCategory = Object.values(
+    MOCK_REQUESTS.reduce((acc: any, curr) => {
+      // Если категорию добавил врач вручную и ее нет в мапе, используем ключ как есть
+      const label = SERVICE_TYPES_MAP[curr.type] || curr.type;
+      acc[label] = acc[label] || { name: label, value: 0 };
+      acc[label].value += 1;
+      return acc;
+    }, {})
+  ) as { name: string; value: number }[];
 
-  const handleExport = (type: "excel" | "pdf") => {
-    alert(`Экспорт ${type.toUpperCase()}...`);
+  // 3. НС по Тяжести (Pie Chart)
+  const eventsBySeverity = Object.values(
+    MOCK_EVENTS.reduce((acc: any, curr) => {
+      const label = SEVERITY_MAP[curr.severity] || curr.severity;
+      acc[label] = acc[label] || { name: label, value: 0 };
+      acc[label].value += 1;
+      return acc;
+    }, {})
+  ) as { name: string; value: number }[];
+
+  // 4. НС по Категориям (Падение, Лекарства и т.д.)
+  const eventsByCategory = Object.values(
+    MOCK_EVENTS.reduce((acc: any, curr) => {
+      const label = curr.category; // Тут предполагаем, что name уже человекочитаемый или есть мап
+      acc[label] = acc[label] || { name: label, value: 0 };
+      acc[label].value += 1;
+      return acc;
+    }, {})
+  ) as { name: string; value: number }[];
+
+
+  // KPI Подсчеты
+  const totalRequests = MOCK_REQUESTS.length;
+  const activeRequests = MOCK_REQUESTS.filter(r => r.status === 'in_work' || r.status === 'created').length;
+  const totalEvents = MOCK_EVENTS.length;
+  const criticalEvents = MOCK_EVENTS.filter(e => e.severity === 'critical' || e.severity === 'severe').length;
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Шапка */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 pb-20 print:p-0 print:pb-0">
+      
+      {/* Заголовок страницы */}
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Аналитика и Отчеты</h1>
-          <p className="text-sm text-muted-foreground">Сводная статистика по инцидентам</p>
+          <h1 className="text-2xl font-bold">Отчеты и Аналитика</h1>
+          <p className="text-muted-foreground">Сводная статистика по клинике</p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => handleExport("pdf")} className="flex-1 sm:flex-none">
-                <Printer className="mr-2 h-4 w-4" /> PDF
-            </Button>
-            <Button variant="outline" onClick={() => handleExport("excel")} className="flex-1 sm:flex-none">
-                <FileDown className="mr-2 h-4 w-4" /> Excel
-            </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="mr-2 h-4 w-4" />
+            Печать
+          </Button>
+          <Button>
+            <Download className="mr-2 h-4 w-4" />
+            Экспорт (PDF)
+          </Button>
         </div>
       </div>
 
-      {/* Блок статистики (KPI) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Всего событий</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold text-foreground flex items-center gap-2">
-                    {total}
-                    {/* Иконка может быть primary цвета */}
-                    <BarChart3 className="h-4 w-4 text-primary" />
-                </div>
-            </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Решено / Закрыто</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold text-success flex items-center gap-2">
-                    {solved}
-                    <span className="text-xs font-normal text-muted-foreground">({total > 0 ? Math.round((solved/total)*100) : 0}%)</span>
-                </div>
-            </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Активные</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold text-warning flex items-center gap-2">
-                    {active}
-                    <PieChart className="h-4 w-4 text-warning" />
-                </div>
-            </CardContent>
-        </Card>
+      {/* Верхние KPI карточки (Общие) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KPICard 
+          title="Всего заявок" 
+          value={totalRequests} 
+          trend="+12% за месяц" 
+          icon={FileText} 
+        />
+        <KPICard 
+          title="Активные ремонты" 
+          value={activeRequests} 
+          trend="Текущая нагрузка" 
+          icon={Wrench} 
+          className="bg-blue-50 border-blue-200 dark:bg-blue-900/20"
+        />
+        <KPICard 
+          title="Инциденты (НС)" 
+          value={totalEvents} 
+          trend="Всего за период" 
+          icon={AlertTriangle} 
+          className="bg-orange-50 border-orange-200 dark:bg-orange-900/20"
+        />
+        <KPICard 
+          title="Критические НС" 
+          value={criticalEvents} 
+          trend="Требуют разбора" 
+          icon={TrendingUp} 
+          iconColor="text-red-600"
+        />
       </div>
 
-      {/* Графики */}
-      <ChartsView />
+      <Separator className="print:hidden" />
 
-      {/* ДЕТАЛЬНЫЙ ОТЧЕТ (Таблица/Карточки) */}
-      <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 justify-between md:items-center">
-            <h2 className="text-lg font-bold text-foreground">Детальный отчет</h2>
-            
-            {/* Фильтры */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <Select value={period} onValueChange={setPeriod}>
-                    <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
-                            <SelectValue placeholder="Период" />
-                        </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="week">За неделю</SelectItem>
-                        <SelectItem value="month">За месяц</SelectItem>
-                        <SelectItem value="year">За год</SelectItem>
-                    </SelectContent>
-                </Select>
+      {/* Основные вкладки */}
+      <Tabs defaultValue="requests" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[600px] print:hidden">
+          <TabsTrigger value="requests">Технические службы</TabsTrigger>
+          <TabsTrigger value="safety">Безопасность (НС)</TabsTrigger>
+          <TabsTrigger value="summary">Сводка для руководства</TabsTrigger>
+        </TabsList>
 
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-[180px] h-9 bg-background">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Filter className="h-4 w-4" />
-                            <SelectValue placeholder="Статус" />
-                        </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Все статусы</SelectItem>
-                        <SelectItem value="Зарегистрировано">Зарегистрировано</SelectItem>
-                        <SelectItem value="В работе">В работе</SelectItem>
-                        <SelectItem value="Выполнено">Выполнено</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-        </div>
+        {/* 1. ВКЛАДКА ТЕХНИЧЕСКИЕ СЛУЖБЫ */}
+        <TabsContent value="requests" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="print:shadow-none print:border-none">
+              <CardHeader>
+                <CardTitle>Распределение по службам</CardTitle>
+                <CardDescription>Какие отделы загружены больше всего</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DynamicChart type="bar" data={requestsByCategory} height={350} />
+              </CardContent>
+            </Card>
+
+            <Card className="print:shadow-none print:border-none">
+              <CardHeader>
+                <CardTitle>Статусы выполнения</CardTitle>
+                <CardDescription>Эффективность обработки заявок</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DynamicChart type="pie" data={requestsByStatus} height={350} />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* 2. ВКЛАДКА БЕЗОПАСНОСТЬ (НС) */}
+        <TabsContent value="safety" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Тяжесть последствий</CardTitle>
+                <CardDescription>Классификация рисков</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DynamicChart type="pie" data={eventsBySeverity} height={300} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Типы инцидентов</CardTitle>
+                <CardDescription>Частота возникновения событий</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DynamicChart type="bar" data={eventsByCategory} height={300} />
+              </CardContent>
+            </Card>
+
+            {/* Таблица последних критических событий */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                 <CardTitle className="text-base text-red-600">Журнал критических событий</CardTitle>
+              </CardHeader>
+              <CardContent>
+                 {MOCK_EVENTS.filter(e => e.severity === 'critical' || e.severity === 'severe' || e.severity === 'moderate').length > 0 ? (
+                   <div className="space-y-2">
+                     {MOCK_EVENTS.filter(e => e.severity === 'critical' || e.severity === 'severe' || e.severity === 'moderate').map(evt => (
+                       <div key={evt.id} className="flex justify-between items-center p-3 border rounded-md bg-muted/20">
+                          <div>
+                            <div className="font-medium text-sm">{evt.description}</div>
+                            <div className="text-xs text-muted-foreground">{evt.location} • {new Date(evt.createdAt).toLocaleDateString()}</div>
+                          </div>
+                          <div className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-700">
+                            {SEVERITY_MAP[evt.severity]}
+                          </div>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <div className="text-center py-4 text-muted-foreground">Критических инцидентов не зафиксировано</div>
+                 )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
         
-        {/* ВАРИАНТ 1: ТАБЛИЦА (Только ПК - hidden md:block) */}
-        <Card className="hidden md:block bg-card border-border overflow-hidden p-0">
-            <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader className="bg-muted/50 border-b border-border">
-                            <TableRow className="border-b border-border hover:bg-transparent">
-                                <TableHead className="text-muted-foreground">Дата</TableHead>
-                                <TableHead className="text-muted-foreground">Тип события</TableHead>
-                                <TableHead className="text-muted-foreground">Категория</TableHead>
-                                <TableHead className="text-muted-foreground">Отделение</TableHead>
-                                <TableHead className="text-muted-foreground">Длительность</TableHead>
-                                <TableHead className="text-right text-muted-foreground">Статус</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredData.length > 0 ? (
-                                filteredData.map((row) => (
-                                    <TableRow key={row.id} className="border-b border-border hover:bg-muted/50">
-                                        <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                                            {row.date}
-                                        </TableCell>
-                                        <TableCell className="font-medium text-foreground">
-                                            {row.type}
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                            {row.category}
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                            {row.department}
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground text-xs">
-                                            {row.duration}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Badge variant="outline" className={`font-normal ${getStatusColor(row.status)}`}>
-                                                {row.status}
-                                            </Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                                        Данных за этот период нет
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-            </CardContent>
-        </Card>
+        {/* 3. ВКЛАДКА СВОДКА (Для Гостей и Директора) */}
+        <TabsContent value="summary" className="mt-6">
+           <Card>
+             <CardHeader>
+               <CardTitle>Эффективность работы учреждения</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <div className="h-[200px] flex items-center justify-center border-dashed border-2 rounded-lg bg-muted/10">
+                 <p className="text-muted-foreground">Здесь можно разместить общий график динамики (LineChart) за год</p>
+               </div>
+               <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <div className="text-3xl font-bold text-green-700">98%</div>
+                    <div className="text-xs text-green-800 uppercase font-bold mt-1">Заявок закрыто в срок</div>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="text-3xl font-bold text-blue-700">2.4 ч</div>
+                    <div className="text-xs text-blue-800 uppercase font-bold mt-1">Среднее время реакции</div>
+                  </div>
+                  <div className="p-4 bg-purple-50 rounded-lg">
+                    <div className="text-3xl font-bold text-purple-700">0</div>
+                    <div className="text-xs text-purple-800 uppercase font-bold mt-1">Травматизм персонала</div>
+                  </div>
+               </div>
+             </CardContent>
+           </Card>
+        </TabsContent>
 
-        {/* ВАРИАНТ 2: КАРТОЧКИ (Только Мобильные - md:hidden) */}
-        <div className="md:hidden space-y-3">
-            {filteredData.length > 0 ? (
-                filteredData.map((row) => (
-                    <Card key={row.id} className="bg-card border-border p-0">
-                        <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="font-medium text-sm text-foreground line-clamp-2 mr-2">{row.type}</div>
-                                <Badge variant="outline" className={`text-[10px] px-1.5 shrink-0 ${getStatusColor(row.status)}`}>
-                                    {row.status}
-                                </Badge>
-                            </div>
-                            
-                            <div className="space-y-1.5">
-                                <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded w-fit">
-                                    {row.category}
-                                </div>
-                                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
-                                    <span className="flex items-center gap-1">
-                                        <Calendar className="h-3 w-3" /> {row.date}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3" /> {row.duration}
-                                    </span>
-                                </div>
-                                <div className="text-xs text-muted-foreground/70 pt-1">
-                                    {row.department}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))
-            ) : (
-                <div className="py-8 text-center text-muted-foreground border-2 border-dashed border-border rounded-lg">
-                    Нет данных
-                </div>
-            )}
-        </div>
-
-      </div>
+      </Tabs>
     </div>
   );
+}
+
+// Вспомогательный компонент для карточек KPI
+function KPICard({ title, value, trend, icon: Icon, className, iconColor }: any) {
+  return (
+    <Card className={className}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className={`h-4 w-4 text-muted-foreground ${iconColor}`} />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground">{trend}</p>
+      </CardContent>
+    </Card>
+  )
 }

@@ -8,18 +8,19 @@ import {
   LayoutDashboard, 
   Shield, 
   Users, 
-  Building
+  Building,
+  Wrench // <-- Добавили иконку
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const pathname = usePathname();
   // В реальном приложении берем из стора.
-  // Если user.role === 'admin', показываем админку.
   const isAdmin = true; 
 
   const mainLinks = [
     { href: "/dashboard", label: "Главная", icon: LayoutDashboard },
+    { href: "/requests", label: "Заявки", icon: Wrench }, // <-- Новый пункт
     { href: "/events", label: "События", icon: AlertTriangle },
     { href: "/reports", label: "Отчеты", icon: BarChart3 },
   ];
@@ -51,7 +52,8 @@ export function Sidebar() {
           <nav className="space-y-1">
             {mainLinks.map((link) => {
               const Icon = link.icon;
-              const isActive = pathname === link.href;
+              // Исправленная логика активного состояния (чтобы /requests/new тоже подсвечивало)
+              const isActive = pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(link.href));
 
               return (
                 <Link
