@@ -23,14 +23,14 @@ export function BottomNav() {
       icon: LayoutDashboard,
     },
     {
-      href: "/requests", 
-      label: "Заявки",
-      icon: Wrench,
-    },
-    {
       href: "/events",
       label: "События",
       icon: AlertTriangle,
+    },
+    {
+      href: "/requests", 
+      label: "Заявки",
+      icon: Wrench,
     },
     {
       href: "/reports",
@@ -46,7 +46,7 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 pb-safe bg-card border-t border-border shadow-[0_-1px_3px_rgba(0,0,0,0.05)] transition-colors duration-300 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 pb-safe bg-card border-t transition-colors duration-300 md:hidden">
       <div className="flex justify-around items-center h-full px-2">
         {links.map((link) => {
           const Icon = link.icon;

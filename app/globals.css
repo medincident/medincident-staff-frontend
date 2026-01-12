@@ -28,20 +28,27 @@
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
 
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+
+  /* CUSTOM STATUS COLORS */
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
 
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-
-  /* Наши кастомные статусные цвета */
   --color-success: hsl(var(--success));
   --color-success-foreground: hsl(var(--success-foreground));
+
   --color-warning: hsl(var(--warning));
   --color-warning-foreground: hsl(var(--warning-foreground));
 
-  /* -- ANIMATIONS (Стандартные для shadcn) -- */
+  --color-purple: hsl(var(--purple));
+  --color-purple-foreground: hsl(var(--purple-foreground));
+
+  /* INFO */
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  /* -- ANIMATIONS -- */
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 
@@ -65,7 +72,7 @@
 
 @layer base {
   :root {
-    /* --- СВЕТЛАЯ ТЕМА (Light Mode) --- */
+    /* --- LIGHT THEME --- */
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
 
@@ -75,54 +82,50 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
 
-    /* ФИРМЕННЫЙ ЗЕЛЕНЫЙ ЦЕНТРА ИЛИЗАРОВА */
-    /* HSL: 88, 54%, 52% (примерно #8DC63F) */
-    --primary: 88 54% 52%;
+    --purple: 270 95% 65%;
+    --purple-foreground: 0 0% 98%;
+
+    --primary: 88 54% 42%;
     --primary-foreground: 0 0% 100%;
 
-    /* Вторичный цвет (Светло-серый с оттенком зеленого) */
     --secondary: 88 20% 96%;
     --secondary-foreground: 240 5.9% 10%;
 
-    /* Muted (Приглушенный) */
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
 
-    /* Accent (Акцент для ховеров в меню) */
     --accent: 88 30% 94%;
     --accent-foreground: 240 5.9% 10%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 88 54% 52%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 98%;
 
-    --radius: 0.5rem;
-
-    /* --- НОВЫЕ СТАТУСНЫЕ ЦВЕТА --- */
     --success: 160 84% 39%;
     --success-foreground: 0 0% 98%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --radius: 0.5rem;
   }
 
   .dark {
-    /* --- ТЕМНАЯ ТЕМА (Dark Mode) --- */
-    --background: 240 10% 3.9%;
+    /* --- BLACK THEME --- */
+    --background: 240 5% 10%;
     --foreground: 0 0% 98%;
 
-    --card: 240 10% 3.9%;
+    --card: 240 5% 13%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 240 10% 3.9%;
+    --popover: 240 5% 10%;
     --popover-foreground: 0 0% 98%;
 
-    /* Зеленый оставляем ярким */
-    --primary: 88 54% 52%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 88 44% 55%;
 
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
@@ -133,18 +136,14 @@
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 60% 60%;
+    --info: 217 70% 65%;
+    --success: 160 50% 50%;
+    --warning: 38 80% 55%;
+    --purple: 270 60% 65%;
 
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 88 54% 52%;
-
-    --success: 160 84% 39%;
-    --success-foreground: 0 0% 98%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 98%;
   }
 }
 

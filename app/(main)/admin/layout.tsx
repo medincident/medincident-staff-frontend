@@ -21,8 +21,8 @@ export default function AdminLayout({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="md:hidden mb-1 w-full max-w-[calc(100vw-32px)] overflow-x-auto pb-2 scrollbar-hide">
-        <nav className="flex gap-2 min-w-max">
+      <div className="md:hidden w-full pb-4">
+        <nav className="grid w-full grid-cols-3 items-center rounded-lg bg-muted p-1 text-muted-foreground">
           {adminTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = pathname === tab.href;
@@ -32,14 +32,15 @@ export default function AdminLayout({
                 key={tab.href}
                 href={tab.href}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all border whitespace-nowrap", 
+                  "inline-flex flex-col items-center justify-center whitespace-nowrap rounded-md py-1.5 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                  "h-full px-1 sm:px-3 sm:text-sm", 
                   isActive 
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm" 
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    ? "bg-background text-foreground" 
+                    : "hover:bg-background/50 hover:text-foreground"
                 )}
               >
-                <Icon size={16} />
-                {tab.label}
+                <Icon size={16} className="mb-1 sm:mb-0 sm:mr-2 inline-block" />
+                <span className="truncate max-w-full">{tab.label}</span>
               </Link>
             );
           })}

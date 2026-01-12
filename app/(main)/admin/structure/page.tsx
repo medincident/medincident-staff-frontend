@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  ArrowLeft, 
   Plus, 
   Pencil, 
   Trash2, 
@@ -12,7 +11,8 @@ import {
   Search,
   Stethoscope,
   MoreVertical,
-  Save
+  Save,
+  User
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,12 +34,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Импорт типов и мок-данных
-import { INITIAL_CLINICS, Clinic, Department } from "@/lib/admin-mock";
+import { INITIAL_CLINICS, Clinic, Department, MOCK_USERS } from "@/lib/admin-mock";
 
 export default function StructurePage() {
-  const router = useRouter();
   const [clinics, setClinics] = useState<Clinic[]>(INITIAL_CLINICS);
   const [search, setSearch] = useState("");
   
@@ -48,14 +54,18 @@ export default function StructurePage() {
   const [isDeptDialogOpen, setIsDeptDialogOpen] = useState(false);
   
   // Состояние редактирования
-  // Для Клиники храним: id, name, address
-  // Для Отделения храним: id, name, parentId (id клиники)
-  const [editingItem, setEditingItem] = useState<{ id?: string, name: string, address?: string, parentId?: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id?: string, parentId?: string } | null>(null);
   
   // Временные поля для инпутов
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
+  const [newHeadId, setNewHeadId] = useState<string>("none"); // ID руководителя
   const [targetClinicId, setTargetClinicId] = useState<string | null>(null);
+
+  // Фильтрация пользователей для выбора руководителя (только врачи или админы)
+  const availableHeads = useMemo(() => {
+      return MOCK_USERS.filter(u => u.role !== 'guest'); 
+  }, []);
 
   // --- УМНЫЙ ПОИСК ---
   const filteredData = useMemo(() => {
@@ -63,17 +73,11 @@ export default function StructurePage() {
     const lowerSearch = search.toLowerCase();
 
     return clinics.map(clinic => {
-      // Ищем совпадение в названии клиники ИЛИ в адресе
       const clinicMatch = clinic.name.toLowerCase().includes(lowerSearch) || 
                           clinic.address.toLowerCase().includes(lowerSearch);
-
-      // Ищем совпадение внутри отделений
       const matchingDepts = clinic.departments.filter(d => d.name.toLowerCase().includes(lowerSearch));
       
-      // Если совпала клиника - показываем её и все отделения
       if (clinicMatch) return clinic;
-
-      // Если совпали только отделения - показываем клинику только с ними
       if (matchingDepts.length > 0) {
         return { ...clinic, departments: matchingDepts };
       }
@@ -82,16 +86,17 @@ export default function StructurePage() {
   }, [clinics, search]);
 
   // --- ЛОГИКА КЛИНИК (Parent) ---
-
   const openClinicModal = (clinic?: Clinic) => {
     if (clinic) {
-        setEditingItem({ id: clinic.id, name: clinic.name, address: clinic.address });
+        setEditingItem({ id: clinic.id });
         setNewName(clinic.name);
         setNewAddress(clinic.address);
+        setNewHeadId(clinic.headId || "none");
     } else {
         setEditingItem(null);
         setNewName("");
         setNewAddress("");
+        setNewHeadId("none");
     }
     setIsClinicDialogOpen(true);
   };
@@ -99,16 +104,21 @@ export default function StructurePage() {
   const saveClinic = () => {
     if (!newName.trim()) return;
     
+    // Ищем имя руководителя по ID
+    const headUser = availableHeads.find(u => u.id === newHeadId);
+    const headData = headUser ? { headId: headUser.id, headName: headUser.name } : { headId: undefined, headName: undefined };
+
     if (editingItem?.id) {
       // Редактирование
-      setClinics(clinics.map(c => c.id === editingItem.id ? { ...c, name: newName, address: newAddress } : c));
+      setClinics(clinics.map(c => c.id === editingItem.id ? { ...c, name: newName, address: newAddress, ...headData } : c));
     } else {
       // Создание
       setClinics([...clinics, { 
         id: `cl_${Date.now()}`, 
         name: newName, 
         address: newAddress, 
-        departments: [] 
+        departments: [],
+        ...headData
       }]);
     }
     setIsClinicDialogOpen(false);
@@ -125,11 +135,13 @@ export default function StructurePage() {
   const openDeptModal = (clinicId: string, dept?: Department) => {
     setTargetClinicId(clinicId);
     if (dept) {
-        setEditingItem({ id: dept.id, name: dept.name, parentId: clinicId });
+        setEditingItem({ id: dept.id, parentId: clinicId });
         setNewName(dept.name);
+        setNewHeadId(dept.headId || "none");
     } else {
         setEditingItem(null);
         setNewName("");
+        setNewHeadId("none");
     }
     setIsDeptDialogOpen(true);
   };
@@ -137,13 +149,16 @@ export default function StructurePage() {
   const saveDept = () => {
     if (!newName.trim() || !targetClinicId) return;
     
+    const headUser = availableHeads.find(u => u.id === newHeadId);
+    const headData = headUser ? { headId: headUser.id, headName: headUser.name } : { headId: undefined, headName: undefined };
+
     if (editingItem?.id) {
         // Редактирование
         setClinics(clinics.map(c => {
             if (c.id === targetClinicId) {
                 return {
                     ...c,
-                    departments: c.departments.map(d => d.id === editingItem.id ? { ...d, name: newName } : d)
+                    departments: c.departments.map(d => d.id === editingItem.id ? { ...d, name: newName, ...headData } : d)
                 };
             }
             return c;
@@ -154,7 +169,7 @@ export default function StructurePage() {
             if (c.id === targetClinicId) {
                 return {
                     ...c,
-                    departments: [...c.departments, { id: `dep_${Date.now()}`, name: newName }]
+                    departments: [...c.departments, { id: `dep_${Date.now()}`, name: newName, ...headData }]
                 };
             }
             return c;
@@ -175,14 +190,11 @@ export default function StructurePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       
       {/* --- ШАПКА + ПОИСК --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div>
                 <h1 className="text-2xl font-bold text-foreground">Структура</h1>
                 <p className="text-sm text-muted-foreground">Клиники, филиалы и отделения</p>
@@ -209,31 +221,38 @@ export default function StructurePage() {
       {/* --- СЕТКА КАРТОЧЕК (КЛИНИКИ) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
         {filteredData.map((clinic) => (
-            <Card key={clinic.id} className="flex flex-col overflow-hidden gap-0 p-0">
+            <Card key={clinic.id} className="flex flex-col overflow-hidden gap-0 p-0 border">
                 
                 {/* Заголовок карточки */}
-                <CardHeader className="bg-muted/50 border-b px-4 py-3">
+                <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
                     <div className="flex items-start justify-between">
                         <div className="space-y-1 overflow-hidden">
                             <div className="flex items-center gap-2">
                                 <CardTitle className="text-sm font-bold truncate" title={clinic.name}>
                                     {clinic.name}
                                 </CardTitle>
-                                <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border border-border">
+                                <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border ">
                                     {clinic.departments.length}
                                 </Badge>
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                {clinic.address}
+                            <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    {clinic.address}
+                                </div>
+                                {/* Руководитель Клиники */}
+                                <div className="flex items-center gap-1.5 text-xs text-primary/80 truncate font-medium">
+                                    <User className="h-3 w-3 shrink-0" />
+                                    {clinic.headName ? `Главврач: ${clinic.headName}` : <span className="text-muted-foreground italic font-normal">Нет руководителя</span>}
+                                </div>
                             </div>
                         </div>
 
                         {/* Меню действий */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-2">
-                                    <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-2 text-muted-foreground hover:text-foreground">
+                                    <MoreVertical className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -253,31 +272,37 @@ export default function StructurePage() {
 
                 {/* Список отделений */}
                 <CardContent className="p-0 flex-1">
-                    <div className="divide-y">
+                    <div className="divide-y divide-border/50">
                         {clinic.departments.length > 0 ? (
                             clinic.departments.map((dept) => (
-                                <div key={dept.id} className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-sm">
+                                <div key={dept.id} className="group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm">
                                     
                                     {/* Левая часть: Иконка + Текст */}
                                     <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
-                                        <div className="p-1.5 bg-muted rounded text-primary shrink-0">
+                                        <div className="p-1.5 text-info transition-colors">
                                             <Stethoscope className="h-3.5 w-3.5" />
                                         </div>
-                                        <span className="text-foreground truncate block w-full">
-                                            {dept.name}
-                                        </span>
+                                        <div className="min-w-0">
+                                            <span className="text-foreground font-medium truncate block w-full">
+                                                {dept.name}
+                                            </span>
+                                            {/* Руководитель Отделения */}
+                                            <span className="text-xs text-muted-foreground truncate block w-full opacity-80">
+                                                {dept.headName || "Руководитель не назначен"}
+                                            </span>
+                                        </div>
                                     </div>
                                     
                                     {/* Правая часть: Кнопки */}
                                     <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                         <Button 
-                                            variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                            variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
                                             onClick={() => openDeptModal(clinic.id, dept)}
                                         >
                                             <Pencil className="h-3.5 w-3.5" />
                                         </Button>
                                         <Button 
-                                            variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                            variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                             onClick={() => deleteDept(dept.id, clinic.id)}
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
@@ -293,12 +318,12 @@ export default function StructurePage() {
                     </div>
                 </CardContent>
 
-                {/* Кнопка "Добавить отделение" */}
+                {/* Кнопка "Добавить отделение" - Обновленный стиль (как в Classifier) */}
                 <div className="p-3 bg-muted/30 border-t">
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent"
+                        className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent transition-all"
                         onClick={() => openDeptModal(clinic.id)}
                     >
                         <Plus className="mr-2 h-3.5 w-3.5" />
@@ -344,6 +369,21 @@ export default function StructurePage() {
                         placeholder="ул. Ленина, 1" 
                     />
                 </div>
+                {/* Выбор руководителя */}
+                <div className="grid gap-2">
+                    <Label>Главный врач</Label>
+                    <Select value={newHeadId} onValueChange={setNewHeadId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Выберите руководителя" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">Не назначен</SelectItem>
+                            {availableHeads.map(u => (
+                                <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setIsClinicDialogOpen(false)}>Отмена</Button>
@@ -370,6 +410,21 @@ export default function StructurePage() {
                         placeholder="Хирургия" 
                         autoFocus
                     />
+                </div>
+                {/* Выбор руководителя */}
+                <div className="grid gap-2">
+                    <Label>Заведующий отделением</Label>
+                    <Select value={newHeadId} onValueChange={setNewHeadId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Выберите заведующего" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">Не назначен</SelectItem>
+                            {availableHeads.map(u => (
+                                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
             <DialogFooter>

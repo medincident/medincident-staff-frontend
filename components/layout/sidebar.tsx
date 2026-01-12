@@ -20,8 +20,8 @@ export function Sidebar() {
 
   const mainLinks = [
     { href: "/dashboard", label: "Главная", icon: LayoutDashboard },
-    { href: "/requests", label: "Заявки", icon: Wrench }, // <-- Новый пункт
     { href: "/events", label: "События", icon: AlertTriangle },
+    { href: "/requests", label: "Заявки", icon: Wrench },
     { href: "/reports", label: "Отчеты", icon: BarChart3 },
   ];
 
@@ -32,11 +32,11 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card h-screen sticky top-0 shadow-sm z-20 transition-colors duration-300">
+    <aside className="hidden md:flex w-64 flex-col border-r  bg-card h-screen sticky top-0 z-20 transition-colors duration-300">
       
       {/* Логотип */}
-      <div className="h-14 flex items-center px-6 border-b border-border">
-        <div className="h-7 w-7 bg-primary rounded-lg flex items-center justify-center mr-3 shadow-sm">
+      <div className="h-14 flex items-center px-6 border-b ">
+        <div className="h-7 w-7 bg-primary rounded-lg flex items-center justify-center mr-3">
             <Shield className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="font-bold text-lg text-foreground tracking-tight">MedSafety</span>
@@ -62,7 +62,7 @@ export function Sidebar() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all",
                     isActive
-                      ? "bg-primary/10 text-primary shadow-sm"
+                      ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
@@ -92,7 +92,7 @@ export function Sidebar() {
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all",
                       isActive
-                        ? "bg-warning/10 text-warning shadow-sm"
+                        ? "bg-warning/10 text-warning"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                   >
@@ -107,11 +107,11 @@ export function Sidebar() {
       </div>
 
       {/* ФУТЕР */}
-      <div className="p-4 text-center border-t border-border">
+      <div className="p-4 text-center border-t ">
         <p className="text-[10px] text-muted-foreground">
             MedSafety v1.0.0
             <br />
-            © 2025
+            © 2026
         </p>
       </div>
     </aside>

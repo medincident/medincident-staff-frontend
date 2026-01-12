@@ -11,36 +11,42 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend
+  Legend,
+  AreaChart,
+  Area
 } from "recharts";
 
-// Профессиональная палитра (спокойные цвета, подходящие под медицину/офис)
+// Профессиональная палитра
 const COLORS = [
-  "#2563eb", // blue-600
-  "#0891b2", // cyan-600
-  "#059669", // emerald-600
-  "#d97706", // amber-600
-  "#dc2626", // red-600
-  "#7c3aed", // violet-600
-  "#db2777", // pink-600
-  "#475569", // slate-600
+  "#3b82f6", // blue-500
+  "#10b981", // emerald-500
+  "#f59e0b", // amber-500
+  "#ef4444", // red-500
+  "#8b5cf6", // violet-500
+  "#ec4899", // pink-500
+  "#06b6d4", // cyan-500
+  "#64748b", // slate-500
 ];
 
-// Кастомный Тултип (Всплывашка) в стиле Shadcn
+// Цвет текста осей (Slate-400 - хорошо виден везде)
+const AXIS_COLOR = "#94a3b8"; 
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-popover border border-border text-popover-foreground shadow-lg rounded-lg p-3 min-w-[150px]">
+      <div className="bg-popover border border-border text-popover-foreground rounded-lg p-3 min-w-[150px]">
         <p className="text-sm font-semibold mb-1">{label}</p>
-        <div className="flex items-center gap-2">
-          <div 
-            className="w-2 h-2 rounded-full" 
-            style={{ backgroundColor: payload[0].fill }} 
-          />
-          <span className="text-sm font-bold">
-            {payload[0].value}
-          </span>
-        </div>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center gap-2">
+            <div 
+              className="w-2 h-2 rounded-full" 
+              style={{ backgroundColor: entry.fill || entry.color }} 
+            />
+            <span className="text-sm text-popover-foreground">
+              {entry.name}: <span className="font-bold">{entry.value}</span>
+            </span>
+          </div>
+        ))}
       </div>
     );
   }
@@ -48,97 +54,144 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 interface DynamicChartProps {
-  data: { name: string; value: number }[];
-  type: "bar" | "pie";
+  data: any[];
+  type: "bar" | "bar-vertical" | "pie" | "donut" | "area";
   title?: string;
   height?: number;
+  dataKey?: string;
+  categoryKey?: string;
+  color?: string;
 }
 
-export function DynamicChart({ data, type, title, height = 300 }: DynamicChartProps) {
-  // Заглушка, если данных нет
+export function DynamicChart({ 
+  data, 
+  type, 
+  title, 
+  height = 300,
+  dataKey = "value",
+  categoryKey = "name",
+  color
+}: DynamicChartProps) {
+
   if (!data || data.length === 0) {
     return (
       <div className="w-full flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-xl bg-muted/10" style={{ height }}>
-        <p className="text-muted-foreground text-sm font-medium">Нет данных для отображения</p>
+        <p className="text-muted-foreground text-sm font-medium">Нет данных</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full">
-      {/* Заголовок графика */}
+    <div className="w-full h-full">
       {title && (
         <h3 className="text-sm font-semibold mb-4 text-foreground tracking-tight">
           {title}
         </h3>
       )}
       
-      <div style={{ height }} className="w-full font-sans">
+      <div style={{ height }} className="w-full font-sans text-xs">
         <ResponsiveContainer width="100%" height="100%">
+          
+          {/* === 1. ГОРИЗОНТАЛЬНЫЕ СТОЛБЦЫ (BAR) === */}
           {type === "bar" ? (
-            // === ГРАФИК СТОЛБЦЫ (BAR) ===
             <BarChart 
               data={data} 
               layout="vertical" 
-              margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+              margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
             >
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                horizontal={false} // Убрали горизонтальные линии
-                vertical={true}    // Оставили вертикальные
-                stroke="#e5e7eb"   // Очень светлый серый
-                opacity={0.5}
-              />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#e2e8f0" opacity={0.2} />
+              <XAxis type="number" hide />
               <YAxis 
-                dataKey="name" 
+                dataKey={categoryKey} 
                 type="category" 
-                width={140} // Ширина под длинные названия
-                tick={{ fontSize: 11, fill: '#64748b' }} // Цвет текста slate-500
-                axisLine={false} // Убрали жирную ось
-                tickLine={false} // Убрали засечки
-                interval={0}     // Показывать все подписи
+                width={120} 
+                tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                axisLine={false} 
+                tickLine={false} 
+                interval={0}
               />
-              <XAxis 
-                type="number" 
-                hide // Скрыли нижнюю ось с цифрами (чистота)
-              />
-              <Tooltip 
-                cursor={{ fill: '#f1f5f9', opacity: 0.5 }} // Подсветка строки при наведении
-                content={<CustomTooltip />}
-              />
-              <Bar 
-                dataKey="value" 
-                barSize={24} // Толщина полоски
-                radius={[0, 6, 6, 0]} // Скругление концов
-              >
+              <Tooltip cursor={{ fill: 'currentColor', opacity: 0.1 }} content={<CustomTooltip />} />
+              <Bar dataKey={dataKey} barSize={20} radius={[0, 4, 4, 0]}>
                 {data.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={COLORS[index % COLORS.length]} 
-                    // Добавляем прозрачность при наведении (Recharts сам это не делает, но цвета подобраны)
-                  />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Bar>
             </BarChart>
+
+          /* === 2. ВЕРТИКАЛЬНЫЕ СТОЛБЦЫ (BAR-VERTICAL) === */
+          ) : type === "bar-vertical" ? (
+            <BarChart 
+              data={data} 
+              margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.2} />
+              <XAxis 
+                dataKey={categoryKey} 
+                tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                axisLine={false} 
+                tickLine={false}
+              />
+              <YAxis 
+                tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                axisLine={false} 
+                tickLine={false}
+              />
+              <Tooltip cursor={{ fill: 'currentColor', opacity: 0.1 }} content={<CustomTooltip />} />
+              <Bar dataKey={dataKey} barSize={32} radius={[4, 4, 0, 0]} fill={color || COLORS[0]} />
+            </BarChart>
+
+          /* === 3. ОБЛАСТЬ/ЛИНЕЙНЫЙ (AREA) === */
+          ) : type === "area" ? (
+            <AreaChart 
+              data={data} 
+              margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id={`color${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={color || COLORS[0]} stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor={color || COLORS[0]} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.2} />
+              <XAxis 
+                dataKey={categoryKey} 
+                tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                axisLine={false} 
+                tickLine={false}
+              />
+              <YAxis 
+                tick={{ fill: AXIS_COLOR, fontSize: 11 }}
+                axisLine={false} 
+                tickLine={false}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Area 
+                type="monotone" 
+                dataKey={dataKey} 
+                stroke={color || COLORS[0]} 
+                fillOpacity={1} 
+                fill={`url(#color${dataKey})`} 
+                strokeWidth={2}
+              />
+            </AreaChart>
+
+          /* === 4. КРУГОВЫЕ (PIE / DONUT) === */
           ) : (
-            // === ГРАФИК ПОНЧИК (DONUT/PIE) ===
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
-                cy="50%"
-                innerRadius={60} // Делает дырку внутри (Пончик)
-                outerRadius={85}
-                paddingAngle={4} // Отступы между кусками
-                cornerRadius={5} // Закругленные края кусков
-                dataKey="value"
-                stroke="none" // Убираем обводку
+                cy="44%"
+                innerRadius={type === "donut" ? 80 : 0} 
+                outerRadius={110} 
+                paddingAngle={type === "donut" ? 4 : 0}
+                cornerRadius={type === "donut" ? 4 : 0}
+                dataKey={dataKey}
+                nameKey={categoryKey}
+                stroke="none"
               >
                 {data.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={COLORS[index % COLORS.length]} 
-                  />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
@@ -147,7 +200,7 @@ export function DynamicChart({ data, type, title, height = 300 }: DynamicChartPr
                 height={36} 
                 iconType="circle" 
                 iconSize={8}
-                formatter={(value) => <span className="text-xs text-slate-600 ml-1">{value}</span>}
+                formatter={(value) => <span style={{ color: AXIS_COLOR }} className="text-xs ml-1">{value}</span>} 
               />
             </PieChart>
           )}

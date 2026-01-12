@@ -55,16 +55,24 @@ export function SearchableSelect({
   if (options.length <= threshold) {
     return (
       <Select disabled={disabled} value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-full bg-white">
+        <SelectTrigger 
+          className={cn(
+            "w-full bg-background text-foreground border-input transition-colors",
+            // Стили как у Input:
+            "hover:border-primary",
+            "focus:ring-0 focus:ring-offset-0 focus:border-primary",
+            !value && "text-muted-foreground"
+          )}
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-popover text-popover-foreground border-border">
           {options.length > 0 ? (
             options.map((option) => (
               <SelectItem
                 key={option.value}
                 value={option.value}
-                className="cursor-pointer"
+                className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
               >
                 {option.label}
               </SelectItem>
@@ -91,7 +99,10 @@ export function SearchableSelect({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            "w-full justify-between bg-white font-normal",
+            "w-full justify-between bg-background font-normal border-input transition-colors",
+            // Стили как у Input:
+            "hover:bg-background hover:text-foreground hover:border-primary", // Убрал серый фон при ховере, оставил рамку
+            "focus:ring-0 focus:ring-offset-0 focus:border-primary", // Убрал стандартное кольцо
             !value && "text-muted-foreground"
           )}
         >
@@ -100,34 +111,39 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent 
+        className="p-0 bg-popover border-border" 
+        align="start"
+        style={{ width: "var(--radix-popover-trigger-width)" }}
+      >
         <Command 
-             // Добавляем фильтр, чтобы поиск работал корректно даже с ID
              filter={(value, search) => {
                 if (value.toLowerCase().includes(search.toLowerCase())) return 1;
                 return 0;
              }}
+             className="bg-popover text-popover-foreground w-full"
         >
-          <CommandInput placeholder="Поиск..." />
+          {/* Убираем кольцо и у инпута поиска внутри */}
+          <CommandInput 
+            placeholder="Поиск..." 
+            className="h-9 border-none focus:ring-0" 
+          />
           <CommandList>
             <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label} // Поиск работает по Label (Русский текст)
-                  
-                  // ВАЖНО: Предотвращаем потерю фокуса при клике
+                  value={option.label} 
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                   }}
-                  
                   onSelect={() => {
-                    onChange(option.value); // Записываем ID
+                    onChange(option.value);
                     setOpen(false);
                   }}
-                  className="cursor-pointer"
+                  className="cursor-pointer aria-selected:bg-accent aria-selected:text-accent-foreground"
                 >
                   <Check
                     className={cn(

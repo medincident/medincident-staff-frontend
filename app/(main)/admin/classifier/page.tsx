@@ -144,9 +144,6 @@ export default function ClassifierPage() {
       {/* --- ШАПКА + ПОИСК --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div>
                 <h1 className="text-2xl font-bold text-foreground">Классификатор</h1>
                 <p className="text-sm text-muted-foreground">Управление справочником событий</p>
@@ -175,13 +172,13 @@ export default function ClassifierPage() {
         {filteredData.map((category) => (
             <Card key={category.id} className="flex flex-col overflow-hidden gap-0 p-0">
                 {/* Заголовок карточки (Категория) */}
-                <CardHeader className="bg-muted/50 border-b px-4 py-3 flex flex-row items-center justify-between space-y-0">
+                <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
                     <div className="flex items-center gap-2 overflow-hidden">
                         <Layers className="h-4 w-4 text-primary shrink-0" />
                         <CardTitle className="text-sm font-bold truncate" title={category.name}>
                             {category.name}
                         </CardTitle>
-                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border border-border">
+                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border ">
                             {category.types.length}
                         </Badge>
                     </div>
