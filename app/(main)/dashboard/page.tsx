@@ -92,7 +92,7 @@ export default function DashboardPage() {
   }, [classifier]);
 
   const activeEvents = events.filter(e => e.status !== 'closed' && e.status !== 'completed');
-  const criticalEvents = activeEvents.filter(e => e.severity === 'critical' || e.severity === 'severe');
+  const criticalEvents = activeEvents.filter(e => e.severity === 'critical');
   
   const recentEvents = events.slice(0, 3);
   const myActiveRequests = requests
