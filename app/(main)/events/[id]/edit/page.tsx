@@ -1,43 +1,67 @@
-import { notFound } from "next/navigation";
-import { EventForm } from "@/components/forms/event-form";
+"use client";
 
-// ЭТО ЗАГЛУШКА (MOCK). В реальности вы сделаете запрос к API/БД.
-// Функция должна вернуть данные в том формате, который ожидает форма (ID категорий, а не названия).
-const getEventById = (id: string) => {
-  // Пример: Если ID = evt_1, возвращаем заполненные данные
-  if (id === "evt_1") {
-    return {
-      id: "evt_1",
-      categoryId: "safety", // ID из вашего CLASSIFIER
-      typeId: "fall_patient", // ID из вашего CLASSIFIER
-      description: "Пациент упал при попытке встать с кровати. Медсестра оказала помощь.",
+import React, { useEffect, useState } from "react";
+
+import { Skeleton } from "@/components/ui/skeleton";
+import { EventForm } from "@/components/events/event-form"; 
+import { useToast } from "@/components/providers/toast-provider";
+
+export default function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
+  const toast = useToast();
+
+  const [initialData, setInitialData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch(`/api/events/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setInitialData(data);
+        } else {
+            toast.error("Ошибка", "Не удалось загрузить данные события");
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
+    fetchData();
+  }, [id, toast]);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto pb-20 space-y-6">
+        <div className="flex items-center gap-2 mb-6">
+            <Skeleton className="h-10 w-10 rounded-md" />
+            <Skeleton className="h-8 w-64" />
+        </div>
+
+        <div className="bg-card p-6 rounded-xl border space-y-6">
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-24 w-full" />
+            </div>
+            <Skeleton className="h-12 w-full mt-4" />
+        </div>
+      </div>
+    );
   }
-  
-  // Для теста возвращаем заглушку для любого ID
-  return {
-    id: id,
-    categoryId: "medication", 
-    typeId: "dosage_error",
-    description: "Тестовое описание для редактирования события " + id,
-  };
-};
 
-interface EditEventPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function EditEventPage({ params }: EditEventPageProps) {
-  // 1. Получаем данные
-  const eventData = getEventById(params.id);
-
-  // 2. Если событие не найдено — 404
-  if (!eventData) {
-    return notFound();
-  }
-
-  // 3. Рендерим форму с initialData
-  return <EventForm initialData={eventData} />;
+  return (
+    <EventForm initialData={initialData} />
+  );
 }

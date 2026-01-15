@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Save, Plus, Zap, Calendar, Siren } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Loader2, Save, Plus, Zap, Calendar, Siren, Link as LinkIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,19 +19,19 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-// Импорт компонента поиска
 import { SearchableSelect } from "@/components/ui/searchable-select";
-// 1. Импортируем хук уведомлений
 import { useToast } from "@/components/providers/toast-provider";
 
-// Типы услуг
+// Конфигурация типов работ (в реальном приложении может приходить с бэкенда)
 const SERVICE_TYPES = [
   { id: "plumbing", label: "Сантехника" },
   { id: "electric", label: "Электрика" },
-  { id: "it_support", label: "IT Поддержка" },
+  { id: "it_support", label: "IT Поддержка / Оргтехника" },
+  { id: "it_soft", label: "IT Программное обеспечение" },
   { id: "med_equipment", label: "Медтехника" },
-  { id: "furniture", label: "Мебель / Ремонт" },
+  { id: "furniture", label: "Мебель / Ремонт помещений" },
   { id: "cleaning", label: "Клининг / Дезинфекция" },
+  { id: "ventilation", label: "Вентиляция и кондиционирование" },
 ];
 
 const formSchema = z.object({
@@ -41,6 +41,7 @@ const formSchema = z.object({
     message: "Выберите приоритет",
   }),
   description: z.string().min(5, { message: "Опишите проблему (минимум 5 символов)" }),
+  linkedEventId: z.string().optional(),
 });
 
 type RequestFormValues = z.infer<typeof formSchema>;
@@ -51,10 +52,14 @@ interface RequestFormProps {
 
 export function RequestForm({ initialData }: RequestFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const linkedEventIdParam = searchParams.get("linkedEventId");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isEditMode = !!initialData;
+  // Стейт для хранения красивого кода события (INC-XXX)
+  const [linkedEventCode, setLinkedEventCode] = useState<string>("");
   
-  // 2. Инициализируем тост
+  const isEditMode = !!initialData;
   const toast = useToast();
 
   const form = useForm<RequestFormValues>({
@@ -62,34 +67,79 @@ export function RequestForm({ initialData }: RequestFormProps) {
     defaultValues: {
       type: initialData?.type || "",
       location: initialData?.location || "",
-      priority: initialData?.priority || "normal",
+      priority: (initialData?.priority as "normal" | "urgent" | "critical") || "normal",
       description: initialData?.description || "",
+      linkedEventId: initialData?.linkedEventId || linkedEventIdParam || "",
     },
   });
 
-  function onSubmit(values: RequestFormValues) {
-    setIsSubmitting(true);
-    console.log(isEditMode ? "Обновление заявки:" : "Создание заявки:", values);
-    
-    setTimeout(() => {
-      setIsSubmitting(false);
+  // Получаем текущее значение ID для отслеживания и отображения
+  const currentLinkedEventId = form.watch("linkedEventId");
 
-      // 3. Вызываем уведомление
+  // Эффект для загрузки кода события по его ID
+  useEffect(() => {
+    const fetchLinkedEventInfo = async () => {
+      if (!currentLinkedEventId) return;
+
+      try {
+        // Делаем запрос к API, чтобы получить детали события (нам нужен code)
+        const res = await fetch(`/api/events/${currentLinkedEventId}`);
+        if (res.ok) {
+          const data = await res.json();
+          // Если API вернул code, сохраняем его
+          if (data.code) {
+            setLinkedEventCode(data.code);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load linked event info", e);
+      }
+    };
+
+    fetchLinkedEventInfo();
+  }, [currentLinkedEventId]);
+
+  async function onSubmit(values: RequestFormValues) {
+    setIsSubmitting(true);
+    
+    try {
+      const url = isEditMode 
+        ? `/api/requests/${initialData?.id}`
+        : "/api/requests";
+      
+      const method = isEditMode ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) throw new Error("Failed to save request");
+
+      const data = await response.json();
+
       if (isEditMode) {
         toast.success(
             "Заявка обновлена", 
             `Заявка #${initialData?.id} успешно сохранена.`
         );
       } else {
-        const newId = Math.floor(Math.random() * 10000);
         toast.success(
             "Заявка создана", 
-            `Номер заявки #${newId}. Исполнители уведомлены.`
+            `Номер заявки #${data.number}. Исполнители уведомлены.`
         );
       }
 
       router.push("/requests"); 
-    }, 1000);
+      router.refresh();
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Ошибка", "Не удалось сохранить заявку.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -103,11 +153,35 @@ export function RequestForm({ initialData }: RequestFormProps) {
         </h1>
       </div>
 
-      <div className="bg-card p-6 rounded-xl border">
+      <div className="bg-card p-6 rounded-xl border space-y-6">
+        
+        {currentLinkedEventId && (
+            <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                <LinkIcon className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                <div>
+                    <h4 className="font-semibold text-warning text-sm">Привязка к событию</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                        Эта заявка создается для устранения последствий события 
+                        <span className="font-mono font-bold mx-1 text-foreground">
+                            {linkedEventCode}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
-            {/* Тип работ и Локация */}
+            {/* Скрытое поле для ID события */}
+            <FormField
+              control={form.control}
+              name="linkedEventId"
+              render={({ field }) => (
+                <input type="hidden" {...field} />
+              )}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                 control={form.control}
@@ -116,7 +190,6 @@ export function RequestForm({ initialData }: RequestFormProps) {
                     <FormItem>
                     <FormLabel>Тип работ</FormLabel>
                     <FormControl>
-                        {/* Используем SearchableSelect */}
                         <SearchableSelect
                             options={SERVICE_TYPES.map(t => ({ value: t.id, label: t.label }))}
                             value={field.value}
@@ -145,7 +218,6 @@ export function RequestForm({ initialData }: RequestFormProps) {
                 />
             </div>
 
-            {/* Приоритет */}
             <FormField
               control={form.control}
               name="priority"
@@ -158,7 +230,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
                       defaultValue={field.value}
                       className="grid grid-cols-1 md:grid-cols-3 gap-3"
                     >
-                      {/* --- NORMAL --- */}
+                      {/* Обычный */}
                       <FormItem className="space-y-0">
                         <FormControl>
                           <RadioGroupItem value="normal" className="peer sr-only" />
@@ -166,11 +238,11 @@ export function RequestForm({ initialData }: RequestFormProps) {
                         <FormLabel className="
                           flex flex-col md:flex-row items-center md:items-start gap-3 p-4 rounded-xl border-2 bg-card cursor-pointer transition-all
                           hover:bg-accent hover:border-accent-foreground/30
-                          peer-data-[state=checked]:border-blue-500 
-                          peer-data-[state=checked]:bg-blue-500/15
+                          peer-data-[state=checked]:border-info
+                          peer-data-[state=checked]:bg-info/15
                           group
                         ">
-                           <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                           <div className="h-10 w-10 rounded-full bg-info/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-info/20 text-info">
                              <Calendar className="h-5 w-5" />
                            </div>
                            <div className="space-y-1 text-center md:text-left">
@@ -180,7 +252,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
                         </FormLabel>
                       </FormItem>
 
-                      {/* --- URGENT --- */}
+                      {/* Срочный */}
                       <FormItem className="space-y-0">
                           <FormControl>
                           <RadioGroupItem value="urgent" className="peer sr-only" />
@@ -188,11 +260,11 @@ export function RequestForm({ initialData }: RequestFormProps) {
                         <FormLabel className="
                           flex flex-col md:flex-row items-center md:items-start gap-3 p-4 rounded-xl border-2 bg-card cursor-pointer transition-all
                           hover:bg-accent hover:border-accent-foreground/30
-                          peer-data-[state=checked]:border-orange-500 
-                          peer-data-[state=checked]:bg-orange-500/15
+                          peer-data-[state=checked]:border-warning
+                          peer-data-[state=checked]:bg-warning/15
                           group
                         ">
-                           <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-orange-500/20 text-orange-600 dark:text-orange-400">
+                           <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-warning/20 text-warning">
                              <Zap className="h-5 w-5 fill-current" />
                            </div>
                            <div className="space-y-1 text-center md:text-left">
@@ -202,7 +274,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
                         </FormLabel>
                       </FormItem>
 
-                      {/* --- CRITICAL --- */}
+                      {/* Критичный */}
                       <FormItem className="space-y-0">
                           <FormControl>
                           <RadioGroupItem value="critical" className="peer sr-only" />
@@ -214,7 +286,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
                           peer-data-[state=checked]:bg-destructive/15
                           group
                         ">
-                           <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-destructive/20 text-destructive dark:text-red-400">
+                           <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-destructive/20 text-destructive">
                              <Siren className="h-5 w-5" />
                            </div>
                            <div className="space-y-1 text-center md:text-left">
@@ -230,7 +302,6 @@ export function RequestForm({ initialData }: RequestFormProps) {
               )}
             />
 
-            {/* Описание */}
             <FormField
               control={form.control}
               name="description"

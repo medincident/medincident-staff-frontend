@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -9,43 +10,95 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-
-const FAQ_ITEMS = [
-  {
-    question: "Я выбрал неверную категорию при создании события. Что делать?",
-    answer: "Если статус события 'Зарегистрировано', вы можете его отредактировать. Если событие уже 'В работе', свяжитесь с Ответственным лицом или напишите в чат события."
-  },
-  {
-    question: "Как изменить свой пароль?",
-    answer: "Пароль меняется через настройки вашего профиля в Telegram или MAX, так как вход осуществляется через эти сервисы. В самой системе пароль менять не нужно."
-  },
-  {
-    question: "Кто видит мои сообщения о событиях?",
-    answer: "Ваше сообщение видит только Ответственное лицо по данной категории (например, Зав. отделением) и Администраторы системы. Анонимность гарантируется внутренними регламентами."
-  },
-  {
-    question: "Приложение не загружается или работает медленно.",
-    answer: "Попробуйте очистить кэш браузера или зайти через другую сеть (например, переключиться с Wi-Fi на мобильный интернет). Если проблема сохраняется, напишите в техподдержку."
-  },
-  {
-    question: "Как скачать отчет в Excel?",
-    answer: "Перейдите в раздел 'Отчеты' в меню навигации. В правом верхнем углу нажмите кнопку 'Excel', выберите период и дождитесь загрузки файла."
-  },
-];
+import { FaqItem } from "@/lib/types";
 
 export default function HelpPage() {
   const router = useRouter();
+  const [faqItems, setFaqItems] = useState<FaqItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFaq = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch("/api/settings/help");
+        if (res.ok) {
+          const data = await res.json();
+          setFaqItems(data);
+        }
+      } catch (error) {
+        console.error("Failed to load FAQ:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFaq();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 pb-20">
+        
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <div className="space-y-2">
+             <Skeleton className="h-8 w-32" />
+             <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+  
+        <div className="space-y-6">
+          
+          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+             <div className="p-6 pb-2">
+                <div className="flex items-center gap-3 mb-2">
+                   <Skeleton className="h-10 w-10 rounded-lg" />
+                   <Skeleton className="h-6 w-48" />
+                </div>
+                <Skeleton className="h-4 w-64 ml-14" />
+             </div>
+             <div className="p-6 pt-2">
+                <div className="space-y-6 mt-2">
+                   {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="border-b pb-4 last:border-0 last:pb-0">
+                         <Skeleton className="h-6 w-full max-w-lg mb-2" />
+                         <Skeleton className="h-4 w-full max-w-2xl" />
+                      </div>
+                   ))}
+                </div>
+             </div>
+          </div>
+  
+          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+             <div className="p-6">
+                <div className="flex items-center gap-3 mb-2">
+                   <Skeleton className="h-10 w-10 rounded-lg" />
+                   <Skeleton className="h-6 w-32" />
+                </div>
+                <Skeleton className="h-4 w-56 ml-14 mb-6" />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <Skeleton className="h-20 w-full rounded-md" />
+                   <Skeleton className="h-20 w-full rounded-md" />
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       
-      {/* Шапка */}
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
           <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -56,14 +109,11 @@ export default function HelpPage() {
         </div>
       </div>
 
-      {/* Основной контент */}
       <div className="space-y-6">
         
-        {/* FAQ */}
         <Card className="bg-card pb-2">
             <CardHeader>
                 <CardTitle className="flex items-center gap-3 text-lg text-foreground">
-                    {/* Иконка в едином стиле */}
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
                         <BookOpen className="h-5 w-5" />
                     </div>
@@ -75,7 +125,7 @@ export default function HelpPage() {
             </CardHeader>
             <CardContent>
                 <Accordion type="single" collapsible className="w-full">
-                    {FAQ_ITEMS.map((item, index) => (
+                    {faqItems.map((item, index) => (
                         <AccordionItem key={index} value={`item-${index}`} className="border-b last:border-0 border-border">
                             <AccordionTrigger className="text-left text-foreground hover:text-primary hover:no-underline transition-colors py-4">
                                 {item.question}
@@ -89,11 +139,9 @@ export default function HelpPage() {
             </CardContent>
         </Card>
 
-        {/* Регламенты */}
         <Card className="bg-card">
             <CardHeader>
                 <CardTitle className="text-lg text-foreground flex items-center gap-3">
-                    {/* Иконка в едином стиле */}
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
                         <FileText className="h-5 w-5" />
                     </div>
@@ -106,7 +154,6 @@ export default function HelpPage() {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 hover:border-primary/50 group border-border">
-                    {/* Иконка файла: серый квадрат (как в профиле) */}
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground mr-4 shrink-0 transition-colors group-hover:text-foreground">
                         <FileText className="h-5 w-5" />
                     </div>
@@ -117,7 +164,6 @@ export default function HelpPage() {
                 </Button>
 
                 <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 hover:border-primary/50 group border-border">
-                    {/* Иконка файла: серый квадрат (как в профиле) */}
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground mr-4 shrink-0 transition-colors group-hover:text-foreground">
                         <FileText className="h-5 w-5" />
                     </div>

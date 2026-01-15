@@ -1,96 +1,200 @@
-// --- РОЛИ И ПОЛЬЗОВАТЕЛИ ---
+// lib/types.ts
+
+// --- 1. РОЛИ ПОЛЬЗОВАТЕЛЕЙ (Строго по вашему списку) ---
 export type UserRole =
-  | "worker" // Работник
-  | "head_dept" // Руководитель отделения
-  | "head_clinic" // Зав. клиникой
-  | "admin_org" // Администратор организации
-  | "admin_system" // Админ системы
-  | "dispatcher_ns" // Диспетчер НС (Нежелательные события)
-  | "dispatcher_req" // Диспетчер Заявок
-  | "guest"; // Гость
+  | "admin_system" // 7. Админ системы (видит все техническое)
+  | "admin_org" // 6. Админ организации (видит все заявки/НС + аналитику)
+  | "head_clinic" // 5. Зав. клиникой (видит свое подразделение и вложенные)
+  | "head_dept" // 4. Руководитель (видит своих подчиненных)
+  | "dispatcher_ns" // 2. Диспетчер НС (принимает все НС)
+  | "dispatcher_req" // 1. Диспетчер заявок (принимает все заявки)
+  | "manager_ns" // 9. Ответственный за обработку НС (по направлениям)
+  | "manager_req" // 10. Ответственный по заявкам (по направлениям)
+  | "worker" // 3. Работник (отправляет и смотрит свои)
+  | "guest"; // 8. Гость (только статистика)
+
+export type UserStatus = "active" | "blocked" | "pending";
 
 export interface User {
   id: string;
   name: string;
+  email: string;
   role: UserRole;
-  departmentId: string;
-  clinicId: string;
-  isActing?: boolean; // Флаг И.О. (заместителя)
+  status: UserStatus;
+
+  // Привязка к структуре (для п. 3, 4, 5)
+  clinicId?: string;
+  departmentId?: string;
+
+  // Доп. данные
+  position?: string;
+  login?: string;
+  avatar?: string;
+
+  // --- ДЛЯ ПУНКТОВ 9 и 10 (МАТРИЦА ОТВЕТСТВЕННОСТИ) ---
+  // Массив ID категорий или типов, за которые отвечает пользователь.
+  // Например: ["plumbing", "electric"] или ["safety", "medication"]
+  responsibleCategories?: string[];
 }
 
-// --- ЗАЯВКИ (SERVICE REQUESTS) ---
+// --- СТРУКТУРА ОРГАНИЗАЦИИ ---
+export interface Department {
+  id: string;
+  name: string;
+  headId?: string; // ID руководителя (User.id с ролью head_dept)
+}
 
+export interface Clinic {
+  id: string;
+  name: string;
+  address: string;
+  departments: Department[];
+  headId?: string; // ID главврача (User.id с ролью head_clinic)
+}
+
+// --- СПРАВОЧНИКИ (КЛАССИФИКАТОР) ---
+export type EventType = {
+  id: string;
+  name: string;
+};
+
+export type Category = {
+  id: string;
+  name: string;
+  types: EventType[];
+};
+
+// --- ЗАЯВКИ (REQUESTS) ---
+// Типы заявок (можно расширять)
 export type ServiceType =
-  | "med_equip" // Медицинское оборудование
-  | "it_equip" // Компьютерное оборудование
-  | "energy" // Энергетическая и лифтовая служба
-  | "ventilation" // Вентиляция
-  | "plumbing" // Сантехники
-  | "housekeeping" // Хозяйственная служба
-  | "territory" // Служба содержания территории
-  | "buildings" // Служба эксплуатации зданий (ОКС)
-  | "control"; // Контрольно-инспекционный отдел
+  | "med_equip"
+  | "it_equip"
+  | "it_soft"
+  | "energy"
+  | "ventilation"
+  | "plumbing"
+  | "housekeeping"
+  | "territory"
+  | "buildings"
+  | "control"
+  | "medical_equip"
+  | "electric"
+  | string; // string позволяет добавлять новые без правки кода типов
 
 export type RequestStatus =
-  | "created" // Принята (автоматически)
-  | "processed" // Обработана
-  | "in_work" // В работе
-  | "purchase" // Закупка запчастей
+  | "created" // Новая (у диспетчера)
+  | "in_work" // В работе (назначена ответственному)
+  | "purchase" // Ожидание закупки
   | "completed" // Выполнена
-  | "refused" // Отказ
-  | "cancelled"; // Отмена
+  | "refused" // Отклонена
+  | "cancelled"; // Отменена автором
 
-export type Priority = "normal" | "urgent" | "critical";
+export type Priority = "normal" | "high" | "critical";
 
 export interface ServiceRequest {
   id: string;
-  number: number; // Человекочитаемый номер (напр. 1024)
+  number: number;
   type: ServiceType;
+  typeName?: string;
+
+  responsibleDept: string; // Название отдела (текстом или ID)
+  executorId?: string; // ID пользователя (manager_req), кто делает
+
   priority: Priority;
   status: RequestStatus;
   description: string;
-  location: string; // Кабинет/Место
-  authorId: string;
-  authorName: string;
-  departmentId: string; // Отделение-заказчик
+  location: string;
+
+  authorId?: string; // ID автора (User.id)
+  authorName: string; // Для удобства отображения
+
   createdAt: string; // ISO Date
-  linkedEventId?: string; // Связь с НС (если есть)
-  comments?: number; // Кол-во комментариев
+  completedAt?: string;
+
+  linkedEventId?: string; // Связь с НС
+  refusalReason?: string; // Причина отказа
 }
 
-// --- СПРАВОЧНИКИ (CONSTANTS) ---
-
-export const SERVICE_TYPES_MAP: Record<ServiceType, string> = {
-  med_equip: "Медицинское оборудование",
-  it_equip: "IT и Оргтехника",
-  energy: "Электрика и Лифты",
-  ventilation: "Вентиляция и Газы",
-  plumbing: "Сантехника и Отопление",
-  housekeeping: "Хозяйственная служба",
-  territory: "Содержание территории",
-  buildings: "Ремонт зданий (ОКС)",
-  control: "Контроль и инспекция",
-};
-
-export const PRIORITY_MAP: Record<Priority, string> = {
-  normal: "Нормальный",
-  urgent: "Срочный",
-  critical: "Критический",
-};
-
-export const STATUS_MAP: Record<RequestStatus, string> = {
-  created: "Принята",
-  processed: "Обработана",
-  in_work: "В работе",
-  purchase: "Закупка запчастей",
-  completed: "Выполнена",
-  refused: "Отказ",
-  cancelled: "Отмена",
-};
-
+// --- СОБЫТИЯ / ИНЦИДЕНТЫ (НС) ---
 export type EventSeverity =
   | "near_miss"
   | "minor"
   | "moderate"
   | "severe"
   | "critical";
+
+export type EventStatus =
+  | "created" // Новое (у диспетчера)
+  | "in_work" // В работе (назначено ответственному)
+  | "investigation" // Расследование
+  | "measures" // Меры приняты
+  | "completed" // Завершено
+  | "closed"; // Закрыто
+
+export interface IncidentEvent {
+  id: string;
+  code: string; // Например INC-001
+
+  categoryId: string; // ID категории из справочника
+  categoryName?: string;
+
+  typeId?: string; // ID типа из справочника
+  typeName?: string;
+
+  description?: string;
+
+  status: EventStatus;
+  severity: EventSeverity;
+
+  authorId?: string; // ID автора
+  author: string; // Имя автора
+
+  responsibleId?: string; // ID пользователя (manager_ns), кто обрабатывает
+
+  createdAt: string; // ISO String
+}
+
+// --- УВЕДОМЛЕНИЯ ---
+export interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  priority: "high" | "normal";
+  date: string;
+}
+
+export type NotificationType = "info" | "success" | "warning" | "error";
+
+export interface Notification {
+  id: number;
+  title: string;
+  desc: string;
+  time: string;
+  type: NotificationType;
+  date: string;
+  read: boolean;
+  userId?: string; // Кому предназначено (если personal)
+}
+
+// --- ДАШБОРД (ДЛЯ АДМИНОВ И ГОСТЕЙ) ---
+export interface DashboardStats {
+  kpi: {
+    totalRequests: number;
+    activeRequests: number;
+    totalEvents: number;
+    criticalEvents: number;
+  };
+  charts: {
+    requestsByStatus: { name: string; value: number }[];
+    requestsByCategory: { name: string; value: number }[];
+    requestsByPriority: { name: string; value: number }[];
+    eventsBySeverity: { name: string; value: number }[];
+    eventsByCategory: { name: string; value: number }[];
+    yearlyTrend: { name: string; requests: number }[];
+  };
+  performance: {
+    closedOnTime: string;
+    avgReactionTime: string;
+    bestDepartment: string;
+  };
+}

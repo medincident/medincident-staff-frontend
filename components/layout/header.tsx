@@ -1,18 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
-  Bell, 
-  User, 
-  Settings, 
-  LogOut, 
-  Check,
-  Info,
-  AlertTriangle,
-  CheckCheck,
-  Shield
+  Bell, User as UserIcon, Settings, LogOut, Check, Info, AlertTriangle, CheckCheck, Shield, Loader2
 } from "lucide-react";
 
 import {
@@ -25,40 +17,88 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { User, Notification } from "@/lib/types";
+import { getIconColor } from "@/lib/status-helper";
+
+const NOTIFICATION_ICONS: Record<string, any> = {
+  info: Info,
+  warning: AlertTriangle,
+  error: Shield,
+  success: Check,
+  default: Info
+};
 
 export function Header() {
   const router = useRouter();
-  const [unreadCount, setUnreadCount] = useState(3);
+  
+  const [user, setUser] = useState<User | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const user = {
-    name: "Иванов И.И.",
-    avatar: "ИИ"
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const getUserInitials = (name: string) => {
+    if (!name) return "U";
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
   };
 
-  const notifications = [
-    { id: 1, title: "Новое событие", desc: "Назначено ответственное лицо", time: "5 мин назад", icon: Info, color: "text-blue-500" },
-    { id: 2, title: "Сбой системы", desc: "Не удалось отправить отчет", time: "1 час назад", icon: AlertTriangle, color: "text-warning" },
-    { id: 3, title: "Статус обновлен", desc: "Событие #123 закрыто", time: "2 часа назад", icon: Check, color: "text-success" },
-  ];
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [userRes, notifRes] = await Promise.all([
+            fetch("/api/user/me"),
+            fetch("/api/notifications") // Предполагаем, что этот роут существует
+        ]);
+
+        if (userRes.ok) {
+            const userData = await userRes.json();
+            setUser(userData);
+        }
+        
+        if (notifRes.ok) {
+            setNotifications(await notifRes.json());
+        }
+      } catch (error) {
+        console.error("Header data load failed", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleMarkAllRead = async (e: React.MouseEvent) => {
+    e.preventDefault(); 
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+        // Здесь был бы реальный вызов API
+        // await fetch("/api/notifications/read-all", { method: "POST" });
+    } catch (error) {
+        console.error("Failed to mark read on server");
+    }
+  };
 
   const handleLogout = () => {
+    // Очистка кук/токенов
     router.push("/login");
   };
 
   return (
     <header className="bg-card border-b sticky top-0 z-30 h-14 px-4 flex justify-between items-center transition-colors duration-300">
       
-      {/* ЛЕВАЯ ЧАСТЬ: Логотип (только на мобилках) и Название */}
+      {/* ЛОГОТИП / НАЗВАНИЕ */}
       <div className="flex items-center gap-3">
-        {/* Логотип виден только до md (пока нет сайдбара) */}
         <div className="flex md:hidden items-center gap-2">
           <div className="h-7 w-7 bg-primary rounded-lg flex items-center justify-center">
             <Shield className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="font-bold text-base text-foreground tracking-tight">MedSafety</span>
         </div>
-        
-        {/* Заголовок виден на десктопе, когда сайдбар уже есть */}
         <h2 className="hidden md:block text-sm font-semibold text-muted-foreground">
           Система мониторинга НС
         </h2>
@@ -71,12 +111,12 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
               <Bell size={20} />
-              {unreadCount > 0 && (
+              {unreadCount > 0 && !isLoading && (
                 <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full border-2 border-card" />
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80 p-0 bg-card border-border">
+          <DropdownMenuContent align="end" className="w-80 p-0 bg-card border-border shadow-xl">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <span className="font-semibold text-sm text-foreground">Уведомления</span>
                 {unreadCount > 0 && (
@@ -84,7 +124,7 @@ export function Header() {
                         variant="ghost" 
                         size="sm" 
                         className="h-auto py-1 px-2 text-[10px] text-primary hover:bg-primary/10"
-                        onClick={() => setUnreadCount(0)}
+                        onClick={handleMarkAllRead}
                     >
                         <CheckCheck className="w-3 h-3 mr-1" />
                         Пометить все
@@ -93,68 +133,87 @@ export function Header() {
             </div>
 
             <div className="max-h-[300px] overflow-y-auto">
-                {notifications.map((note) => (
-                    <DropdownMenuItem key={note.id} className="flex items-start gap-3 p-3 cursor-pointer focus:bg-muted/50 border-b border-border/50 last:border-0">
-                        <div className={`mt-1 shrink-0 ${note.color}`}>
-                            <note.icon size={16} />
-                        </div>
-                        <div className="flex-1 space-y-1">
-                            <div className="flex justify-between items-start">
-                                <p className="text-sm font-medium leading-none text-foreground">{note.title}</p>
-                                {unreadCount > 0 && note.id === 1 && (
-                                    <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0" />
-                                )}
-                            </div>
-                            <p className="text-xs text-muted-foreground line-clamp-2">{note.desc}</p>
-                            <p className="text-[10px] text-muted-foreground/60">{note.time}</p>
-                        </div>
-                    </DropdownMenuItem>
-                ))}
+                {isLoading ? (
+                    <div className="p-4 flex justify-center"><Loader2 className="animate-spin h-5 w-5 text-muted-foreground" /></div>
+                ) : notifications.length > 0 ? (
+                    notifications.slice(0, 3).map((note) => {
+                        const Icon = NOTIFICATION_ICONS[note.type] || NOTIFICATION_ICONS.default;
+                        const iconColorClass = getIconColor(note.type);
+
+                        return (
+                            <DropdownMenuItem key={note.id} className="flex items-start gap-3 p-3 cursor-pointer focus:bg-muted/50 border-b border-border/50 last:border-0">
+                                <div className={`mt-1 shrink-0 ${iconColorClass}`}>
+                                    <Icon size={16} />
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-sm font-medium leading-none text-foreground">{note.title}</p>
+                                        {!note.read && (
+                                            <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0" />
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{note.desc}</p>
+                                    <p className="text-[10px] text-muted-foreground/60">{note.time}</p>
+                                </div>
+                            </DropdownMenuItem>
+                        );
+                    })
+                ) : (
+                    <div className="p-4 text-center text-xs text-muted-foreground">Нет новых уведомлений</div>
+                )}
             </div>
             <div className="p-2 border-t border-border text-center">
                 <Link href="/notifications" className="text-xs font-medium text-primary hover:underline">
-                    Показать все уведомления
+                    Показать все
                 </Link>
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
         
-        {/* --- МЕНЮ ПОЛЬЗОВАТЕЛЯ --- */}
+        {/* --- ПОЛЬЗОВАТЕЛЬ --- */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-muted">
+            <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-muted transition-colors">
                 <Avatar className="h-8 w-8 border border-border">
                     <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
-                        {user.avatar}
+                        {isLoading 
+                            ? <Loader2 className="h-3 w-3 animate-spin" /> 
+                            : (getUserInitials(user?.name || ""))
+                        }
                     </AvatarFallback>
                 </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-card border-border">
+          <DropdownMenuContent align="end" className="w-56 bg-card border-border shadow-xl">
             <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none text-foreground">{user.name}</p>
-                    <p className="text-xs leading-none text-muted-foreground">ivanov.i@hospital.ru</p>
+                    {isLoading ? (
+                        <div className="space-y-2">
+                            <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+                            <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+                        </div>
+                    ) : (
+                        <>
+                            <p className="text-sm font-medium leading-none text-foreground">{user?.name}</p>
+                            <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email}</p>
+                        </>
+                    )}
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            
             <Link href="/profile">
                 <DropdownMenuItem className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
+                    <UserIcon className="mr-2 h-4 w-4" />
                     <span>Профиль</span>
                 </DropdownMenuItem>
             </Link>
-            
-            <Link href="/settings">
+            <Link href="/profile/settings">
                 <DropdownMenuItem className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Настройки</span>
                 </DropdownMenuItem>
             </Link>
-            
             <DropdownMenuSeparator />
-            
             <DropdownMenuItem 
                 className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
                 onClick={handleLogout}

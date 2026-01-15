@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { 
   TrendingUp, 
   Download, 
@@ -7,104 +8,96 @@ import {
   Wrench, 
   FileText,
   Users,
-  Activity,
-  MapPin
+  Activity
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Компонент графика
 import { DynamicChart } from "@/components/charts/dynamic-chart";
-
-// Моки и типы
-import { 
-  MOCK_REQUESTS, 
-  MOCK_EVENTS, 
-  SEVERITY_MAP, 
-  SERVICE_TYPES_MAP, 
-  STATUS_MAP 
-} from "@/lib/mock-data";
+import { EVENT_SEVERITY_MAP } from "@/lib/constants";
+import { DashboardStats } from "@/lib/types";
+import { enrichChartData } from "@/lib/status-helper";
 
 export default function ReportsPage() {
-  
-  // --- АГРЕГАЦИЯ ДАННЫХ ---
-  const requestsByStatus = Object.values(
-    MOCK_REQUESTS.reduce((acc: any, curr) => {
-      const label = STATUS_MAP[curr.status] || curr.status;
-      acc[curr.status] = acc[curr.status] || { name: label, value: 0 };
-      acc[curr.status].value += 1;
-      return acc;
-    }, {})
-  ) as { name: string; value: number }[];
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const requestsByCategory = Object.values(
-    MOCK_REQUESTS.reduce((acc: any, curr) => {
-      const label = SERVICE_TYPES_MAP[curr.type] || curr.type;
-      acc[label] = acc[label] || { name: label, value: 0 };
-      acc[label].value += 1;
-      return acc;
-    }, {})
-  ) as { name: string; value: number }[];
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch("/api/reports/stats");
+        if (res.ok) {
+          const rawData = await res.json();
+          
+          const enrichedStats = {
+            ...rawData,
+            charts: {
+                ...rawData.charts,
+                requestsByStatus: enrichChartData(rawData.charts.requestsByStatus),
+                eventsBySeverity: enrichChartData(rawData.charts.eventsBySeverity),
+                requestsByCategory: enrichChartData(rawData.charts.requestsByCategory), 
+            }
+          };
+          
+          setStats(enrichedStats);
+        }
+      } catch (error) {
+        console.error("Failed to load stats:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const priorityMap: Record<string, string> = {
-    normal: "Обычный",
-    urgent: "Срочный",
-    critical: "Аварийный"
-  };
-  const requestsByPriority = Object.values(
-    MOCK_REQUESTS.reduce((acc: any, curr) => {
-      const label = priorityMap[curr.priority] || curr.priority;
-      acc[curr.priority] = acc[curr.priority] || { name: label, value: 0 };
-      acc[curr.priority].value += 1;
-      return acc;
-    }, {})
-  ).sort((a: any, b: any) => b.value - a.value) as { name: string; value: number }[];
+    fetchStats();
+  }, []);
 
-  const eventsBySeverity = Object.values(
-    MOCK_EVENTS.reduce((acc: any, curr) => {
-      const label = SEVERITY_MAP[curr.severity] || curr.severity;
-      acc[label] = acc[label] || { name: label, value: 0 };
-      acc[label].value += 1;
-      return acc;
-    }, {})
-  ) as { name: string; value: number }[];
+  // --- SKELETON LOADING VIEW ---
+  if (isLoading || !stats) {
+    return (
+      <div className="space-y-6 pb-20 overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+        </div>
 
-  const eventsByCategory = Object.values(
-    MOCK_EVENTS.reduce((acc: any, curr) => {
-      const label = curr.category;
-      acc[label] = acc[label] || { name: label, value: 0 };
-      acc[label].value += 1;
-      return acc;
-    }, {})
-  ) as { name: string; value: number }[];
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 space-y-2">
+                    <div className="flex justify-between items-start">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-4 rounded-full" />
+                    </div>
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-3 w-20" />
+                </div>
+            ))}
+        </div>
 
-  const yearlyTrendData = [
-    { name: 'Янв', requests: 45, events: 2 },
-    { name: 'Фев', requests: 52, events: 3 },
-    { name: 'Мар', requests: 48, events: 1 },
-    { name: 'Апр', requests: 61, events: 4 },
-    { name: 'Май', requests: 55, events: 2 },
-    { name: 'Июн', requests: 67, events: 5 },
-    { name: 'Июл', requests: 72, events: 3 },
-    { name: 'Авг', requests: 65, events: 1 },
-    { name: 'Сен', requests: 80, events: 6 },
-    { name: 'Окт', requests: 85, events: 4 },
-    { name: 'Ноя', requests: 92, events: 2 },
-    { name: 'Дек', requests: 105, events: 8 },
-  ];
+        <Separator />
 
-  const totalRequests = MOCK_REQUESTS.length;
-  const activeRequests = MOCK_REQUESTS.filter(r => r.status === 'in_work' || r.status === 'created').length;
-  const totalEvents = MOCK_EVENTS.length;
-  const criticalEvents = MOCK_EVENTS.filter(e => e.severity === 'critical' || e.severity === 'severe').length;
+        <div className="space-y-6">
+            <Skeleton className="h-10 w-full md:w-[400px] rounded-lg" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Skeleton className="h-[400px] w-full rounded-xl" />
+                <Skeleton className="h-[400px] w-full rounded-xl" />
+            </div>
+        </div>
+      </div>
+    );
+  }
 
+  // --- MAIN ANALYTICS VIEW ---
   return (
     <div className="space-y-6 pb-20 overflow-x-hidden">
       
-      {/* Заголовок */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-2xl font-bold">Отчеты и Аналитика</h1>
@@ -118,68 +111,67 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards Section */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard 
           title="Всего заявок" 
-          value={totalRequests} 
+          value={stats.kpi.totalRequests} 
           trend="+12% за месяц" 
           icon={FileText} 
         />
         <KPICard 
           title="Активные ремонты" 
-          value={activeRequests} 
+          value={stats.kpi.activeRequests} 
           trend="Текущая нагрузка" 
           icon={Wrench} 
-          // ИСПРАВЛЕНО: text-info вместо text-info-foreground
-          className="bg-info/10 border-info/20 text-info dark:text-info"
+          className="bg-info/10 border-info/20 text-info"
           iconColor="text-info"
         />
         <KPICard 
           title="Инциденты (НС)" 
-          value={totalEvents} 
+          value={stats.kpi.totalEvents} 
           trend="Всего за период" 
           icon={AlertTriangle} 
-          className="bg-warning/10 border-warning/20 text-warning dark:text-warning"
-          iconColor="text-amber-600 dark:text-amber-400"
+          className="bg-warning/10 border-warning/20 text-warning"
+          iconColor="text-warning"
         />
         <KPICard 
           title="Критические НС" 
-          value={criticalEvents} 
+          value={stats.kpi.criticalEvents} 
           trend="Требуют разбора" 
           icon={TrendingUp} 
-          // ИСПРАВЛЕНО: text-destructive вместо text-destructive-foreground
-          className="bg-destructive/10 border-destructive/20 text-destructive dark:text-destructive"
+          className="bg-destructive/10 border-destructive/20 text-destructive"
           iconColor="text-destructive"
         />
       </div>
 
       <Separator />
 
-      {/* Табы */}
+      {/* Analytics Tabs */}
       <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted rounded-lg md:w-[600px] border">
+        <TabsList className="grid w-full grid-cols-3 h-auto min-h-12 p-1 bg-muted rounded-lg md:w-150 border">
           <TabsTrigger 
             value="requests" 
-            className="text-xs sm:text-sm py-2 data-[state=active]:bg-background"
+            className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight data-[state=active]:shadow-sm"
           >
             Заявки
           </TabsTrigger>
+          
           <TabsTrigger 
             value="safety" 
-            className="text-xs sm:text-sm py-2 whitespace-normal leading-tight px-1 data-[state=active]:bg-background"
+            className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight data-[state=active]:shadow-sm"
           >
             Нежелательные события
           </TabsTrigger>
+          
           <TabsTrigger 
             value="summary" 
-            className="text-xs sm:text-sm py-2 data-[state=active]:bg-background"
+            className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight data-[state=active]:shadow-sm"
           >
             Сводка
           </TabsTrigger>
         </TabsList>
 
-        {/* --- 1. ВКЛАДКА ЗАЯВКИ --- */}
         <TabsContent value="requests" className="space-y-6 mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="shadow-none">
@@ -188,7 +180,7 @@ export default function ReportsPage() {
                 <CardDescription>Воронка обработки</CardDescription>
               </CardHeader>
               <CardContent>
-                <DynamicChart type="donut" data={requestsByStatus} height={300} />
+                <DynamicChart type="donut" data={stats.charts.requestsByStatus} height={300} />
               </CardContent>
             </Card>
 
@@ -198,7 +190,12 @@ export default function ReportsPage() {
                 <CardDescription>Нагрузка на отделы</CardDescription>
               </CardHeader>
               <CardContent>
-                <DynamicChart type="bar" data={requestsByCategory} height={300} />
+                <DynamicChart 
+                    type="bar" 
+                    data={stats.charts.requestsByCategory} 
+                    height={300} 
+                    color="hsl(var(--primary))"
+                />
               </CardContent>
             </Card>
           </div>
@@ -211,15 +208,14 @@ export default function ReportsPage() {
             <CardContent>
               <DynamicChart 
                 type="bar-vertical" 
-                data={requestsByPriority} 
+                data={stats.charts.requestsByPriority} 
                 height={300} 
-                color="#3b82f6" 
+                color="hsl(var(--info))"
               />
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* --- 2. ВКЛАДКА БЕЗОПАСНОСТЬ --- */}
         <TabsContent value="safety" className="space-y-6 mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="shadow-none">
@@ -228,7 +224,7 @@ export default function ReportsPage() {
                 <CardDescription>Классификация рисков</CardDescription>
               </CardHeader>
               <CardContent>
-                <DynamicChart type="pie" data={eventsBySeverity} height={300} />
+                <DynamicChart type="pie" data={stats.charts.eventsBySeverity} height={300} />
               </CardContent>
             </Card>
 
@@ -240,45 +236,24 @@ export default function ReportsPage() {
               <CardContent>
                 <DynamicChart 
                   type="bar-vertical" 
-                  data={eventsByCategory} 
+                  data={stats.charts.eventsByCategory} 
                   height={300} 
-                  color="#f59e0b" 
+                  color="hsl(var(--warning))"
                 />
               </CardContent>
             </Card>
 
-            {/* Журнал критических */}
-            <Card className="lg:col-span-2 border-l-4 border-l-destructive">
+            <Card className="lg:col-span-2 border-l-4 border-l-destructive shadow-none">
               <CardHeader>
-                 <CardTitle className="text-base text-destructive flex items-center gap-2">
+                  <CardTitle className="text-base text-destructive flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
                     Последние критические инциденты
-                 </CardTitle>
+                  </CardTitle>
               </CardHeader>
-              <CardContent>
-                 {MOCK_EVENTS.filter(e => e.severity === 'critical' || e.severity === 'severe').length > 0 ? (
-                   <div className="space-y-2">
-                     {MOCK_EVENTS.filter(e => e.severity === 'critical' || e.severity === 'severe').slice(0, 3).map(evt => (
-                       <div key={evt.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 border rounded-md bg-muted/20">
-                         <div>
-                           <div className="font-medium text-sm">{evt.description}</div>
-                           <div className="text-xs text-muted-foreground">{evt.location} • {new Date(evt.createdAt).toLocaleDateString()}</div>
-                         </div>
-                         <div className="self-start sm:self-center px-2 py-1 rounded text-xs font-bold bg-destructive/15 text-destructive border border-destructive/20 whitespace-nowrap">
-                           {SEVERITY_MAP[evt.severity]}
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                 ) : (
-                   <div className="text-center py-4 text-muted-foreground">Критических инцидентов нет</div>
-                 )}
-              </CardContent>
             </Card>
           </div>
         </TabsContent>
         
-        {/* --- 3. ВКЛАДКА СВОДКА --- */}
         <TabsContent value="summary" className="mt-4">
            <Card className="shadow-none">
              <CardHeader>
@@ -293,46 +268,43 @@ export default function ReportsPage() {
                <div className="h-[300px] w-full">
                   <DynamicChart 
                     type="area" 
-                    data={yearlyTrendData} 
+                    data={stats.charts.yearlyTrend} 
                     dataKey="requests" 
                     categoryKey="name"
-                    color="#3b82f6"
+                    color="hsl(var(--primary))"
                     height={300}
                   />
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <SummaryStat 
-                    val="98%" 
+                    val={stats.performance.closedOnTime} 
                     label="Заявок закрыто в срок" 
                     className="bg-success/10 text-success border border-success/20"
                   />
                   <SummaryStat 
-                    val="2.4 ч" 
+                    val={stats.performance.avgReactionTime} 
                     label="Среднее время реакции" 
                     className="bg-info/10 text-info border border-info/20"
                   />
                   <SummaryStat 
-                    val="Top 1" 
-                    label="Лучший сотрудник: Иванов И.И." 
-                    className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                    val={stats.performance.bestDepartment}
+                    label="Самый эффективный отдел"
+                    className="bg-purple/10 text-purple border border-purple/20"
                     icon={Users}
                   />
-               </div>
+                </div>
              </CardContent>
            </Card>
         </TabsContent>
-
       </Tabs>
     </div>
   );
 }
 
-// --- ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ---
-
 function KPICard({ title, value, trend, icon: Icon, className, iconColor }: any) {
   return (
-    <Card className={`shadow-none ${className || ""}`}>
+    <Card className={`shadow-none border rounded-xl overflow-hidden transition-all hover:bg-accent/5 ${className || ""}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium line-clamp-1">{title}</CardTitle>
         <Icon className={`h-4 w-4 text-muted-foreground ${iconColor || ""}`} />
@@ -347,10 +319,10 @@ function KPICard({ title, value, trend, icon: Icon, className, iconColor }: any)
 
 function SummaryStat({ val, label, className, icon: Icon }: any) {
     return (
-        <div className={`p-4 rounded-lg flex flex-col items-center justify-center text-center ${className}`}>
+        <div className={`p-4 rounded-xl flex flex-col items-center justify-center text-center ${className}`}>
             {Icon && <Icon className="h-5 w-5 mb-2 opacity-70" />}
             <div className="text-3xl font-bold">{val}</div>
-            <div className="text-xs uppercase font-bold mt-1 opacity-80">{label}</div>
+            <div className="text-[10px] uppercase font-bold mt-1 tracking-wider opacity-80">{label}</div>
         </div>
     )
 }

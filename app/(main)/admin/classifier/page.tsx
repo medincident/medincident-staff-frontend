@@ -1,9 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
 import { 
-  ArrowLeft, 
   Plus, 
   Pencil, 
   Trash2, 
@@ -18,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -32,38 +31,65 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// Данные
-import { CLASSIFIER, Category, EventType } from "@/lib/classifier";
+import { useToast } from "@/components/providers/toast-provider";
+import { Category, EventType } from "@/lib/types";
 
 export default function ClassifierPage() {
-  const router = useRouter();
-  const [data, setData] = useState<Category[]>(CLASSIFIER);
+  const toast = useToast();
+  
+  const [data, setData] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  // Состояния диалогов
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   
-  // Состояние редактирования
   const [editingItem, setEditingItem] = useState<{ id: string, name: string } | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
 
-  // --- УМНЫЙ ПОИСК ---
-  // Фильтруем категории и типы "на лету"
+  useEffect(() => {
+    fetchClassifier();
+  }, []);
+
+  const fetchClassifier = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch("/api/admin/classifier");
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+      }
+    } catch (error) {
+      toast.error("Ошибка", "Не удалось загрузить классификатор");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const syncWithServer = async (newData: Category[]) => {
+    setData(newData); 
+    
+    try {
+        await fetch("/api/admin/classifier", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newData)
+        });
+        toast.success("Сохранено", "Изменения успешно применены");
+    } catch (e) {
+        toast.error("Ошибка", "Не удалось сохранить изменения");
+        fetchClassifier();
+    }
+  };
+
   const filteredData = useMemo(() => {
     if (!search) return data;
     const lowerSearch = search.toLowerCase();
 
     return data.map(cat => {
-      // Если имя категории совпадает - показываем её полностью
       if (cat.name.toLowerCase().includes(lowerSearch)) return cat;
-
-      // Иначе ищем совпадения внутри типов
       const matchingTypes = cat.types.filter(t => t.name.toLowerCase().includes(lowerSearch));
-      
-      // Если нашли типы - возвращаем категорию только с ними
       if (matchingTypes.length > 0) {
         return { ...cat, types: matchingTypes };
       }
@@ -71,10 +97,6 @@ export default function ClassifierPage() {
     }).filter(Boolean) as Category[];
   }, [data, search]);
 
-
-  // --- ЛОГИКА (CRUD) ---
-
-  // 1. Категории
   const openCategoryModal = (cat?: Category) => {
     setEditingItem(cat ? { id: cat.id, name: cat.name } : null);
     setNewItemName(cat ? cat.name : "");
@@ -83,22 +105,26 @@ export default function ClassifierPage() {
 
   const saveCategory = () => {
     if (!newItemName.trim()) return;
+    
+    let newData;
     if (editingItem) {
-      setData(data.map(c => c.id === editingItem.id ? { ...c, name: newItemName } : c));
+      newData = data.map(c => c.id === editingItem.id ? { ...c, name: newItemName } : c);
     } else {
       const newCat: Category = { id: `cat_${Date.now()}`, name: newItemName, types: [] };
-      setData([...data, newCat]);
+      newData = [...data, newCat];
     }
+    
+    syncWithServer(newData);
     setIsCategoryDialogOpen(false);
   };
 
   const deleteCategory = (id: string) => {
     if (confirm("Удалить категорию и все вложенные типы?")) {
-        setData(data.filter(c => c.id !== id));
+        const newData = data.filter(c => c.id !== id);
+        syncWithServer(newData);
     }
   };
 
-  // 2. Типы
   const openTypeModal = (categoryId: string, type?: EventType) => {
     setTargetCategoryId(categoryId);
     setEditingItem(type ? { id: type.id, name: type.name } : null);
@@ -108,40 +134,77 @@ export default function ClassifierPage() {
 
   const saveType = () => {
     if (!newItemName.trim() || !targetCategoryId) return;
+    
+    let newData;
     if (editingItem) {
-        setData(data.map(cat => {
+        newData = data.map(cat => {
             if (cat.id === targetCategoryId) {
                 return { ...cat, types: cat.types.map(t => t.id === editingItem.id ? { ...t, name: newItemName } : t) };
             }
             return cat;
-        }));
+        });
     } else {
         const newType: EventType = { id: `type_${Date.now()}`, name: newItemName };
-        setData(data.map(cat => {
+        newData = data.map(cat => {
             if (cat.id === targetCategoryId) {
                 return { ...cat, types: [...cat.types, newType] };
             }
             return cat;
-        }));
+        });
     }
+    
+    syncWithServer(newData);
     setIsTypeDialogOpen(false);
   };
 
   const deleteType = (typeId: string, categoryId: string) => {
     if (confirm("Удалить этот тип события?")) {
-        setData(data.map(cat => {
+        const newData = data.map(cat => {
             if (cat.id === categoryId) {
                 return { ...cat, types: cat.types.filter(t => t.id !== typeId) };
             }
             return cat;
-        }));
+        });
+        syncWithServer(newData);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
+            <div className="w-full md:w-auto">
+                <Skeleton className="h-8 w-48 mb-2" />
+                <Skeleton className="h-4 w-64" />
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+                <Skeleton className="h-10 flex-1 md:w-64" />
+                <Skeleton className="h-10 w-32" />
+            </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="rounded-xl border bg-card text-card-foreground shadow-sm h-[200px] flex flex-col p-0 overflow-hidden">
+                    <div className="p-4 border-b bg-muted/20 flex justify-between items-center">
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                    </div>
+                    <div className="p-4 flex-1 space-y-3">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                    </div>
+                </div>
+            ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       
-      {/* --- ШАПКА + ПОИСК --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
             <div>
@@ -167,11 +230,9 @@ export default function ClassifierPage() {
         </div>
       </div>
 
-      {/* --- СЕТКА КАРТОЧЕК --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
         {filteredData.map((category) => (
             <Card key={category.id} className="flex flex-col overflow-hidden gap-0 p-0">
-                {/* Заголовок карточки (Категория) */}
                 <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
                     <div className="flex items-center gap-2 overflow-hidden">
                         <Layers className="h-4 w-4 text-primary shrink-0" />
@@ -183,7 +244,6 @@ export default function ClassifierPage() {
                         </Badge>
                     </div>
                     
-                    {/* Меню действий категории */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -204,7 +264,6 @@ export default function ClassifierPage() {
                     </DropdownMenu>
                 </CardHeader>
 
-                {/* Список типов */}
                 <CardContent className="p-0 flex-1">
                     <div className="divide-y">
                         {category.types.length > 0 ? (
@@ -212,7 +271,6 @@ export default function ClassifierPage() {
                                 <div key={type.id} className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-sm">
                                     <span className="text-foreground truncate pr-2">{type.name}</span>
                                     
-                                    {/* Кнопки действий для типа */}
                                     <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                         <Button 
                                             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -237,7 +295,6 @@ export default function ClassifierPage() {
                     </div>
                 </CardContent>
 
-                {/* Кнопка "Добавить" внизу карточки */}
                 <div className="p-3 bg-muted/30 border-t">
                     <Button 
                         variant="outline" 
@@ -252,7 +309,6 @@ export default function ClassifierPage() {
             </Card>
         ))}
 
-        {/* Заглушка если поиск пустой */}
         {filteredData.length === 0 && (
             <div className="col-span-full py-12 text-center text-muted-foreground">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
@@ -263,9 +319,6 @@ export default function ClassifierPage() {
         )}
       </div>
 
-      {/* ================= МОДАЛЬНЫЕ ОКНА ================= */}
-      
-      {/* Диалог Категории */}
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -288,7 +341,6 @@ export default function ClassifierPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Диалог Типа */}
       <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
         <DialogContent>
           <DialogHeader>

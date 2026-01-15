@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -24,58 +24,112 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+// --- ОБНОВЛЕННЫЕ ИМПОРТЫ ---
+import { User } from "@/lib/types";
+import { ROLE_NAMES } from "@/lib/constants";
 
 export default function MenuPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  
+  const [user, setUser] = useState<User | any>(null); // any для поддержки поля department из профиля
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
 
-  const user = {
-    name: "Иванов Иван Иванович",
-    email: "ivanov.i@hospital.ru",
-    role: "Зав. отделением",
-    department: "Терапевтическое отделение",
-    initials: "ИИ"
-  };
+    const fetchUser = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch("/api/user/me");
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data);
+        }
+      } catch (error) {
+        console.error("Failed to load profile:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   const handleLogout = () => {
     router.push("/login");
   };
 
-  // --- ССЫЛКА МЕНЮ (Без бордера, с цветным текстом) ---
-  const MenuLink = ({ href, icon: Icon, title, desc, colorClass = "bg-muted text-muted-foreground" }: any) => (
-    <Link 
-        href={href} 
-        className={cn(
-            "flex items-center justify-between p-4 rounded-xl transition-all duration-200 group border border-transparent"
-        )}
-    >
-        <div className="flex items-center gap-4">
-            <div className={cn("p-2.5 rounded-lg transition-colors", colorClass)}>
-                <Icon className="h-5 w-5" />
-            </div>
-            <div>
-                {/* Текст заголовка меняет цвет на primary */}
-                <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {title}
-                </p>
-                {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
-            </div>
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 pb-20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+             <Skeleton className="h-8 w-32 mb-2" />
+             <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-24 hidden md:block" />
         </div>
-        {/* Стрелочка меняет цвет на primary */}
-        <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-    </Link>
-  );
+  
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-5 space-y-3">
+             <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+                <Skeleton className="h-32 w-full rounded-none" />
+                <div className="px-6 pb-6 relative">
+                   <div className="-mt-12 mb-4 flex justify-between items-end">
+                      <Skeleton className="h-24 w-24 rounded-full border-4 border-card" />
+                      <Skeleton className="h-6 w-24 rounded-full mb-2" />
+                   </div>
+                   <div className="space-y-4">
+                      <div>
+                          <Skeleton className="h-6 w-48 mb-2" />
+                          <Skeleton className="h-4 w-24" />
+                      </div>
+                      <Separator className="my-4" />
+                      <div className="space-y-3">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-4 w-2/3" />
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+  
+          <div className="lg:col-span-7 space-y-6">
+              {[1, 2].map((i) => (
+                  <div key={i}>
+                      <Skeleton className="h-4 w-32 mb-3" />
+                      <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-2 space-y-2">
+                          <Skeleton className="h-16 w-full rounded-xl" />
+                          <Skeleton className="h-16 w-full rounded-xl" />
+                      </div>
+                  </div>
+              ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       
-      {/* Заголовок страницы */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Профиль</h1>
@@ -92,17 +146,15 @@ export default function MenuPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* === ЛЕВАЯ КОЛОНКА: ИНФО О ПОЛЬЗОВАТЕЛЕ === */}
         <div className="lg:col-span-5 space-y-3">
             <Card className="overflow-hidden py-0!">
                 <div className="h-32 bg-gradient-to-b from-primary/20 via-primary/5 to-card" />
                 
                 <CardContent className="px-6 pb-6 relative">
-                    <div className="-mt-30 mb-4 flex justify-between items-end">
-                        {/* ИСПРАВЛЕНО: Добавлен border-4 */}
+                    <div className="-mt-28 mb-4 flex justify-between items-end">
                         <Avatar className="h-24 w-24 border-4 border-card bg-background">
                             <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
-                                {user.initials}
+                                {getInitials(user.name)}
                             </AvatarFallback>
                         </Avatar>
                         <Badge variant="secondary" className="mb-2 bg-primary/10 text-primary hover:bg-primary/20">
@@ -113,19 +165,21 @@ export default function MenuPage() {
                     <div className="space-y-4">
                         <div>
                             <h2 className="text-xl font-bold text-foreground leading-tight">{user.name}</h2>
-                            <p className="text-sm text-muted-foreground mt-1">ID: u_10234</p>
+                            <p className="text-sm text-muted-foreground mt-1">ID: {user.id}</p>
                         </div>
 
                         <Separator />
 
                         <div className="space-y-3 text-sm">
+                            {/* Оставили только должность, убрали дубликат роли */}
                             <div className="flex items-center gap-3 text-muted-foreground">
                                 <Briefcase className="h-4 w-4 shrink-0 opacity-70" />
-                                <span className="text-foreground">{user.role}</span>
+                                <span className="text-foreground">{user.position || "Сотрудник"}</span>
                             </div>
+                            {/* Вернули user.department */}
                             <div className="flex items-center gap-3 text-muted-foreground">
                                 <Building className="h-4 w-4 shrink-0 opacity-70" />
-                                <span className="text-foreground">{user.department}</span>
+                                <span className="text-foreground">{user.department || "Отделение не указано"}</span>
                             </div>
                             <div className="flex items-center gap-3 text-muted-foreground">
                                 <Mail className="h-4 w-4 shrink-0 opacity-70" />
@@ -137,17 +191,14 @@ export default function MenuPage() {
             </Card>
         </div>
 
-        {/* === ПРАВАЯ КОЛОНКА: МЕНЮ И НАСТРОЙКИ === */}
         <div className="lg:col-span-7 space-y-6">
             
-            {/* 1. Блок управления отделом */}
             <div>
                 <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
                     Рабочее пространство
                 </h3>
                 <Card className="py-0!">
                     <CardContent className="p-2">
-                        {/* ИСПРАВЛЕНО: Убрана синяя подложка (colorClass), теперь как все */}
                         <MenuLink 
                             href="/profile/department"
                             icon={UserCog}
@@ -158,7 +209,6 @@ export default function MenuPage() {
                 </Card>
             </div>
 
-            {/* 2. Блок настроек приложения */}
             <div>
                 <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
                     Настройки
@@ -166,7 +216,6 @@ export default function MenuPage() {
                 <Card className="py-0!">
                     <CardContent className="p-2 space-y-1">
                         
-                        {/* --- НОВЫЙ ДИЗАЙН ВЫБОРА ТЕМЫ --- */}
                         <div className="p-4 flex flex-col gap-3">
                             <div className="flex items-center gap-4">
                                 <div className="p-2.5 bg-muted rounded-lg text-muted-foreground">
@@ -206,14 +255,14 @@ export default function MenuPage() {
                         <Separator className="my-1 opacity-50" />
 
                         <MenuLink 
-                            href="/settings"
+                            href="/profile/settings"
                             icon={Settings}
                             title="Общие настройки"
                             desc="Уведомления, пароль и безопасность"
                         />
                         
                         <MenuLink 
-                            href="/help"
+                            href="/profile/help"
                             icon={HelpCircle}
                             title="Помощь и справка"
                             desc="Инструкции по работе с системой"
@@ -222,7 +271,6 @@ export default function MenuPage() {
                 </Card>
             </div>
 
-            {/* Кнопка выхода (Мобильная) */}
             <div className="md:hidden pt-4">
                  <Button 
                     variant="destructive" 
@@ -241,3 +289,26 @@ export default function MenuPage() {
     </div>
   );
 }
+
+const MenuLink = ({ href, icon: Icon, title, desc, colorClass = "bg-muted text-muted-foreground" }: any) => (
+    <Link 
+        href={href} 
+        className={cn(
+            "flex items-center justify-between p-4 rounded-xl transition-all duration-200 group border border-transparent"
+            // Убрал hover:bg-muted/50
+        )}
+    >
+        <div className="flex items-center gap-4">
+            <div className={cn("p-2.5 rounded-lg transition-colors", colorClass)}>
+                <Icon className="h-5 w-5" />
+            </div>
+            <div>
+                <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                    {title}
+                </p>
+                {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
+            </div>
+        </div>
+        <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+    </Link>
+);

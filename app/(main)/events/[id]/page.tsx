@@ -1,8 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, User, CheckCircle2, FileText, MessageSquare } from "lucide-react";
+import { 
+  ArrowLeft, 
+  User, 
+  CheckCircle2, 
+  FileText, 
+  MessageSquare, 
+  Wrench 
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,128 +17,214 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Используем новые хелперы
-import { getStatusColor } from "@/lib/status-helper";
-import { STATUS_MAP, RequestStatus } from "@/lib/types";
-import { ChatSection, ChatMessage } from "@/components/ui/chat-section";
-
-const MOCK_EVENT = {
-  id: "evt_123",
-  category: "Безопасность пациента",
-  type: "Падение пациента",
-  status: "in_work", // Правильный ключ статуса
-  place: "Палата №205, Терапевтическое отделение",
-  description: "Пациент попытался встать без посторонней помощи и упал возле кровати. Видимых повреждений нет, жалобы на боль в колене. Осмотрен дежурным врачом.",
-  author: "Иванов И.И. (Медбрат)",
-  createdAt: "24.11.2025 10:30",
-};
-
-const INITIAL_MESSAGES: ChatMessage[] = [
-  { id: 1, sender: "System", text: "Событие создано. Ожидает назначения ответственного.", time: "10:30", isSystem: true },
-  { id: 2, sender: "Петрова А.В.", role: "Ответственный", text: "Добрый день. Был ли поднят бортик кровати в момент падения?", time: "10:50", isMe: false },
-  { id: 3, sender: "Иванов И.И.", role: "Вы", text: "Нет, бортик был опущен, так как проводились процедуры за 10 минут до этого.", time: "10:55", isMe: true },
-];
+// Importing constants, types, and helpers
+import { EVENT_STATUS_MAP } from "@/lib/constants";
+import { IncidentEvent, EventStatus, Category } from "@/lib/types";
+import { getBadgeColor } from "@/lib/status-helper";
+import { EventChatContainer } from "@/components/events/event-chat-container";
+import { useToast } from "@/components/providers/toast-provider";
 
 export default function EventDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
+  const toast = useToast();
   
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
-  // Приводим статус к типу RequestStatus для безопасности типов
-  const [status, setStatus] = useState<RequestStatus>(MOCK_EVENT.status as RequestStatus);
+  const [event, setEvent] = useState<IncidentEvent | null>(null);
+  const [classifier, setClassifier] = useState<Category[]>([]);
+  const [status, setStatus] = useState<EventStatus | "">("");
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      try {
+        setIsLoading(true);
+        const [eventRes, classifierRes] = await Promise.all([
+            fetch(`/api/events/${id}`),
+            fetch(`/api/classifier`)
+        ]);
 
-  const handleSendMessage = (text: string) => {
-    const msg: ChatMessage = {
-      id: Date.now(),
-      sender: "Иванов И.И.",
-      role: "Вы",
-      text: text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMe: true
+        if (eventRes.ok && classifierRes.ok) {
+          const eventData = await eventRes.json();
+          const classifierData = await classifierRes.json();
+          
+          setEvent(eventData);
+          setClassifier(classifierData);
+          setStatus(eventData.status as EventStatus);
+        }
+      } catch (error) {
+        console.error("Network error:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    setMessages([...messages, msg]);
+
+    fetchEventDetails();
+  }, [id]);
+
+  const typeNamesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    classifier.forEach(cat => {
+        cat.types.forEach(t => { map[t.id] = t.name; });
+    });
+    return map;
+  }, [classifier]);
+
+  const categoryNamesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    classifier.forEach(cat => { map[cat.id] = cat.name; });
+    return map;
+  }, [classifier]);
+
+  const handleStatusChange = async (newStatus: EventStatus) => {
+    setStatus(newStatus);
+    try {
+        const res = await fetch(`/api/events/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus })
+        });
+        
+        if (!res.ok) throw new Error("Failed to update status");
+        
+        toast.success("Статус обновлен", `Событие переведено в статус "${EVENT_STATUS_MAP[newStatus]}"`);
+    } catch (error) {
+        console.error(error);
+        toast.error("Ошибка", "Не удалось обновить статус");
+    }
   };
 
-  const DetailsSection = () => (
-    <div className="space-y-6">
-       <Card className="gap-3 bg-card border">
-            <CardHeader>
-                <div className="text-xs text-primary font-semibold uppercase tracking-wider mb-1">
-                    {MOCK_EVENT.category}
-                </div>
-                <CardTitle className="text-lg text-foreground">{MOCK_EVENT.type}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex items-start gap-3 text-sm text-foreground bg-muted/50 p-3 rounded-lg">
-                    <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                    <span>{MOCK_EVENT.place}</span>
-                </div>
-                <div>
-                    <h4 className="text-sm font-semibold mb-2 text-foreground">Описание ситуации</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                        {MOCK_EVENT.description}
-                    </p>
-                </div>
-                <Separator className="bg-border" />
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    Автор: {MOCK_EVENT.author}
-                </div>
-            </CardContent>
-        </Card>
+  const DetailsSection = () => {
+    if (!event) return null;
+    
+    const displayTypeName = typeNamesMap[event.typeId || ""] || event.typeName || event.typeId;
+    const displayCategoryName = categoryNamesMap[event.categoryId] || event.categoryName || event.categoryId;
 
-        {/* Карточка управления статусом (обновленная) */}
-        <Card className="border-primary/20 bg-primary/5 gap-1">
-            <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Управление статусом
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                    <Select value={status} onValueChange={(val) => setStatus(val as RequestStatus)}>
-                        <SelectTrigger className="w-full sm:w-[200px] bg-background border-input text-foreground">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="shadow-none border">
-                            {/* Используем общий маппинг статусов */}
-                            {Object.entries(STATUS_MAP).map(([key, label]) => (
-                                <SelectItem key={key} value={key}>{label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <span className="text-xs text-muted-foreground">
-                        Измените статус, если работа по инциденту завершена
-                    </span>
+    return (
+        <div className="space-y-6">
+           <Card className="gap-3 bg-card border">
+                <CardHeader>
+                    <div className="text-xs text-primary font-semibold uppercase tracking-wider mb-1">
+                        {displayCategoryName}
                     </div>
-            </CardContent>
-        </Card>
-    </div>
-  );
+                    <CardTitle className="text-lg text-foreground">{displayTypeName}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {/* Описание ситуации (если есть) */}
+                    {event.description && (
+                        <div>
+                            <h4 className="text-sm font-semibold mb-2 text-foreground">Описание ситуации</h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-md">
+                                {event.description}
+                            </p>
+                        </div>
+                    )}
+
+                    <Separator className="bg-border" />
+                    
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        Автор: <span className="text-foreground">{event.author}</span>
+                    </div>
+                </CardContent>
+            </Card>
+    
+            <Card className="border-primary/20 bg-primary/5 gap-1">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Управление событием
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-4">
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
+                        <Select value={status} onValueChange={(v) => handleStatusChange(v as EventStatus)}>
+                            <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="shadow-none border">
+                                {Object.entries(EVENT_STATUS_MAP).map(([key, label]) => (
+                                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="pt-2 border-t border-primary/10 flex flex-col gap-2">
+                        <Button 
+                            variant="outline" 
+                            className="w-full justify-start text-foreground border-primary/20 hover:bg-background hover:border-primary/40 transition-colors"
+                            onClick={() => router.push(`/requests/new?linkedEventId=${event.id}`)}
+                        >
+                            <Wrench className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Создать техническую заявку
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground px-1">
+                            Создаст наряд на работы, привязанный к этому инциденту.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+      );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-4 h-[calc(100vh-6rem)] md:h-auto pb-4 md:pb-20">
+        <div className="flex items-center gap-3 shrink-0">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <div className="space-y-2">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-3 w-32" />
+            </div>
+        </div>
+        <div className="hidden md:grid grid-cols-3 gap-6 items-start">
+            <div className="col-span-2 space-y-6">
+                <Skeleton className="h-[300px] w-full rounded-xl" />
+                <Skeleton className="h-[200px] w-full rounded-xl" />
+            </div>
+            <div className="col-span-1 h-[600px] rounded-xl border bg-card p-4">
+                <Skeleton className="h-full w-full rounded-xl" />
+            </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+        <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
+            <h2 className="text-xl font-bold">Событие не найдено</h2>
+            <Button onClick={() => router.back()}>Вернуться назад</Button>
+        </div>
+    );
+  }
 
   return (
-    <div className="space-y-4 h-[calc(100vh-140px)] md:h-auto flex flex-col pb-20 md:pb-0">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
-          <ArrowLeft className="h-5 w-5 text-foreground" />
+    <div className="flex flex-col gap-4 h-[calc(100vh-6rem)] md:h-auto pb-4 md:pb-20">
+      
+      <div className="flex items-center gap-3 shrink-0">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-9 w-9 shrink-0 hover:bg-muted">
+          <ArrowLeft className="h-4 w-4 text-foreground" />
         </Button>
-        <div>
-            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-                Событие #{id}
-                <Badge variant="outline" className={`shadow-none ${getStatusColor(status)}`}>
-                    {STATUS_MAP[status] || status}
+        <div className="min-w-0">
+            <h1 className="text-lg font-bold text-foreground flex items-center gap-2 truncate">
+                Событие #{event.code || id}
+                <Badge variant="outline" className={`ml-1 shrink-0 ${getBadgeColor(status)}`}>
+                    {EVENT_STATUS_MAP[status as EventStatus] || status}
                 </Badge>
             </h1>
-            <p className="text-xs text-muted-foreground">Создано {MOCK_EVENT.createdAt}</p>
+            <p className="text-xs text-muted-foreground truncate">Создано {new Date(event.createdAt).toLocaleString()}</p>
         </div>
       </div>
 
       {/* MOBILE VIEW */}
-      <div className="md:hidden flex-1 flex flex-col">
-        <Tabs defaultValue="details" className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 h-12 p-1 mb-4 bg-muted rounded-lg border">
+      <div className="md:hidden flex-1 flex flex-col min-h-0">
+        <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-2 h-12 p-1 mb-4 bg-muted rounded-lg border shrink-0">
                 <TabsTrigger value="details" className="flex gap-2 data-[state=active]:bg-background">
                     <FileText className="h-4 w-4" /> <span>Детали</span>
                 </TabsTrigger>
@@ -145,26 +238,18 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
             </TabsContent>
             
             <TabsContent value="chat" className="flex-1 h-full mt-0 overflow-hidden">
-                <ChatSection 
-                    messages={messages} 
-                    onSendMessage={handleSendMessage} 
-                    title="Обсуждение инцидента"
-                />
+                <EventChatContainer eventId={id} className="h-full" />
             </TabsContent>
         </Tabs>
       </div>
 
       {/* DESKTOP VIEW */}
-      <div className="hidden md:grid grid-cols-3 gap-6 flex-1 min-h-0">
-        <div className="col-span-2 overflow-y-auto pr-1 pb-4">
+      <div className="hidden md:grid grid-cols-3 gap-6 items-start">
+        <div className="col-span-2 space-y-6">
             <DetailsSection />
         </div>
-        <div className="col-span-1 h-[600px]">
-            <ChatSection 
-                messages={messages} 
-                onSendMessage={handleSendMessage} 
-                title="Обсуждение инцидента"
-            />
+        <div className="col-span-1 sticky top-24 h-[600px]">
+            <EventChatContainer eventId={id} />
         </div>
       </div>
     </div>

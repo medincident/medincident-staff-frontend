@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -9,7 +9,8 @@ import {
   Clock, 
   Mail, 
   Moon,
-  Globe
+  Globe,
+  Loader2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -24,13 +26,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/components/providers/toast-provider";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const toast = useToast();
+  
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  // Состояние настроек
   const [settings, setSettings] = useState({
+    timezone: "msk",
     emailNotification: false,
     quietMode: {
       enabled: false,
@@ -39,18 +45,113 @@ export default function SettingsPage() {
     }
   });
 
-  const handleSave = () => {
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setInitialLoading(true);
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          setSettings(data);
+        }
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+        toast.error("Ошибка", "Не удалось загрузить настройки");
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
+  const handleSave = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      alert("Настройки успешно сохранены!");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+
+      if (!res.ok) throw new Error("Save failed");
+
+      toast.success("Успешно", "Настройки сохранены!");
       router.back();
-    }, 800);
+    } catch (error) {
+        toast.error("Ошибка", "Не удалось сохранить настройки");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 pb-20">
+        <div className="flex items-center gap-2 mb-6">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <div className="space-y-2">
+             <Skeleton className="h-8 w-48" />
+             <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+  
+        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+           <div className="p-6 pb-4">
+              <div className="flex items-center gap-3">
+                 <Skeleton className="h-10 w-10 rounded-lg" />
+                 <Skeleton className="h-6 w-48" />
+              </div>
+           </div>
+           <div className="p-6 pt-0 space-y-4">
+              <div className="space-y-2">
+                 <Skeleton className="h-4 w-24" />
+                 <Skeleton className="h-10 w-full" />
+                 <Skeleton className="h-3 w-64" />
+              </div>
+           </div>
+        </div>
+  
+        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+           <div className="p-6 pb-4">
+              <div className="flex items-center gap-3">
+                 <Skeleton className="h-10 w-10 rounded-lg" />
+                 <div className="space-y-1">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                 </div>
+              </div>
+           </div>
+           <div className="p-6 pt-0 space-y-6">
+              <div className="flex justify-between items-center">
+                 <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div className="space-y-1">
+                       <Skeleton className="h-5 w-32" />
+                       <Skeleton className="h-3 w-40" />
+                    </div>
+                 </div>
+                 <Skeleton className="h-6 w-12 rounded-full" />
+              </div>
+              <div className="flex justify-between items-center">
+                 <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div className="space-y-1">
+                       <Skeleton className="h-5 w-40" />
+                       <Skeleton className="h-3 w-48" />
+                    </div>
+                 </div>
+                 <Skeleton className="h-6 w-12 rounded-full" />
+              </div>
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
-      {/* Шапка */}
+      
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
           <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -61,7 +162,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 1. Региональные настройки */}
       <Card className="bg-card">
         <CardHeader>
             <CardTitle className="text-base flex items-center gap-3 text-foreground">
@@ -74,7 +174,10 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
             <div className="grid gap-2">
                 <Label className="text-foreground">Часовой пояс</Label>
-                <Select defaultValue="msk">
+                <Select 
+                    value={settings.timezone} 
+                    onValueChange={(val) => setSettings({...settings, timezone: val})}
+                >
                     <SelectTrigger className="bg-background border-input">
                           <div className="flex items-center gap-2 text-foreground">
                             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -93,7 +196,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* 2. Уведомления и Тихие часы */}
       <Card className="bg-card pb-2!">
         <CardHeader>
             <div className="flex items-center gap-3">
@@ -108,7 +210,6 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="divide-y divide-border">
             
-            {/* Email */}
             <div className="py-4 pt-0 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
@@ -125,7 +226,6 @@ export default function SettingsPage() {
                 />
             </div>
 
-            {/* Тихие часы */}
             <div className="py-4 space-y-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -169,19 +269,14 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Кнопка сохранения */}
       <div className="flex justify-end pt-4">
         <Button 
             onClick={handleSave} 
             disabled={loading} 
             className="w-full sm:w-auto"
         >
-            {loading ? "Сохранение..." : (
-                <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Сохранить изменения
-                </>
-            )}
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {loading ? "Сохранение..." : "Сохранить изменения"}
         </Button>
       </div>
     </div>

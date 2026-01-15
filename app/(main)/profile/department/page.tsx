@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { UserCog, Save, ArrowLeft, ShieldAlert } from "lucide-react";
+import { UserCog, Save, ArrowLeft, ShieldAlert, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,43 +11,135 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/providers/toast-provider";
 
-// Импортируем мок-данные
-import { MOCK_USERS } from "@/lib/admin-mock";
+// Updated Imports
+import { User } from "@/lib/types";
+import { ROLE_NAMES } from "@/lib/constants";
 
 export default function DepartmentSettingsPage() {
   const router = useRouter();
+  const toast = useToast();
 
-  // Состояния
-  const [headId, setHeadId] = useState("u_4");
+  // State for settings
+  const [headId, setHeadId] = useState("");
   const [isActingEnabled, setIsActingEnabled] = useState(false);
   const [actingId, setActingId] = useState("");
+  const [departmentName, setDepartmentName] = useState("");
+  
+  // Data State
+  const [staff, setStaff] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const staff = MOCK_USERS.filter(u => u.role !== 'admin_system' && u.role !== 'guest');
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch("/api/settings/department");
+        
+        if (res.ok) {
+          const data = await res.json();
+          // Extract settings
+          setHeadId(data.settings.headId || "");
+          setIsActingEnabled(data.settings.isActingEnabled || false);
+          setActingId(data.settings.actingId || "");
+          setDepartmentName(data.settings.departmentName || "Мое отделение");
+          
+          // Extract staff list
+          setStaff(data.staff || []);
+        } else {
+            throw new Error("Failed to load");
+        }
+      } catch (error) {
+        toast.error("Ошибка", "Не удалось загрузить настройки");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const handleSave = () => {
-    alert("Настройки сохранены! Права доступа обновлены.");
+    fetchData();
+  }, [toast]);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      const res = await fetch("/api/settings/department", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            headId,
+            isActingEnabled,
+            // If acting mode is disabled, we clear the ID on save
+            actingId: isActingEnabled ? actingId : "" 
+        }),
+      });
+
+      if (!res.ok) throw new Error("Save failed");
+
+      toast.success("Настройки сохранены", "Права доступа и структура отдела обновлены.");
+    } catch (error) {
+      toast.error("Ошибка", "Не удалось сохранить изменения");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
+  // --- SKELETON LOADING ---
+  if (isLoading) {
+    return (
+      <div className="max-w-3xl mx-auto pb-20 space-y-6">
+        <div className="flex items-center gap-3 mb-6">
+            <Skeleton className="h-10 w-10 rounded-md" />
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-4 w-48" />
+            </div>
+        </div>
+
+        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+            <div className="p-6 pb-4 space-y-2">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-full max-w-md" />
+            </div>
+            <div className="p-6 pt-0 space-y-6">
+                <div className="space-y-3">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-10 w-full max-w-md" />
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-4 border rounded-lg">
+                    <div className="space-y-2">
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-4 w-48" />
+                    </div>
+                    <Skeleton className="h-6 w-12 rounded-full" />
+                </div>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN CONTENT ---
   return (
     <div className="max-w-3xl mx-auto pb-20 space-y-6">
       
-      {/* Шапка с кнопкой назад */}
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-            <h1 className="text-2xl font-bold">Терапевтическое отделение</h1>
+            <h1 className="text-2xl font-bold">{departmentName}</h1>
             <p className="text-muted-foreground text-sm">Настройки управления и доступов</p>
         </div>
       </div>
 
-      {/* Блок Руководителя */}
-      <Card className="">
+      <Card>
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-3 text-lg">
-            {/* ИСПРАВЛЕНО: Иконка в едином стиле (как в настройках) */}
             <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
                 <UserCog className="h-5 w-5" />
             </div>
@@ -60,7 +152,7 @@ export default function DepartmentSettingsPage() {
         
         <CardContent className="space-y-6">
           
-          {/* 1. Основной начальник */}
+          {/* Section: Head of Department */}
           <div className="grid gap-3">
             <Label className="text-base font-medium">Заведующий отделением</Label>
             <div className="text-sm text-muted-foreground mb-1">
@@ -73,7 +165,7 @@ export default function DepartmentSettingsPage() {
               <SelectContent>
                 {staff.map(u => (
                     <SelectItem key={u.id} value={u.id}>
-                        {u.name} <span className="text-muted-foreground text-xs ml-2">({u.position})</span>
+                        {u.name} <span className="text-muted-foreground text-xs ml-2">({u.position || ROLE_NAMES[u.role]})</span>
                     </SelectItem>
                 ))}
               </SelectContent>
@@ -82,9 +174,9 @@ export default function DepartmentSettingsPage() {
 
           <Separator />
 
-          {/* 2. Логика И.О. (Deputy) */}
+          {/* Section: Acting Head (Substitution) */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-card">
+            <div className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-card transition-colors hover:bg-accent/5">
               <div className="space-y-0.5">
                 <Label className="text-base font-medium">Режим замещения</Label>
                 <div className="text-xs text-muted-foreground max-w-[300px] sm:max-w-none">
@@ -112,9 +204,10 @@ export default function DepartmentSettingsPage() {
                         <SelectValue placeholder="Выберите заместителя" />
                       </SelectTrigger>
                       <SelectContent>
+                        {/* Exclude current head from selection */}
                         {staff.filter(u => u.id !== headId).map(u => (
                             <SelectItem key={u.id} value={u.id}>
-                                {u.name} <span className="text-muted-foreground text-xs ml-2">({u.position})</span>
+                                {u.name} <span className="text-muted-foreground text-xs ml-2">({u.position || ROLE_NAMES[u.role]})</span>
                             </SelectItem>
                         ))}
                       </SelectContent>
@@ -126,7 +219,7 @@ export default function DepartmentSettingsPage() {
                         Выбранный сотрудник получит расширенные права доступа (просмотр всех заявок отдела, подтверждение работ) до тех пор, пока этот режим включен.
                       </p>
                     </div>
-                 </div>
+                  </div>
               </div>
             )}
           </div>
@@ -135,8 +228,8 @@ export default function DepartmentSettingsPage() {
       </Card>
 
       <div className="flex justify-end pt-4">
-        <Button size="lg" onClick={handleSave} className="w-full md:w-auto">
-          <Save className="mr-2 h-4 w-4" />
+        <Button size="lg" onClick={handleSave} disabled={isSaving} className="w-full md:w-auto">
+          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Сохранить изменения
         </Button>
       </div>

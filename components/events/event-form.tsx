@@ -7,7 +7,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Save, Plus } from "lucide-react";
 
-import { CLASSIFIER } from "@/lib/classifier";
+import { CLASSIFIER } from "@/lib/mock-db";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -19,7 +19,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-// 1. Импортируем хук уведомлений
 import { useToast } from "@/components/providers/toast-provider";
 
 const formSchema = z.object({
@@ -39,7 +38,6 @@ export function EventForm({ initialData }: EventFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = !!initialData;
   
-  // 2. Инициализируем тост
   const toast = useToast();
 
   const form = useForm<EventFormValues>({
@@ -54,30 +52,54 @@ export function EventForm({ initialData }: EventFormProps) {
   const selectedCategoryId = form.watch("categoryId");
   const availableTypes = CLASSIFIER.find((c) => c.id === selectedCategoryId)?.types || [];
 
-  function onSubmit(values: EventFormValues) {
+  async function onSubmit(values: EventFormValues) {
     setIsSubmitting(true);
-    // Имитация запроса
-    console.log(isEditMode ? "Обновление:" : "Создание:", values);
     
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const url = isEditMode 
+        ? `/api/events/${initialData?.id}` 
+        : "/api/events";
+      
+      const method = isEditMode ? "PATCH" : "POST";
 
-      // 3. Вызываем уведомление
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        throw new Error("Ошибка при сохранении");
+      }
+
+      const data = await response.json();
+
       if (isEditMode) {
         toast.success(
             "Изменения сохранены", 
             `Событие #${initialData?.id} успешно обновлено.`
         );
       } else {
-        const newId = Math.floor(Math.random() * 10000);
         toast.success(
             "Событие зарегистрировано", 
-            `Присвоен номер #${newId}. Ответственные оповещены.`
+            `Присвоен номер #${data.id}. Ответственные оповещены.`
         );
       }
 
-      router.push("/events"); // Возвращаемся в список
-    }, 1000);
+      router.push("/events");
+      router.refresh();
+
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        "Ошибка",
+        "Не удалось сохранить данные. Попробуйте позже."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (

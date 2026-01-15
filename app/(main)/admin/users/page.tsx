@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
 import { 
   Pencil, 
   Trash2, 
   Search, 
   ShieldAlert, 
-  CheckCircle2,
-  Building,
-  Mail,
-  Briefcase,
+  CheckCircle2, 
+  Building, 
+  Mail, 
+  Briefcase, 
   Ban
 } from "lucide-react";
 
@@ -18,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -28,42 +28,67 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/providers/toast-provider";
 
-import { MOCK_USERS, INITIAL_CLINICS, User, UserRole, UserStatus } from "@/lib/admin-mock";
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  admin_system: "Системный администратор",
-  admin_org: "Администратор организации",
-  head_clinic: "Главный врач / Директор",
-  head_dept: "Заведующий отделением",
-  dispatcher_ns: "Диспетчер (Безопасность)",
-  dispatcher_req: "Диспетчер (АХО)",
-  worker: "Сотрудник / Врач",
-  guest: "Гость (Ожидает регистрации)"
-};
+// ИМПОРТ НОВЫХ ТИПОВ
+import { User, UserRole, UserStatus, Clinic } from "@/lib/types";
+import { ROLE_NAMES } from "@/lib/constants";
 
 export default function UsersPage() {
-  const router = useRouter();
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const toast = useToast();
+  
+  const [users, setUsers] = useState<User[]>([]);
+  const [clinics, setClinics] = useState<Clinic[]>([]); // Для выпадающих списков
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(search.toLowerCase()) || 
-    u.login.toLowerCase().includes(search.toLowerCase()) ||
-    u.position.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    try {
+      setIsLoading(true);
+      const [usersRes, structureRes] = await Promise.all([
+          fetch("/api/admin/users"),
+          fetch("/api/admin/structure")
+      ]);
+
+      if (usersRes.ok && structureRes.ok) {
+        const usersJson = await usersRes.json();
+        const structureJson = await structureRes.json();
+        setUsers(usersJson);
+        setClinics(structureJson);
+      } else {
+          throw new Error("Failed to load data");
+      }
+    } catch (error) {
+      toast.error("Ошибка", "Не удалось загрузить данные");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredUsers = useMemo(() => {
+      const lowerSearch = search.toLowerCase();
+      return users.filter(u => 
+        u.name.toLowerCase().includes(lowerSearch) || 
+        (u.login && u.login.toLowerCase().includes(lowerSearch)) ||
+        (u.position && u.position.toLowerCase().includes(lowerSearch))
+      );
+  }, [users, search]);
 
   const handleEditUser = (user: User) => {
     setEditingUser({ ...user });
     setIsDialogOpen(true);
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
     if (!editingUser) return;
     
-    // Логика авто-активации: Если роль сменили с Guest на что-то другое, ставим Active
+    // Автоматическая активация при сохранении (если не гость)
     let updatedStatus = editingUser.status;
     if (editingUser.role !== 'guest' && editingUser.status === 'pending') {
         updatedStatus = 'active';
@@ -74,15 +99,134 @@ export default function UsersPage() {
         status: updatedStatus
     };
 
-    setUsers(users.map(u => u.id === editingUser.id ? updatedUser as User : u));
+    // Оптимистичное обновление UI
+    const newUsers = users.map(u => u.id === editingUser.id ? updatedUser as User : u);
+    setUsers(newUsers);
     setIsDialogOpen(false);
+
+    try {
+        await fetch("/api/admin/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // В нашем моке API принимает одного юзера для обновления или массив.
+            // Отправим обновленного юзера (или весь массив, зависит от реализации вашего API)
+            // Судя по вашему API - он принимает одного юзера в body (если это объект).
+            body: JSON.stringify(updatedUser) 
+        });
+        toast.success("Успешно", "Данные пользователя обновлены");
+    } catch (e) {
+        toast.error("Ошибка", "Не удалось сохранить");
+        fetchAllData(); // Откат при ошибке
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
-    if(confirm("Удалить пользователя из системы?")) setUsers(users.filter(u => u.id !== id));
+  const handleDeleteUser = async (id: string) => {
+    if(confirm("Удалить пользователя из системы?")) {
+        // Оптимистичное удаление
+        const newUsers = users.filter(u => u.id !== id);
+        setUsers(newUsers);
+        
+        try {
+            await fetch("/api/admin/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                // Отправляем массив, чтобы API перезаписал базу (согласно вашей реализации API)
+                body: JSON.stringify(newUsers)
+            });
+            toast.success("Успешно", "Пользователь удален");
+        } catch (e) {
+            toast.error("Ошибка", "Не удалось удалить");
+            fetchAllData();
+        }
+    }
   };
 
-  const availableDepts = INITIAL_CLINICS.find(c => c.id === editingUser?.clinicId)?.departments || [];
+  // Вычисляем доступные отделения для выбранной клиники в модальном окне
+  const availableDepts = useMemo(() => {
+      return clinics.find(c => c.id === editingUser?.clinicId)?.departments || [];
+  }, [clinics, editingUser?.clinicId]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Заголовок и поиск (общие) */}
+        <div className="flex flex-col gap-4 mb-6">
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-10 w-full" />
+        </div>
+        
+        {/* DESKTOP SKELETON (Таблица) */}
+        <div className="hidden md:block rounded-md border p-4 space-y-4">
+            <div className="flex justify-between border-b pb-4 mb-4">
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-4 w-32" />)}
+            </div>
+            {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div className="space-y-2">
+                        <Skeleton className="h-5 w-40" />
+                        <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-6 w-24 rounded-full" />
+                    <div className="space-y-1">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                    </div>
+                    <div className="space-y-1">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                    </div>
+                    <div className="flex gap-2">
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
+                    </div>
+                </div>
+            ))}
+        </div>
+
+        {/* MOBILE SKELETON (Карточки) */}
+        <div className="md:hidden space-y-3">
+            {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-xl border bg-card p-4 space-y-4">
+                    {/* Верхняя часть: Имя и Статус */}
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                            <Skeleton className="h-5 w-40" />
+                            <Skeleton className="h-3 w-24" />
+                        </div>
+                        <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+
+                    {/* Средняя часть: Информация */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-4 rounded-full" />
+                            <div className="space-y-1">
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-2 w-16" />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-4 rounded-full" />
+                            <div className="space-y-1">
+                                <Skeleton className="h-3 w-32" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Нижняя часть: Кнопки */}
+                    <div className="flex gap-2 pt-2 border-t border-border/50">
+                        <Skeleton className="h-8 flex-1 rounded-md" /> {/* Большая кнопка редактирования */}
+                        <Skeleton className="h-8 w-8 rounded-md" />    {/* Кнопка удаления */}
+                    </div>
+                </div>
+            ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20">
@@ -103,7 +247,6 @@ export default function UsersPage() {
           />
       </div>
 
-      {/* === ВАРИАНТ 1: ТАБЛИЦА (ПК) === */}
       <div className="hidden md:block bg-card rounded-lg border overflow-hidden">
         <Table>
             <TableHeader className="bg-muted/50">
@@ -117,12 +260,11 @@ export default function UsersPage() {
             </TableHeader>
             <TableBody>
                 {filteredUsers.map(user => {
-                    const clinicName = INITIAL_CLINICS.find(c => c.id === user.clinicId)?.name || "—";
-                    const deptName = INITIAL_CLINICS.find(c => c.id === user.clinicId)?.departments.find(d => d.id === user.departmentId)?.name;
+                    const clinicName = clinics.find(c => c.id === user.clinicId)?.name || "—";
+                    const deptName = clinics.find(c => c.id === user.clinicId)?.departments.find(d => d.id === user.departmentId)?.name;
                     const isNew = user.status === 'pending';
 
                     return (
-                        // Используем bg-warning/5 для подсветки строки, чтобы не было "кислотно"
                         <TableRow key={user.id} className={`border-b ${isNew ? "bg-warning/5 hover:bg-warning/10" : ""}`}>
                             <TableCell>
                                 <div className="font-medium text-foreground">{user.name}</div>
@@ -151,7 +293,7 @@ export default function UsersPage() {
                             <TableCell>
                                 <div className="flex flex-col">
                                     <span className={`font-medium text-sm ${user.role === 'guest' ? 'text-muted-foreground italic' : 'text-foreground'}`}>
-                                        {ROLE_LABELS[user.role]}
+                                        {ROLE_NAMES[user.role]}
                                     </span>
                                     <span className="text-xs text-muted-foreground">{user.position}</span>
                                 </div>
@@ -185,11 +327,10 @@ export default function UsersPage() {
         </Table>
       </div>
 
-      {/* === ВАРИАНТ 2: КАРТОЧКИ (Мобильные) === */}
       <div className="md:hidden space-y-3">
         {filteredUsers.map(user => {
-            const clinicName = INITIAL_CLINICS.find(c => c.id === user.clinicId)?.name || "Не назначено";
-            const deptName = INITIAL_CLINICS.find(c => c.id === user.clinicId)?.departments.find(d => d.id === user.departmentId)?.name;
+            const clinicName = clinics.find(c => c.id === user.clinicId)?.name || "Не назначено";
+            const deptName = clinics.find(c => c.id === user.clinicId)?.departments.find(d => d.id === user.departmentId)?.name;
             const isNew = user.status === 'pending';
 
             return (
@@ -222,7 +363,7 @@ export default function UsersPage() {
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Briefcase className="h-3.5 w-3.5" />
                                 <div className="flex flex-col leading-tight">
-                                    <span className="font-medium text-foreground text-xs">{ROLE_LABELS[user.role]}</span>
+                                    <span className="font-medium text-foreground text-xs">{ROLE_NAMES[user.role]}</span>
                                     <span className="text-[10px]">{user.position}</span>
                                 </div>
                             </div>
@@ -264,7 +405,6 @@ export default function UsersPage() {
         })}
       </div>
 
-      {/* Диалог редактирования */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
             <DialogHeader>
@@ -276,7 +416,6 @@ export default function UsersPage() {
             
             {editingUser && (
                 <div className="grid gap-4 py-4">
-                    {/* Статус (можно менять вручную) */}
                     <div className="grid gap-2">
                         <Label>Статус аккаунта</Label>
                         <Select value={editingUser.status} onValueChange={(v: UserStatus) => setEditingUser({...editingUser, status: v})}>
@@ -312,7 +451,7 @@ export default function UsersPage() {
                         <Select value={editingUser.role} onValueChange={(v: UserRole) => setEditingUser({...editingUser, role: v})}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                                {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                                {Object.entries(ROLE_NAMES).map(([key, label]) => (
                                     <SelectItem key={key} value={key} disabled={key === 'guest'}>
                                         {label}
                                     </SelectItem>
@@ -328,7 +467,7 @@ export default function UsersPage() {
                                 <Select value={editingUser.clinicId || ""} onValueChange={(v) => setEditingUser({...editingUser, clinicId: v, departmentId: undefined})}>
                                     <SelectTrigger><SelectValue placeholder="Выберите клинику" /></SelectTrigger>
                                     <SelectContent>
-                                        {INITIAL_CLINICS.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                        {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>

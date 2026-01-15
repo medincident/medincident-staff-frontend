@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
 import { 
   Plus, 
   Pencil, 
@@ -12,7 +11,7 @@ import {
   Stethoscope,
   MoreVertical,
   Save,
-  User
+  User as UserIcon
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -41,33 +41,89 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/components/providers/toast-provider";
 
-// Импорт типов и мок-данных
-import { INITIAL_CLINICS, Clinic, Department, MOCK_USERS } from "@/lib/admin-mock";
+// Импортируем типы (предполагается, что они в @/lib/types.ts)
+import { Clinic, Department, User } from "@/lib/types";
+// Можно импортировать константы для красивых названий ролей
+import { ROLE_NAMES } from "@/lib/constants";
 
 export default function StructurePage() {
-  const [clinics, setClinics] = useState<Clinic[]>(INITIAL_CLINICS);
-  const [search, setSearch] = useState("");
+  const toast = useToast();
   
-  // Состояния диалогов
+  // Состояния данных
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [users, setUsers] = useState<User[]>([]); // Полный список пользователей с бэка
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Состояния UI
+  const [search, setSearch] = useState("");
   const [isClinicDialogOpen, setIsClinicDialogOpen] = useState(false);
   const [isDeptDialogOpen, setIsDeptDialogOpen] = useState(false);
   
-  // Состояние редактирования
+  // Состояния формы редактирования
   const [editingItem, setEditingItem] = useState<{ id?: string, parentId?: string } | null>(null);
-  
-  // Временные поля для инпутов
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
-  const [newHeadId, setNewHeadId] = useState<string>("none"); // ID руководителя
+  const [newHeadId, setNewHeadId] = useState<string>("none");
   const [targetClinicId, setTargetClinicId] = useState<string | null>(null);
 
-  // Фильтрация пользователей для выбора руководителя (только врачи или админы)
-  const availableHeads = useMemo(() => {
-      return MOCK_USERS.filter(u => u.role !== 'guest'); 
-  }, []);
+  // 1. ЗАГРУЗКА ДАННЫХ ПРИ СТАРТЕ
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Параллельно загружаем структуру клиник и список пользователей
+        const [structureRes, usersRes] = await Promise.all([
+            fetch("/api/admin/structure"),
+            fetch("/api/admin/users")
+        ]);
 
-  // --- УМНЫЙ ПОИСК ---
+        if (structureRes.ok && usersRes.ok) {
+            const structureData = await structureRes.json();
+            const usersData = await usersRes.json();
+            
+            setClinics(structureData);
+            setUsers(usersData);
+        } else {
+            throw new Error("Failed to load data");
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Ошибка", "Не удалось загрузить данные");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, [toast]);
+
+  // 2. ФИЛЬТРАЦИЯ ПОЛЬЗОВАТЕЛЕЙ (МЕМОИЗАЦИЯ)
+  // Создаем список потенциальных руководителей: исключаем гостей
+  const availableHeads = useMemo(() => {
+    return users.filter((u) => u.role !== "guest");
+  }, [users]);
+
+  // 3. ОТПРАВКА ДАННЫХ НА БЭКЕНД
+  const syncStructureWithServer = async (newData: Clinic[]) => {
+    setClinics(newData); // Оптимистичное обновление UI
+    try {
+        await fetch("/api/admin/structure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newData)
+        });
+        toast.success("Успешно", "Структура обновлена");
+    } catch (e) {
+        console.error(e);
+        toast.error("Ошибка", "Не удалось сохранить изменения");
+        // В реальном приложении здесь стоило бы сделать refetch данных
+    }
+  };
+
+  // Фильтрация клиник для поиска
   const filteredData = useMemo(() => {
     if (!search) return clinics;
     const lowerSearch = search.toLowerCase();
@@ -85,7 +141,8 @@ export default function StructurePage() {
     }).filter(Boolean) as Clinic[];
   }, [clinics, search]);
 
-  // --- ЛОГИКА КЛИНИК (Parent) ---
+  // --- ЛОГИКА МОДАЛЬНЫХ ОКОН ---
+
   const openClinicModal = (clinic?: Clinic) => {
     if (clinic) {
         setEditingItem({ id: clinic.id });
@@ -104,33 +161,35 @@ export default function StructurePage() {
   const saveClinic = () => {
     if (!newName.trim()) return;
     
-    // Ищем имя руководителя по ID
-    const headUser = availableHeads.find(u => u.id === newHeadId);
+    // Ищем пользователя в availableHeads (или users)
+    const headUser = users.find(u => u.id === newHeadId);
     const headData = headUser ? { headId: headUser.id, headName: headUser.name } : { headId: undefined, headName: undefined };
 
+    let newData;
     if (editingItem?.id) {
       // Редактирование
-      setClinics(clinics.map(c => c.id === editingItem.id ? { ...c, name: newName, address: newAddress, ...headData } : c));
+      newData = clinics.map(c => c.id === editingItem.id ? { ...c, name: newName, address: newAddress, ...headData } : c);
     } else {
       // Создание
-      setClinics([...clinics, { 
+      newData = [...clinics, { 
         id: `cl_${Date.now()}`, 
         name: newName, 
         address: newAddress, 
         departments: [],
         ...headData
-      }]);
+      }];
     }
+    
+    syncStructureWithServer(newData);
     setIsClinicDialogOpen(false);
   };
 
   const deleteClinic = (id: string) => {
-    if(confirm("Вы уверены? Это удалит клинику и ВСЕХ сотрудников, привязанных к ней!")) {
-        setClinics(clinics.filter(c => c.id !== id));
+    if(confirm("Вы уверены? Это удалит клинику и ВСЕ данные о ней!")) {
+        const newData = clinics.filter(c => c.id !== id);
+        syncStructureWithServer(newData);
     }
   };
-
-  // --- ЛОГИКА ОТДЕЛЕНИЙ (Child) ---
 
   const openDeptModal = (clinicId: string, dept?: Department) => {
     setTargetClinicId(clinicId);
@@ -149,12 +208,13 @@ export default function StructurePage() {
   const saveDept = () => {
     if (!newName.trim() || !targetClinicId) return;
     
-    const headUser = availableHeads.find(u => u.id === newHeadId);
+    const headUser = users.find(u => u.id === newHeadId);
     const headData = headUser ? { headId: headUser.id, headName: headUser.name } : { headId: undefined, headName: undefined };
 
+    let newData;
     if (editingItem?.id) {
-        // Редактирование
-        setClinics(clinics.map(c => {
+        // Редактирование отделения
+        newData = clinics.map(c => {
             if (c.id === targetClinicId) {
                 return {
                     ...c,
@@ -162,10 +222,10 @@ export default function StructurePage() {
                 };
             }
             return c;
-        }));
+        });
     } else {
-        // Создание
-        setClinics(clinics.map(c => {
+        // Создание отделения
+        newData = clinics.map(c => {
             if (c.id === targetClinicId) {
                 return {
                     ...c,
@@ -173,26 +233,67 @@ export default function StructurePage() {
                 };
             }
             return c;
-        }));
+        });
     }
+    
+    syncStructureWithServer(newData);
     setIsDeptDialogOpen(false);
   };
 
   const deleteDept = (deptId: string, clinicId: string) => {
       if(confirm("Удалить отделение?")) {
-        setClinics(clinics.map(c => {
+        const newData = clinics.map(c => {
             if (c.id === clinicId) {
                 return { ...c, departments: c.departments.filter(d => d.id !== deptId) };
             }
             return c;
-        }));
+        });
+        syncStructureWithServer(newData);
       }
   };
+
+  // --- RENDER ---
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
+            <div className="w-full md:w-auto">
+                <Skeleton className="h-8 w-48 mb-2" />
+                <Skeleton className="h-4 w-64" />
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+                <Skeleton className="h-10 flex-1 md:w-64" />
+                <Skeleton className="h-10 w-32" />
+            </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="rounded-xl border bg-card text-card-foreground shadow-sm h-[240px] flex flex-col p-0 overflow-hidden">
+                    <div className="p-4 border-b bg-muted/20 flex justify-between items-start">
+                        <div className="space-y-2">
+                            <Skeleton className="h-5 w-40" />
+                            <Skeleton className="h-4 w-32" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                    </div>
+                    <div className="p-4 flex-1 space-y-3">
+                        <Skeleton className="h-10 w-full rounded-md" />
+                        <Skeleton className="h-10 w-full rounded-md" />
+                        <Skeleton className="h-10 w-full rounded-md" />
+                    </div>
+                </div>
+            ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20">
       
-      {/* --- ШАПКА + ПОИСК --- */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
             <div>
@@ -218,12 +319,10 @@ export default function StructurePage() {
         </div>
       </div>
 
-      {/* --- СЕТКА КАРТОЧЕК (КЛИНИКИ) --- */}
+      {/* LIST */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
         {filteredData.map((clinic) => (
             <Card key={clinic.id} className="flex flex-col overflow-hidden gap-0 p-0 border">
-                
-                {/* Заголовок карточки */}
                 <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
                     <div className="flex items-start justify-between">
                         <div className="space-y-1 overflow-hidden">
@@ -240,15 +339,13 @@ export default function StructurePage() {
                                     <MapPin className="h-3 w-3 shrink-0" />
                                     {clinic.address}
                                 </div>
-                                {/* Руководитель Клиники */}
                                 <div className="flex items-center gap-1.5 text-xs text-primary/80 truncate font-medium">
-                                    <User className="h-3 w-3 shrink-0" />
+                                    <UserIcon className="h-3 w-3 shrink-0" />
                                     {clinic.headName ? `Главврач: ${clinic.headName}` : <span className="text-muted-foreground italic font-normal">Нет руководителя</span>}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Меню действий */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-2 text-muted-foreground hover:text-foreground">
@@ -270,14 +367,11 @@ export default function StructurePage() {
                     </div>
                 </CardHeader>
 
-                {/* Список отделений */}
                 <CardContent className="p-0 flex-1">
                     <div className="divide-y divide-border/50">
                         {clinic.departments.length > 0 ? (
                             clinic.departments.map((dept) => (
                                 <div key={dept.id} className="group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm">
-                                    
-                                    {/* Левая часть: Иконка + Текст */}
                                     <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
                                         <div className="p-1.5 text-info transition-colors">
                                             <Stethoscope className="h-3.5 w-3.5" />
@@ -286,14 +380,12 @@ export default function StructurePage() {
                                             <span className="text-foreground font-medium truncate block w-full">
                                                 {dept.name}
                                             </span>
-                                            {/* Руководитель Отделения */}
                                             <span className="text-xs text-muted-foreground truncate block w-full opacity-80">
                                                 {dept.headName || "Руководитель не назначен"}
                                             </span>
                                         </div>
                                     </div>
                                     
-                                    {/* Правая часть: Кнопки */}
                                     <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                         <Button 
                                             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -318,7 +410,6 @@ export default function StructurePage() {
                     </div>
                 </CardContent>
 
-                {/* Кнопка "Добавить отделение" - Обновленный стиль (как в Classifier) */}
                 <div className="p-3 bg-muted/30 border-t">
                     <Button 
                         variant="outline" 
@@ -333,7 +424,6 @@ export default function StructurePage() {
             </Card>
         ))}
 
-        {/* Заглушка поиска */}
         {filteredData.length === 0 && (
             <div className="col-span-full py-12 text-center text-muted-foreground">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
@@ -344,7 +434,7 @@ export default function StructurePage() {
         )}
       </div>
 
-      {/* === ДИАЛОГ: КЛИНИКА === */}
+      {/* --- МОДАЛЬНОЕ ОКНО КЛИНИКИ --- */}
       <Dialog open={isClinicDialogOpen} onOpenChange={setIsClinicDialogOpen}>
         <DialogContent>
             <DialogHeader>
@@ -369,9 +459,9 @@ export default function StructurePage() {
                         placeholder="ул. Ленина, 1" 
                     />
                 </div>
-                {/* Выбор руководителя */}
                 <div className="grid gap-2">
                     <Label>Главный врач</Label>
+                    {/* Используем availableHeads для фильтрации гостей */}
                     <Select value={newHeadId} onValueChange={setNewHeadId}>
                         <SelectTrigger>
                             <SelectValue placeholder="Выберите руководителя" />
@@ -379,7 +469,9 @@ export default function StructurePage() {
                         <SelectContent>
                             <SelectItem value="none">Не назначен</SelectItem>
                             {availableHeads.map(u => (
-                                <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
+                                <SelectItem key={u.id} value={u.id}>
+                                    {u.name} <span className="text-muted-foreground text-xs">({ROLE_NAMES?.[u.role] || u.role})</span>
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -394,7 +486,7 @@ export default function StructurePage() {
         </DialogContent>
       </Dialog>
 
-      {/* === ДИАЛОГ: ОТДЕЛЕНИЕ === */}
+      {/* --- МОДАЛЬНОЕ ОКНО ОТДЕЛЕНИЯ --- */}
       <Dialog open={isDeptDialogOpen} onOpenChange={setIsDeptDialogOpen}>
         <DialogContent>
             <DialogHeader>
@@ -411,9 +503,9 @@ export default function StructurePage() {
                         autoFocus
                     />
                 </div>
-                {/* Выбор руководителя */}
                 <div className="grid gap-2">
                     <Label>Заведующий отделением</Label>
+                    {/* Используем availableHeads для фильтрации гостей */}
                     <Select value={newHeadId} onValueChange={setNewHeadId}>
                         <SelectTrigger>
                             <SelectValue placeholder="Выберите заведующего" />
@@ -421,7 +513,9 @@ export default function StructurePage() {
                         <SelectContent>
                             <SelectItem value="none">Не назначен</SelectItem>
                             {availableHeads.map(u => (
-                                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                                <SelectItem key={u.id} value={u.id}>
+                                    {u.name} <span className="text-muted-foreground text-xs">({ROLE_NAMES?.[u.role] || u.role})</span>
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

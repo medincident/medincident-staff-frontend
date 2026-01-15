@@ -1,49 +1,155 @@
-export const getStatusColor = (status: string) => {
-  const s = status.toLowerCase();
-  const common = "font-medium text-[12px]";
+type ColorIntent =
+  | "muted"
+  | "info"
+  | "warning"
+  | "purple"
+  | "success"
+  | "destructive";
 
-  if (["created", "new"].includes(s)) {
-    return `${common} bg-muted text-muted-foreground border-border`;
-  }
+const STATUS_INTENTS: Record<string, ColorIntent> = {
+  // --- Нейтральные (Синие/Серые) ---
+  created: "muted",
+  minor: "muted",
 
-  if (["processed"].includes(s)) {
-    return `${common} bg-info/15 text-info border-info/20`;
-  }
+  // --- Информационные (Синие) ---
+  processed: "info",
+  check: "info",
+  normal: "info",
 
-  if (["in_work", "investigation"].includes(s)) {
-    return `${common} bg-warning/15 text-warning border-warning/20`;
-  }
+  // --- Внимание (Желтые) ---
+  in_work: "warning",
+  investigation: "warning",
+  urgent: "warning",
+  moderate: "warning",
 
-  if (["purchase"].includes(s)) {
-    return `${common} bg-purple/15 text-purple border-purple/20`;
-  }
+  // --- Ожидание/Спец (Фиолетовые) ---
+  purchase: "purple",
+  measures: "purple",
 
-  if (["completed", "closed"].includes(s)) {
-    return `${common} bg-success/15 text-success border-success/20`;
-  }
+  // --- Успех (Зеленые) ---
+  completed: "success",
+  closed: "success",
 
-  if (["refused", "cancelled"].includes(s)) {
-    return `${common} bg-destructive/15 text-destructive border-destructive/20`;
-  }
+  // --- Опасность/Отказ (Красные) ---
+  refused: "destructive",
+  cancelled: "destructive",
+  critical: "destructive",
+  severe: "destructive",
 
-  return `${common} bg-muted text-muted-foreground`;
+  // --- Типы уведомлений (Generic) ---
+  info: "info",
+  success: "success",
+  error: "destructive",
+  warning: "warning",
+  default: "muted",
 };
 
-export const getPriorityColor = (priority: string) => {
-  const p = priority.toLowerCase();
-  const common = "font-medium text-[12px]";
+export const getIntentColors = (key: string) => {
+  const intent = getIntent(key);
 
-  if (["critical", "severe"].includes(p)) {
-    return `${common} bg-destructive/15 text-destructive border-destructive/20`;
+  switch (intent) {
+    case "info":
+      return {
+        text: "text-info",
+        bg: "bg-info/10",
+        border: "border-info/20",
+        fill: "fill-info",
+      };
+    case "warning":
+      return {
+        text: "text-warning",
+        bg: "bg-warning/10",
+        border: "border-warning/20",
+        fill: "fill-warning",
+      };
+    case "purple":
+      return {
+        text: "text-purple",
+        bg: "bg-purple/10",
+        border: "border-purple/20",
+        fill: "fill-purple",
+      };
+    case "success":
+      return {
+        text: "text-success",
+        bg: "bg-success/10",
+        border: "border-success/20",
+        fill: "fill-success",
+      };
+    case "destructive":
+      return {
+        text: "text-destructive",
+        bg: "bg-destructive/10",
+        border: "border-destructive/20",
+        fill: "fill-destructive",
+      };
+    case "muted":
+    default:
+      return {
+        text: "text-muted-foreground",
+        bg: "bg-muted",
+        border: "border-border",
+        fill: "fill-muted",
+      };
   }
+};
 
-  if (["urgent", "moderate"].includes(p)) {
-    return `${common} bg-warning/15 text-warning border-warning/20`;
+const getIntent = (key: string): ColorIntent => {
+  const normalizedKey = key?.toLowerCase() || "";
+  return STATUS_INTENTS[normalizedKey] || "muted";
+};
+
+export const getIconColor = (key: string) => getIntentColors(key).text;
+
+export const getBadgeColor = (key: string) => {
+  const c = getIntentColors(key);
+  if (getIntent(key) === "muted")
+    return "font-medium text-[12px] border bg-muted text-muted-foreground border-border";
+  return `font-medium text-[12px] border ${c.bg} ${c.text} ${c.border}`;
+};
+
+export const getCardBorderColor = (key: string) => {
+  const intent = getIntent(key);
+  switch (intent) {
+    case "info":
+      return "border-l-4 border-l-info";
+    case "warning":
+      return "border-l-4 border-l-warning";
+    case "purple":
+      return "border-l-4 border-l-purple";
+    case "success":
+      return "border-l-4 border-l-success";
+    case "destructive":
+      return "border-l-4 border-l-destructive";
+    default:
+      return "border-l-4 border-l-muted-foreground";
   }
+};
 
-  if (["normal", "minor"].includes(p)) {
-    return `${common} bg-info/15 text-info border-info/20`;
-  }
+export const CHART_COLORS: Record<string, string> = {
+  // Статусы
+  Новые: "hsl(var(--info))",
+  "В работе": "hsl(var(--warning))",
+  Завершены: "hsl(var(--success))",
+  Отменены: "hsl(var(--destructive))",
 
-  return `${common} bg-muted text-muted-foreground border-border`;
+  // Тяжесть / Приоритет
+  Легкий: "hsl(var(--success))",
+  Средний: "hsl(var(--warning))",
+  Тяжелый: "hsl(var(--purple))",
+  Критический: "hsl(var(--destructive))",
+
+  // Общие
+  Низкий: "hsl(var(--muted-foreground))",
+  Высокий: "hsl(var(--primary))",
+
+  default: "hsl(var(--primary))",
+};
+
+export const enrichChartData = (data: any[], colorMap = CHART_COLORS) => {
+  if (!data) return [];
+  return data.map((item) => ({
+    ...item,
+    fill: colorMap[item.name] || colorMap.default,
+  }));
 };
