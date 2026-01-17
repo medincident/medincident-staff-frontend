@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ChatSection, ChatMessage } from "@/components/ui/chat-section";
-import { useToast } from "@/components/providers/toast-provider";
+import { toast } from "sonner";
 
 interface EventChatContainerProps {
   eventId: string;
@@ -13,7 +13,6 @@ interface EventChatContainerProps {
 export function EventChatContainer({ eventId, className }: EventChatContainerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const toast = useToast();
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -43,7 +42,7 @@ export function EventChatContainer({ eventId, className }: EventChatContainerPro
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isMe: true
     };
-    
+
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
@@ -56,13 +55,13 @@ export function EventChatContainer({ eventId, className }: EventChatContainerPro
       if (!res.ok) throw new Error("Ошибка отправки");
 
       const serverMsg = await res.json();
-      
-      setMessages((prev) => 
+
+      setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? serverMsg : m))
       );
-      
+
     } catch (error) {
-      toast.error("Ошибка", "Не удалось отправить сообщение");
+      toast.error("Ошибка", { description: "Не удалось отправить сообщение" });
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };

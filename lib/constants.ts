@@ -80,12 +80,3 @@ export const EVENT_STATUS_MAP: Record<EventStatus | string, string> = {
   completed: "Завершено",
   closed: "Закрыто",
 };
-
-export const EVENT_SEVERITY_MAP: Record<EventSeverity | string, string> = {
-  near_miss: "Потенциальный риск",
-  minor: "Легкий вред",
-  moderate: "Средний вред",
-  severe: "Тяжкий вред",
-  critical: "Критический",
-  low: "Низкий",
-};

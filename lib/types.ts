@@ -41,7 +41,7 @@ export interface User {
 export interface Department {
   id: string;
   name: string;
-  headId?: string; // ID руководителя (User.id с ролью head_dept)
+  headId?: string; // ID руководителя
 }
 
 export interface Clinic {
@@ -49,7 +49,7 @@ export interface Clinic {
   name: string;
   address: string;
   departments: Department[];
-  headId?: string; // ID главврача (User.id с ролью head_clinic)
+  headId?: string; // ID главврача
 }
 
 // --- СПРАВОЧНИКИ (КЛАССИФИКАТОР) ---
@@ -197,4 +197,9 @@ export interface DashboardStats {
     avgReactionTime: string;
     bestDepartment: string;
   };
+}
+
+export interface FaqItem {
+  question: string;
+  answer: string;
 }

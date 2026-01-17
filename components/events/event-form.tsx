@@ -19,12 +19,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { useToast } from "@/components/providers/toast-provider";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, { message: "Пожалуйста, выберите категорию" }),
   typeId: z.string().min(1, { message: "Пожалуйста, выберите тип события" }),
-  description: z.string().optional(), 
+  description: z.string().optional(),
 });
 
 type EventFormValues = z.infer<typeof formSchema>;
@@ -37,8 +37,6 @@ export function EventForm({ initialData }: EventFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = !!initialData;
-  
-  const toast = useToast();
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(formSchema),
@@ -54,12 +52,12 @@ export function EventForm({ initialData }: EventFormProps) {
 
   async function onSubmit(values: EventFormValues) {
     setIsSubmitting(true);
-    
+
     try {
-      const url = isEditMode 
-        ? `/api/events/${initialData?.id}` 
+      const url = isEditMode
+        ? `/api/events/${initialData?.id}`
         : "/api/events";
-      
+
       const method = isEditMode ? "PATCH" : "POST";
 
       const response = await fetch(url, {
@@ -78,13 +76,13 @@ export function EventForm({ initialData }: EventFormProps) {
 
       if (isEditMode) {
         toast.success(
-            "Изменения сохранены", 
-            `Событие #${initialData?.id} успешно обновлено.`
+          "Изменения сохранены",
+          { description: `Событие #${initialData?.id} успешно обновлено.` }
         );
       } else {
         toast.success(
-            "Событие зарегистрировано", 
-            `Присвоен номер #${data.id}. Ответственные оповещены.`
+          "Событие зарегистрировано",
+          { description: `Присвоен номер #${data.id}. Ответственные оповещены.` }
         );
       }
 
@@ -95,7 +93,7 @@ export function EventForm({ initialData }: EventFormProps) {
       console.error(error);
       toast.error(
         "Ошибка",
-        "Не удалось сохранить данные. Попробуйте позже."
+        { description: "Не удалось сохранить данные. Попробуйте позже." }
       );
     } finally {
       setIsSubmitting(false);
@@ -128,7 +126,7 @@ export function EventForm({ initialData }: EventFormProps) {
                       value={field.value}
                       onChange={(val) => {
                         field.onChange(val);
-                        if (val !== initialData?.categoryId) form.setValue("typeId", ""); 
+                        if (val !== initialData?.categoryId) form.setValue("typeId", "");
                       }}
                       placeholder="Выберите категорию..."
                     />
@@ -165,10 +163,10 @@ export function EventForm({ initialData }: EventFormProps) {
                 <FormItem>
                   <FormLabel>Описание <span className="text-muted-foreground font-normal">(необязательно)</span></FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Детали происшествия..." 
+                    <Textarea
+                      placeholder="Детали происшествия..."
                       className="resize-none min-h-24"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
