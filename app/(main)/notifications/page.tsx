@@ -62,45 +62,11 @@ export default function NotificationsPage() {
     return acc;
   }, {} as Record<string, Notification[]>);
 
-  if (isLoading) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-8 pb-20">
-        <div className="flex items-center gap-2 py-4">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-        </div>
-        <div className="space-y-8 px-4 md:px-0">
-          {[1, 2].map((group) => (
-            <div key={group} className="space-y-4">
-              <Skeleton className="h-6 w-24 rounded-full" />
-              <div className="space-y-4 ml-2">
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="flex gap-4 p-4 border rounded-xl">
-                    <Skeleton className="h-10 w-10 rounded-full shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <div className="flex justify-between">
-                        <Skeleton className="h-4 w-1/3" />
-                        <Skeleton className="h-4 w-12" />
-                      </div>
-                      <Skeleton className="h-4 w-3/4" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-2xl mx-auto space-y-8 pb-20">
+    <div className="max-w-2xl mx-auto space-y-6 pb-20">
 
-      <div className="flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-md py-4 z-10 border-b md:static md:border-none md:bg-transparent md:py-0">
+      {/* HEADER */}
+      <div className="flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-md py-4 z-10 border-b md:static md:border-none md:bg-transparent md:py-0 px-4 md:px-0">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
             <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -110,78 +76,149 @@ export default function NotificationsPage() {
             <p className="text-sm text-muted-foreground">История системных сообщений</p>
           </div>
         </div>
-        {notifications.some(n => !n.read) && (
+        
+        {!isLoading && notifications.some(n => !n.read) && (
           <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-primary hover:bg-primary/10">
             <CheckCheck className="mr-2 h-4 w-4" />
-            Пометить все
+            <span className="hidden sm:inline">Пометить все</span>
           </Button>
         )}
       </div>
 
-      <div className="space-y-8 px-4 md:px-0">
-        {Object.entries(grouped).map(([date, items]) => (
-          <div key={date} className="relative">
-            <div className="sticky top-20 md:top-0 z-0 flex items-center mb-4">
-              <Badge variant="outline" className="bg-background text-muted-foreground font-normal px-3 py-1 border-border">
-                {date}
-              </Badge>
-              <div className="h-px bg-border flex-1 ml-4 opacity-50"></div>
+      <div className="hidden md:block space-y-8">
+        {isLoading ? (
+          /* Desktop Skeleton */
+          Array.from({ length: 2 }).map((_, i) => (
+            <div key={`desk-skel-${i}`} className="space-y-4">
+              <Skeleton className="h-6.5 w-24 rounded-full" />
+              <div className="space-y-3">
+                {Array.from({ length: 2 }).map((_, j) => (
+                   <div key={j} className="flex gap-4 p-4 border rounded-xl bg-card">
+                      <Skeleton className="h-11 w-10 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-2">
+                         <div className="flex justify-between"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-3 w-10" /></div>
+                         <Skeleton className="h-3 w-3/4" />
+                      </div>
+                   </div>
+                ))}
+              </div>
             </div>
-
-            <div className="space-y-4 ml-2">
-              {items.map((note) => {
-                const Icon = ICON_MAP[note.type] || ICON_MAP.default;
-
-                const colors = getIntentColors(note.type);
-
-                return (
-                  <div key={note.id} className="relative group pl-6 md:pl-0">
-                    <div className="absolute left-0 top-3 -bottom-5 w-px bg-border md:hidden last:hidden"></div>
-
-                    <div className={cn(
-                      "flex items-start gap-4 p-4 rounded-xl border bg-card transition-all duration-200",
-                      "hover:border-primary/30",
-                      !note.read && "bg-accent/5 border-accent/20",
-                      note.type === 'error' && `border-destructive/30 ${colors.bg}`
-                    )}>
-
-                      <div className={cn(
-                        "h-10 w-10 rounded-full flex items-center justify-center shrink-0 border",
-                        colors.text,
-                        colors.bg,
-                        colors.border
+          ))
+        ) : (
+          /* Desktop Content */
+          Object.entries(grouped).map(([date, items]) => (
+            <div key={date} className="relative">
+              <div className="flex items-center mb-4">
+                 <Badge variant="outline" className="px-3 py-1">{date}</Badge>
+                 <div className="h-px bg-border flex-1 ml-4 opacity-50"></div>
+              </div>
+              <div className="space-y-3">
+                {items.map((note) => {
+                  const Icon = ICON_MAP[note.type] || ICON_MAP.default;
+                  const colors = getIntentColors(note.type);
+                  return (
+                    <div key={note.id} className={cn(
+                        "flex items-start gap-4 p-4 rounded-xl border bg-card transition-all hover:border-primary/30",
+                        !note.read && "bg-accent/5 border-accent/20",
+                        note.type === 'error' && `border-destructive/30 ${colors.bg}`
                       )}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start gap-2">
-                          <h4 className={cn("text-sm font-semibold truncate flex items-center gap-2",
-                            note.type === 'error' ? colors.text : 'text-foreground'
-                          )}>
-                            {note.title}
-                            {!note.read && <span className="w-2 h-2 rounded-full bg-primary inline-block" />}
-                          </h4>
-                          <span className="flex items-center text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded whitespace-nowrap">
-                            <Clock className="h-3 w-3 mr-1 opacity-70" />
-                            {note.time}
-                          </span>
+                        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0 border", colors.text, colors.bg, colors.border)}>
+                          <Icon className="h-5 w-5" />
                         </div>
-
-                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                          {note.desc}
-                        </p>
-                      </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <h4 className={cn("text-sm font-semibold truncate", note.type === 'error' ? colors.text : 'text-foreground')}>{note.title} {!note.read && <span className="inline-block w-2 h-2 bg-primary rounded-full ml-1" />}</h4>
+                            <span className="text-[10px] text-muted-foreground flex items-center bg-muted px-1.5 py-0.5 rounded"><Clock className="h-3 w-3 mr-1"/>{note.time}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{note.desc}</p>
+                        </div>
                     </div>
-                  </div>
-                );
-              })}
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
-      {notifications.length === 0 && (
+      <div className="md:hidden space-y-6 px-4">
+         {isLoading ? (
+           /* Mobile Skeleton */
+           Array.from({ length: 2 }).map((_, i) => (
+             <div key={`mob-skel-${i}`} className="space-y-4">
+               <div className="flex items-center mb-4 py-2">
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <div className="h-px bg-border flex-1 ml-4 opacity-50" />
+               </div>
+               
+               <div className="space-y-6">
+                 {Array.from({ length: 2 }).map((_, j) => (
+                    <div key={j} className="relative pl-6">
+                       
+                       <div className="flex gap-3 p-2 border rounded-xl bg-card items-start">
+                          <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                          
+                          <div className="flex-1 space-y-2 py-0.5">
+                             <div className="flex justify-between">
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-2 w-8" />
+                             </div>
+                             <Skeleton className="h-3 w-full" />
+                             <Skeleton className="h-2 w-2/3" />
+                          </div>
+                       </div>
+                    </div>
+                 ))}
+               </div>
+             </div>
+           ))
+         ) : (
+           /* Mobile Content */
+           Object.entries(grouped).map(([date, items]) => (
+            <div key={date}>
+               <div className="sticky top-15 z-10 flex items-center mb-4 bg-background py-2">
+                 <Badge variant="outline" className="px-3 py-1 font-normal bg-background">{date}</Badge>
+                 <div className="h-px bg-border flex-1 ml-4 opacity-50"></div>
+               </div>
+               
+               <div className="space-y-6">
+                 {items.map((note) => {
+                    const Icon = ICON_MAP[note.type] || ICON_MAP.default;
+                    const colors = getIntentColors(note.type);
+                    return (
+                      <div key={note.id} className="relative pl-6">
+                         <div className="absolute left-0 top-3 -bottom-8 w-px bg-border last:bottom-0"></div>
+                         <div className="absolute -left-0.5 top-5 w-1.5 h-1.5 rounded-full bg-border"></div>
+
+                         <div className={cn(
+                           "flex gap-3 p-3 rounded-xl border bg-card transition-all",
+                           !note.read && "bg-accent/5 border-accent/20",
+                           note.type === 'error' && `border-destructive/30 ${colors.bg}`
+                         )}>
+                            <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0 border", colors.text, colors.bg, colors.border)}>
+                               <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                               <div className="flex justify-between items-start gap-1">
+                                  <h4 className={cn("text-sm font-semibold truncate leading-tight", note.type === 'error' ? colors.text : 'text-foreground')}>
+                                    {note.title}
+                                    {!note.read && <span className="inline-block w-1.5 h-1.5 bg-primary rounded-full ml-1 align-top" />}
+                                  </h4>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">{note.time}</span>
+                               </div>
+                               <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">{note.desc}</p>
+                            </div>
+                         </div>
+                      </div>
+                    )
+                 })}
+               </div>
+            </div>
+           ))
+         )}
+      </div>
+
+      {!isLoading && notifications.length === 0 && (
         <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4">
           <div className="h-24 w-24 bg-muted/30 rounded-full flex items-center justify-center mb-6">
             <BellOff className="h-10 w-10 text-muted-foreground/40" />

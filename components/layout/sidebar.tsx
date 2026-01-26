@@ -9,7 +9,7 @@ import {
   Shield, 
   Users, 
   Building,
-  Wrench // <-- Добавили иконку
+  UserCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,12 +21,13 @@ export function Sidebar() {
   const mainLinks = [
     { href: "/dashboard", label: "Главная", icon: LayoutDashboard },
     { href: "/events", label: "События", icon: AlertTriangle },
-    { href: "/requests", label: "Заявки", icon: Wrench },
+    // { href: "/requests", label: "Заявки", icon: Wrench },
     { href: "/reports", label: "Отчеты", icon: BarChart3 },
   ];
 
   const adminLinks = [
     { href: "/admin/classifier", label: "Классификатор", icon: Shield },
+    { href: "/admin/department", label: "Подразделение", icon: UserCheck },
     { href: "/admin/structure", label: "Структура", icon: Building },
     { href: "/admin/users", label: "Пользователи", icon: Users },
   ];

@@ -26,13 +26,13 @@ import {
 } from "@/components/ui/select";
 
 type Option = {
-  value: string;
+  value: string | number; // Разрешаем и числа в типах
   label: string;
 };
 
 interface SearchableSelectProps {
   options: Option[];
-  value?: string;
+  value?: string | number; // Разрешаем приходить числу
   onChange: (value: string) => void;
   placeholder?: string;
   emptyMessage?: string;
@@ -51,17 +51,25 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
 
+  // !!! ГЛАВНОЕ ИСПРАВЛЕНИЕ !!!
+  // Приводим текущее значение к строке для корректного сравнения,
+  // так как value селектов всегда строки в HTML.
+  const stringValue = value !== undefined && value !== null ? String(value) : "";
+
   // 1. Режим простого списка (мало элементов)
   if (options.length <= threshold) {
     return (
-      <Select disabled={disabled} value={value} onValueChange={onChange}>
+      <Select 
+        disabled={disabled} 
+        value={stringValue} // Используем строковое значение
+        onValueChange={onChange}
+      >
         <SelectTrigger 
           className={cn(
             "w-full bg-background text-foreground border-input transition-colors",
-            // Стили как у Input:
             "hover:border-primary",
             "focus:ring-0 focus:ring-offset-0 focus:border-primary",
-            !value && "text-muted-foreground"
+            !stringValue && "text-muted-foreground"
           )}
         >
           <SelectValue placeholder={placeholder} />
@@ -70,8 +78,8 @@ export function SearchableSelect({
           {options.length > 0 ? (
             options.map((option) => (
               <SelectItem
-                key={option.value}
-                value={option.value}
+                key={String(option.value)}
+                value={String(option.value)} // Гарантируем строку в value
                 className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
               >
                 {option.label}
@@ -88,7 +96,9 @@ export function SearchableSelect({
   }
 
   // 2. Режим поиска (Combobox)
-  const selectedLabel = options.find((opt) => opt.value === value)?.label;
+  
+  // Ищем лейбл, сравнивая значения как строки
+  const selectedLabel = options.find((opt) => String(opt.value) === stringValue)?.label;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -100,13 +110,12 @@ export function SearchableSelect({
           disabled={disabled}
           className={cn(
             "w-full justify-between bg-background font-normal border-input transition-colors",
-            // Стили как у Input:
-            "hover:bg-background hover:text-foreground hover:border-primary", // Убрал серый фон при ховере, оставил рамку
-            "focus:ring-0 focus:ring-offset-0 focus:border-primary", // Убрал стандартное кольцо
-            !value && "text-muted-foreground"
+            "hover:bg-background hover:text-foreground hover:border-primary",
+            "focus:ring-0 focus:ring-offset-0 focus:border-primary",
+            !stringValue && "text-muted-foreground"
           )}
         >
-          {value ? selectedLabel : placeholder}
+          {stringValue ? selectedLabel : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -117,13 +126,14 @@ export function SearchableSelect({
         style={{ width: "var(--radix-popover-trigger-width)" }}
       >
         <Command 
-             filter={(value, search) => {
-                if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+             filter={(val, search) => {
+                // val здесь - это label опции (так работает Command по умолчанию), 
+                // если не переопределено filter
+                if (val.toLowerCase().includes(search.toLowerCase())) return 1;
                 return 0;
              }}
              className="bg-popover text-popover-foreground w-full"
         >
-          {/* Убираем кольцо и у инпута поиска внутри */}
           <CommandInput 
             placeholder="Поиск..." 
             className="h-9 border-none focus:ring-0" 
@@ -133,14 +143,14 @@ export function SearchableSelect({
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
-                  key={option.value}
+                  key={String(option.value)}
                   value={option.label} 
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                   }}
                   onSelect={() => {
-                    onChange(option.value);
+                    onChange(String(option.value)); // Возвращаем всегда строку
                     setOpen(false);
                   }}
                   className="cursor-pointer aria-selected:bg-accent aria-selected:text-accent-foreground"
@@ -148,7 +158,8 @@ export function SearchableSelect({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0"
+                      // Сравниваем как строки
+                      stringValue === String(option.value) ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {option.label}

@@ -1,14 +1,28 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RequestForm } from "@/components/requests/request-form"; 
-import { useToast } from "@/components/providers/toast-provider";
+import { toast } from "sonner";
+
+// Этот справочник можно вынести в отдельный файл констант или загружать с API
+const SERVICE_TYPES = [
+  { id: "plumbing", label: "Сантехника" },
+  { id: "electric", label: "Электрика" },
+  { id: "it_support", label: "IT Поддержка / Оргтехника" },
+  { id: "it_soft", label: "IT Программное обеспечение" },
+  { id: "med_equipment", label: "Медтехника" },
+  { id: "furniture", label: "Мебель / Ремонт помещений" },
+  { id: "cleaning", label: "Клининг / Дезинфекция" },
+  { id: "ventilation", label: "Вентиляция и кондиционирование" },
+];
 
 export default function EditRequestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
-  const toast = useToast();
+  const router = useRouter();
 
   const [initialData, setInitialData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,52 +36,73 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
           const data = await res.json();
           setInitialData(data);
         } else {
-            toast.error("Ошибка", "Не удалось загрузить данные заявки");
+            toast.error("Ошибка", {description: "Не удалось загрузить данные заявки"});
         }
       } catch (error) {
         console.error(error);
+        toast.error("Ошибка сети");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [id, toast]);
+  }, [id]);
 
   if (isLoading) {
     return (
-      <div className="max-w-2xl mx-auto pb-20 space-y-6">
+      <div className="max-w-2xl mx-auto pb-20">
+        
+        {/* HEADER SKELETON */}
         <div className="flex items-center gap-2 mb-6">
-            <Skeleton className="h-10 w-10 rounded-md" />
-            <Skeleton className="h-8 w-64" />
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                <ArrowLeft className="h-5 w-5 text-foreground" />
+            </Button>
+            <h1 className="text-2xl font-bold text-foreground">
+                Редактирование заявки
+            </h1>
         </div>
 
+        {/* FORM SKELETON (Structure matches the real form) */}
         <div className="bg-card p-6 rounded-xl border space-y-6">
+            
+            {/* Grid: Type & Location */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" /> {/* Label */}
+                    <Skeleton className="h-8.25 w-full rounded-md" /> {/* Input */}
+                </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-8.25 w-full rounded-md" />
+                </div>
+            </div>
+
+            {/* Priority Cards */}
+            <div className="space-y-3">
+                <Skeleton className="h-4 w-40" /> {/* Label */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                </div>
+            </div>
+
+            {/* Description */}
             <div className="space-y-2">
                 <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-24 w-full rounded-md" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-10 w-full" />
-                </div>
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-10 w-full" />
-                </div>
-            </div>
-            <div className="space-y-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-24 w-full" />
-            </div>
-            <Skeleton className="h-12 w-full mt-4" />
+
+            {/* Button */}
+            <Skeleton className="h-12 w-full mt-4 rounded-md" />
         </div>
       </div>
     );
   }
 
+  // Передаем справочник и данные в чистую форму
   return (
-    <RequestForm initialData={initialData} />
+    <RequestForm initialData={initialData} serviceTypes={SERVICE_TYPES} />
   );
 }

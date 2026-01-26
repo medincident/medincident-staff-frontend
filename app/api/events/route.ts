@@ -21,6 +21,8 @@ export async function GET() {
     category: getCategoryName(event.categoryId),
   }));
 
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
   return NextResponse.json(enrichedEvents);
 }
 

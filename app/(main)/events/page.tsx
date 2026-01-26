@@ -6,10 +6,8 @@ import {
   Plus,
   Search,
   Filter,
-  MoreHorizontal,
   Calendar,
   Edit,
-  Trash2,
   User,
   ChevronRight
 } from "lucide-react";
@@ -27,13 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -58,7 +49,6 @@ export default function EventsListPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        // Загружаем публичный классификатор
         const [eventsRes, classifierRes] = await Promise.all([
           fetch("/api/events"),
           fetch("/api/classifier")
@@ -81,30 +71,23 @@ export default function EventsListPage() {
     fetchData();
   }, []);
 
-  // 1. Словарь типов событий (id -> name)
   const typeNamesMap = useMemo(() => {
     const map: Record<string, string> = {};
     classifier.forEach(cat => {
-      cat.types.forEach(t => {
-        map[t.id] = t.name;
-      });
+      cat.types.forEach(t => { map[t.id] = t.name; });
     });
     return map;
   }, [classifier]);
 
-  // 2. Словарь категорий (id -> name) — ДОБАВЛЕНО
   const categoryNamesMap = useMemo(() => {
     const map: Record<string, string> = {};
-    classifier.forEach(cat => {
-      map[cat.id] = cat.name;
-    });
+    classifier.forEach(cat => { map[cat.id] = cat.name; });
     return map;
   }, [classifier]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
       const typeNameRu = typeNamesMap[event.typeId || ""] || event.typeName || "";
-      // Можно добавить поиск и по названию категории
       const categoryNameRu = categoryNamesMap[event.categoryId] || event.categoryName || "";
 
       const searchString = `${event.code} ${typeNameRu} ${categoryNameRu} ${event.description || ''}`.toLowerCase();
@@ -117,88 +100,60 @@ export default function EventsListPage() {
     });
   }, [events, searchTerm, statusFilter, typeNamesMap, categoryNamesMap]);
 
-  const handleCancel = (id: string) => {
-    if (confirm(`Вы уверены, что хотите закрыть это событие?`)) {
-      console.log(`Event ${id} closed`);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6 pb-20">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Skeleton className="h-10 flex-1" />
-          <Skeleton className="h-10 w-full sm:w-[180px]" />
-        </div>
-        <div className="hidden md:block rounded-md border overflow-hidden">
-          <div className="border-b bg-muted/50 p-4 flex gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-4 flex-1" />)}
-          </div>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="p-4 border-b flex gap-4 items-center last:border-0">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 flex-1" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-6 w-20 rounded-full" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-8 w-8 rounded-md ml-auto" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 pb-20">
 
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Журнал событий</h1>
           <p className="text-sm text-muted-foreground">Список всех зарегистрированных инцидентов и НС</p>
         </div>
         <Link href="/events/new">
-          <Button className="font-semibold">
+          <Button className="font-semibold" disabled={isLoading}>
             <Plus className="mr-2 h-4 w-4" />
             Новое событие
           </Button>
         </Link>
       </div>
 
+      {/* FILTERS */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Поиск по коду, типу или описанию..."
-            className="pl-9 bg-background focus-visible:ring-primary"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[220px] bg-background">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Filter className="h-4 w-4" />
-              <SelectValue placeholder="Статус" />
-            </div>
-          </SelectTrigger>
-          <SelectContent className="border">
-            <SelectItem value="all">Все статусы</SelectItem>
-            {Object.entries(EVENT_STATUS_MAP).map(([key, label]) => (
-              <SelectItem key={key} value={key}>{label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isLoading ? (
+            <>
+                <Skeleton className="h-9 w-full sm:flex-1 rounded-md" />
+                <Skeleton className="h-9 w-full sm:w-[220px] rounded-md" />
+            </>
+        ) : (
+            <>
+                <div className="relative flex-1 w-full">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Поиск по коду, типу или описанию..."
+                        className="pl-9 bg-background focus-visible:ring-primary w-full"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-[220px] bg-background">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Filter className="h-4 w-4" />
+                            <SelectValue placeholder="Статус" />
+                        </div>
+                    </SelectTrigger>
+                    <SelectContent className="border">
+                        <SelectItem value="all">Все статусы</SelectItem>
+                        {Object.entries(EVENT_STATUS_MAP).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </>
+        )}
       </div>
 
-      {/* ТАБЛИЦА (DESKTOP) */}
+      {/* TABLE (DESKTOP) */}
       <div className="hidden md:block bg-card rounded-xl border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50 border-b">
@@ -208,15 +163,37 @@ export default function EventsListPage() {
               <TableHead className="text-muted-foreground font-semibold">Категория</TableHead>
               <TableHead className="text-muted-foreground font-semibold">Статус</TableHead>
               <TableHead className="text-center text-muted-foreground font-semibold">Дата</TableHead>
-              <TableHead className="text-right text-muted-foreground font-semibold">Действия</TableHead>
+              <TableHead className="text-right text-muted-foreground font-semibold w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredEvents.length > 0 ? (
+            {/* SKELETON STATE */}
+            {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skel-${i}`} className="border-b last:border-0">
+                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell>
+                        <div className="space-y-1.5 max-w-[350px]">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-3 w-32" />
+                        </div>
+                    </TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20 rounded-md" /></TableCell>
+                    <TableCell>
+                        <div className="flex justify-center"><Skeleton className="h-4 w-24" /></div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                        <div className="flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div>
+                    </TableCell>
+                </TableRow>
+            ))}
+
+            {/* DATA STATE */}
+            {!isLoading && (filteredEvents.length > 0 ? (
               filteredEvents.map((event) => (
                 <TableRow
                   key={event.id}
-                  className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                  className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer group"
                   onClick={() => window.location.href = `/events/${event.id}`}
                 >
                   <TableCell className="font-mono font-bold text-xs text-muted-foreground">
@@ -233,7 +210,6 @@ export default function EventsListPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {/* 3. ИСПОЛЬЗУЕМ СЛОВАРЬ КАТЕГОРИЙ */}
                     {categoryNamesMap[event.categoryId] || event.categoryName || event.categoryId}
                   </TableCell>
                   <TableCell>
@@ -248,44 +224,63 @@ export default function EventsListPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="border w-48">
-                        <Link href={`/events/${event.id}/edit`}>
-                          <DropdownMenuItem className="cursor-pointer">
-                            <Edit className="mr-2 h-4 w-4" /> Редактировать
-                          </DropdownMenuItem>
-                        </Link>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                          onClick={() => handleCancel(event.id)}
+                    <Link href={`/events/${event.id}/edit`}>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> Закрыть
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                  События не найдены
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <Search className="h-8 w-8 mb-2 opacity-20" />
+                    События не найдены
+                  </div>
                 </TableCell>
               </TableRow>
-            )}
+            ))}
           </TableBody>
         </Table>
       </div>
 
-      {/* КАРТОЧКИ (MOBILE) */}
+      {/* CARDS (MOBILE) */}
       <div className="md:hidden space-y-4">
-        {filteredEvents.length > 0 ? (
+        {/* SKELETON STATE (Mobile) */}
+        {isLoading && Array.from({ length: 3 }).map((_, i) => (
+            <div key={`mob-skel-${i}`} className="border rounded-xl bg-card overflow-hidden">
+                <div className="p-4 pr-12 pb-3 space-y-3">
+                    <div className="space-y-1.5">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-4 w-3/4" />
+                    </div>
+                    <div className="flex gap-2">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                        <Skeleton className="h-5 w-24 rounded-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-3.5 w-3.5 rounded-full" />
+                        <Skeleton className="h-3 w-32" />
+                    </div>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/5">
+                    <div className="flex gap-2">
+                        <Skeleton className="h-3 w-3" />
+                        <Skeleton className="h-3 w-20" />
+                    </div>
+                    <Skeleton className="h-4 w-4 rounded-full opacity-30" />
+                </div>
+            </div>
+        ))}
+
+        {/* DATA STATE */}
+        {!isLoading && (filteredEvents.length > 0 ? (
           filteredEvents.map((event) => (
             <div key={event.id} className="relative">
               <Link href={`/events/${event.id}`} className="block">
@@ -308,7 +303,6 @@ export default function EventsListPage() {
                         {EVENT_STATUS_MAP[event.status as EventStatus] || event.status}
                       </Badge>
                       <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border">
-                        {/* 4. И ЗДЕСЬ ТОЖЕ СЛОВАРЬ КАТЕГОРИЙ */}
                         {categoryNamesMap[event.categoryId] || event.categoryName || event.categoryId}
                       </span>
                     </div>
@@ -331,36 +325,18 @@ export default function EventsListPage() {
                 </Card>
               </Link>
 
-              <div className="absolute top-2 right-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+              {/* Кнопка редактирования (абсолют) */}
+              <div className="absolute top-3 right-3">
+                <Link href={`/events/${event.id}/edit`}>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-muted-foreground hover:bg-muted"
-                      onClick={(e) => e.stopPropagation()}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                      <MoreHorizontal className="h-5 w-5" />
+                        <Edit className="h-4 w-4" />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="border w-48">
-                    <Link href={`/events/${event.id}/edit`}>
-                      <DropdownMenuItem className="cursor-pointer">
-                        <Edit className="mr-2 h-4 w-4" /> Редактировать
-                      </DropdownMenuItem>
-                    </Link>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCancel(event.id);
-                      }}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Закрыть
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                </Link>
               </div>
             </div>
           ))
@@ -369,7 +345,7 @@ export default function EventsListPage() {
             <Search className="h-10 w-10 mb-3 opacity-20" />
             <p className="text-sm font-medium">События не найдены</p>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

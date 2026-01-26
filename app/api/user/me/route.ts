@@ -22,12 +22,14 @@ export async function GET() {
           : "Общее отделение",
     };
 
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
     return NextResponse.json(userResponse);
   } catch (error) {
     console.error("Fetch Me Error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

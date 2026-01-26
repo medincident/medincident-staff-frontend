@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react"; 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,19 +20,7 @@ import {
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { useToast } from "@/components/providers/toast-provider";
-
-// Конфигурация типов работ (в реальном приложении может приходить с бэкенда)
-const SERVICE_TYPES = [
-  { id: "plumbing", label: "Сантехника" },
-  { id: "electric", label: "Электрика" },
-  { id: "it_support", label: "IT Поддержка / Оргтехника" },
-  { id: "it_soft", label: "IT Программное обеспечение" },
-  { id: "med_equipment", label: "Медтехника" },
-  { id: "furniture", label: "Мебель / Ремонт помещений" },
-  { id: "cleaning", label: "Клининг / Дезинфекция" },
-  { id: "ventilation", label: "Вентиляция и кондиционирование" },
-];
+import { toast } from "sonner";
 
 const formSchema = z.object({
   type: z.string().min(1, { message: "Выберите тип работ" }),
@@ -46,21 +34,25 @@ const formSchema = z.object({
 
 type RequestFormValues = z.infer<typeof formSchema>;
 
-interface RequestFormProps {
-  initialData?: RequestFormValues & { id?: string };
+interface ServiceType {
+    id: string;
+    label: string;
 }
 
-export function RequestForm({ initialData }: RequestFormProps) {
+interface RequestFormProps {
+  initialData?: RequestFormValues & { id?: string };
+  serviceTypes?: ServiceType[];
+}
+
+function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const linkedEventIdParam = searchParams.get("linkedEventId");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Стейт для хранения красивого кода события (INC-XXX)
   const [linkedEventCode, setLinkedEventCode] = useState<string>("");
   
   const isEditMode = !!initialData;
-  const toast = useToast();
 
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(formSchema),
@@ -73,20 +65,27 @@ export function RequestForm({ initialData }: RequestFormProps) {
     },
   });
 
-  // Получаем текущее значение ID для отслеживания и отображения
+  useEffect(() => {
+    if (initialData) {
+      form.reset({
+        type: initialData.type,
+        location: initialData.location,
+        priority: initialData.priority as "normal" | "urgent" | "critical",
+        description: initialData.description,
+        linkedEventId: initialData.linkedEventId,
+      });
+    }
+  }, [initialData, form]);
+
   const currentLinkedEventId = form.watch("linkedEventId");
 
-  // Эффект для загрузки кода события по его ID
   useEffect(() => {
     const fetchLinkedEventInfo = async () => {
       if (!currentLinkedEventId) return;
-
       try {
-        // Делаем запрос к API, чтобы получить детали события (нам нужен code)
         const res = await fetch(`/api/events/${currentLinkedEventId}`);
         if (res.ok) {
           const data = await res.json();
-          // Если API вернул code, сохраняем его
           if (data.code) {
             setLinkedEventCode(data.code);
           }
@@ -101,13 +100,12 @@ export function RequestForm({ initialData }: RequestFormProps) {
 
   async function onSubmit(values: RequestFormValues) {
     setIsSubmitting(true);
-    
     try {
-      const url = isEditMode 
-        ? `/api/requests/${initialData?.id}`
+      const url = isEditMode && initialData?.id
+        ? `/api/requests/${initialData.id}`
         : "/api/requests";
       
-      const method = isEditMode ? "PATCH" : "POST";
+      const method = isEditMode && initialData?.id ? "PATCH" : "POST";
 
       const response = await fetch(url, {
         method: method,
@@ -120,15 +118,9 @@ export function RequestForm({ initialData }: RequestFormProps) {
       const data = await response.json();
 
       if (isEditMode) {
-        toast.success(
-            "Заявка обновлена", 
-            `Заявка #${initialData?.id} успешно сохранена.`
-        );
+        toast.success("Заявка обновлена", {description: `Заявка #${initialData?.id} успешно сохранена.`});
       } else {
-        toast.success(
-            "Заявка создана", 
-            `Номер заявки #${data.number}. Исполнители уведомлены.`
-        );
+        toast.success("Заявка создана", {description: `Номер заявки #${data.number}. Исполнители уведомлены.`});
       }
 
       router.push("/requests"); 
@@ -136,7 +128,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
 
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка", "Не удалось сохранить заявку.");
+      toast.error("Ошибка", {description: "Не удалось сохранить заявку."});
     } finally {
       setIsSubmitting(false);
     }
@@ -144,6 +136,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
 
   return (
     <div className="max-w-2xl mx-auto pb-20">
+      
       <div className="flex items-center gap-2 mb-6">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -163,7 +156,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
                     <p className="text-xs text-muted-foreground mt-0.5">
                         Эта заявка создается для устранения последствий события 
                         <span className="font-mono font-bold mx-1 text-foreground">
-                            {linkedEventCode}
+                            {linkedEventCode || "..."}
                         </span>
                     </p>
                 </div>
@@ -173,7 +166,6 @@ export function RequestForm({ initialData }: RequestFormProps) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
-            {/* Скрытое поле для ID события */}
             <FormField
               control={form.control}
               name="linkedEventId"
@@ -191,7 +183,7 @@ export function RequestForm({ initialData }: RequestFormProps) {
                     <FormLabel>Тип работ</FormLabel>
                     <FormControl>
                         <SearchableSelect
-                            options={SERVICE_TYPES.map(t => ({ value: t.id, label: t.label }))}
+                            options={serviceTypes.map(t => ({ value: t.id, label: t.label }))}
                             value={field.value}
                             onChange={field.onChange}
                             placeholder="Выберите службу"
@@ -230,7 +222,6 @@ export function RequestForm({ initialData }: RequestFormProps) {
                       defaultValue={field.value}
                       className="grid grid-cols-1 md:grid-cols-3 gap-3"
                     >
-                      {/* Обычный */}
                       <FormItem className="space-y-0">
                         <FormControl>
                           <RadioGroupItem value="normal" className="peer sr-only" />
@@ -252,7 +243,6 @@ export function RequestForm({ initialData }: RequestFormProps) {
                         </FormLabel>
                       </FormItem>
 
-                      {/* Срочный */}
                       <FormItem className="space-y-0">
                           <FormControl>
                           <RadioGroupItem value="urgent" className="peer sr-only" />
@@ -274,7 +264,6 @@ export function RequestForm({ initialData }: RequestFormProps) {
                         </FormLabel>
                       </FormItem>
 
-                      {/* Критичный */}
                       <FormItem className="space-y-0">
                           <FormControl>
                           <RadioGroupItem value="critical" className="peer sr-only" />
@@ -331,5 +320,17 @@ export function RequestForm({ initialData }: RequestFormProps) {
         </Form>
       </div>
     </div>
+  );
+}
+
+export function RequestForm(props: RequestFormProps) {
+  return (
+    <Suspense fallback={
+        <div className="flex h-[50vh] w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    }>
+        <RequestFormContent {...props} />
+    </Suspense>
   );
 }

@@ -6,7 +6,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   await delay(500); // Небольшая задержка для реалистичности
   const { id } = await params;
@@ -24,7 +24,7 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await delay(500);
@@ -51,7 +51,7 @@ export async function PATCH(
     console.error("Update error:", error);
     return NextResponse.json(
       { error: "Failed to update event" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -8,5 +8,7 @@ export async function GET() {
 export async function POST() {
   // Логика "прочитать все"
   MOCK_NOTIFICATIONS.forEach((n) => (n.read = true));
+
+  await new Promise((resolve) => setTimeout(resolve, 800));
   return NextResponse.json({ success: true });
 }

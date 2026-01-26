@@ -6,13 +6,11 @@ import {
   Plus,
   Search,
   Filter,
-  MoreHorizontal,
   Calendar,
   ChevronRight,
   MapPin,
   Clock,
   Edit,
-  Trash2,
   Wrench
 } from "lucide-react";
 
@@ -29,13 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -91,41 +82,6 @@ export default function RequestsListPage() {
     });
   }, [requests, searchTerm, statusFilter, priorityFilter]);
 
-  const handleCancel = (id: string) => {
-    if (confirm(`Вы уверены, что хотите отменить заявку?`)) {
-      console.log(`Request ${id} cancelled`);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6 pb-20">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div><Skeleton className="h-8 w-48 mb-2" /><Skeleton className="h-4 w-64" /></div>
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="flex flex-col md:flex-row gap-3">
-          <Skeleton className="h-10 flex-1" />
-          <div className="flex gap-3 w-full md:w-auto">
-            <Skeleton className="h-10 w-full sm:w-[180px]" /><Skeleton className="h-10 w-full sm:w-[180px]" />
-          </div>
-        </div>
-        <div className="hidden md:block rounded-md border overflow-hidden">
-          <div className="border-b bg-muted/50 p-4 flex gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-4 flex-1" />)}
-          </div>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="p-4 border-b flex gap-4 items-center last:border-0">
-              <Skeleton className="h-4 w-16" /><Skeleton className="h-4 flex-1" /><Skeleton className="h-4 w-32" />
-              <Skeleton className="h-6 w-20 rounded-full" /><Skeleton className="h-6 w-24 rounded-full" />
-              <Skeleton className="h-4 w-24" /><Skeleton className="h-8 w-8 rounded-md ml-auto" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 pb-20">
 
@@ -135,48 +91,67 @@ export default function RequestsListPage() {
           <h1 className="text-2xl font-bold text-foreground">Заявки на обслуживание</h1>
           <p className="text-sm text-muted-foreground">АХО, ИТ, Медтехника и другие службы</p>
         </div>
-        <Link href="/requests/new">
-          <Button className="font-semibold"><Plus className="mr-2 h-4 w-4" />Создать заявку</Button>
+        
+        {/* ИСПРАВЛЕНИЕ: Кнопка теперь неактивна при загрузке */}
+        <Link href="/requests/new" className={isLoading ? "pointer-events-none" : ""}>
+          <Button className="font-semibold" disabled={isLoading}>
+            <Plus className="mr-2 h-4 w-4" />
+            Создать заявку
+          </Button>
         </Link>
       </div>
 
       {/* FILTERS */}
       <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Поиск по номеру, описанию или кабинету..."
-            className="pl-9 bg-background focus-visible:ring-primary"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        {isLoading ? (
+          /* SKELETON FILTERS */
+          <>
+             <Skeleton className="h-9 flex-1 rounded-md" />
+             <div className="flex gap-3 w-full md:w-auto">
+                <Skeleton className="h-9 w-full sm:w-[180px] rounded-md" />
+                <Skeleton className="h-9 w-full sm:w-[180px] rounded-md" />
+             </div>
+          </>
+        ) : (
+          /* REAL FILTERS */
+          <>
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Поиск по номеру, описанию или кабинету..."
+                className="pl-9 bg-background focus-visible:ring-primary"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px] bg-background">
-              <div className="flex items-center gap-2 text-muted-foreground"><Filter className="h-4 w-4" /><SelectValue placeholder="Статус" /></div>
-            </SelectTrigger>
-            <SelectContent className="border">
-              <SelectItem value="all">Все статусы</SelectItem>
-              {Object.entries(STATUS_MAP).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[180px] bg-background">
+                  <div className="flex items-center gap-2 text-muted-foreground"><Filter className="h-4 w-4" /><SelectValue placeholder="Статус" /></div>
+                </SelectTrigger>
+                <SelectContent className="border">
+                  <SelectItem value="all">Все статусы</SelectItem>
+                  {Object.entries(STATUS_MAP).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-full sm:w-[180px] bg-background">
-              <div className="flex items-center gap-2 text-muted-foreground"><Clock className="h-4 w-4" /><SelectValue placeholder="Приоритет" /></div>
-            </SelectTrigger>
-            <SelectContent className="border">
-              <SelectItem value="all">Все приоритеты</SelectItem>
-              {Object.entries(PRIORITY_MAP).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-full sm:w-[180px] bg-background">
+                  <div className="flex items-center gap-2 text-muted-foreground"><Clock className="h-4 w-4" /><SelectValue placeholder="Приоритет" /></div>
+                </SelectTrigger>
+                <SelectContent className="border">
+                  <SelectItem value="all">Все приоритеты</SelectItem>
+                  {Object.entries(PRIORITY_MAP).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
       </div>
 
       {/* DESKTOP TABLE */}
@@ -190,15 +165,33 @@ export default function RequestsListPage() {
               <TableHead className="text-muted-foreground font-semibold">Приоритет</TableHead>
               <TableHead className="text-muted-foreground font-semibold">Статус</TableHead>
               <TableHead className="text-center text-muted-foreground font-semibold">Дата</TableHead>
-              <TableHead className="text-right text-muted-foreground font-semibold">Действия</TableHead>
+              <TableHead className="text-right text-muted-foreground font-semibold w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.length > 0 ? (
+            {isLoading ? (
+               /* DESKTOP SKELETON ROWS */
+               Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i} className="border-b last:border-0">
+                     <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                     <TableCell>
+                        <div className="space-y-1.5">
+                           <Skeleton className="h-4 w-32" />
+                           <Skeleton className="h-3 w-48 opacity-70" />
+                        </div>
+                     </TableCell>
+                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                     <TableCell><Skeleton className="h-5 w-20 rounded-md" /></TableCell>
+                     <TableCell><Skeleton className="h-5 w-24 rounded-md" /></TableCell>
+                     <TableCell><div className="flex justify-center"><Skeleton className="h-4 w-20" /></div></TableCell>
+                     <TableCell><div className="flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
+                  </TableRow>
+               ))
+            ) : filteredData.length > 0 ? (
               filteredData.map((req) => (
                 <TableRow
                   key={req.id}
-                  className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                  className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer group"
                   onClick={() => window.location.href = `/requests/${req.id}`}
                 >
                   <TableCell className="font-mono font-medium text-xs text-muted-foreground">#{req.number}</TableCell>
@@ -224,27 +217,15 @@ export default function RequestsListPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="border w-48">
-                        <Link href={`/requests/${req.id}/edit`}>
-                          <DropdownMenuItem className="cursor-pointer">
-                            <Edit className="mr-2 h-4 w-4" />Редактировать
-                          </DropdownMenuItem>
-                        </Link>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                          onClick={() => handleCancel(req.id)}
+                    <Link href={`/requests/${req.id}/edit`}>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />Отменить
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))
@@ -257,7 +238,31 @@ export default function RequestsListPage() {
 
       {/* MOBILE VIEW (CARDS) */}
       <div className="md:hidden space-y-4">
-        {filteredData.length > 0 ? (
+        {isLoading ? (
+           /* MOBILE SKELETON CARDS */
+           Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="border rounded-xl bg-card overflow-hidden">
+                 <div className="p-4 space-y-3">
+                    <div className="space-y-1.5">
+                       <Skeleton className="h-3 w-12" />
+                       <Skeleton className="h-5 w-3/4" />
+                    </div>
+                    <div className="flex gap-2">
+                       <Skeleton className="h-5 w-20 rounded-md" />
+                       <Skeleton className="h-5 w-24 rounded-md" />
+                    </div>
+                    <div className="space-y-1">
+                       <Skeleton className="h-3 w-full" />
+                       <Skeleton className="h-3 w-2/3" />
+                    </div>
+                 </div>
+                 <div className="flex justify-between px-4 py-3 bg-muted/5 border-t">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-4 w-4 rounded-full" />
+                 </div>
+              </div>
+           ))
+        ) : filteredData.length > 0 ? (
           filteredData.map((req) => (
             <div key={req.id} className="relative">
               <Link href={`/requests/${req.id}`} className="block">
@@ -305,32 +310,18 @@ export default function RequestsListPage() {
                 </Card>
               </Link>
 
-              {/* DROPDOWN MENU FOR MOBILE */}
+              {/* EDIT ICON FOR MOBILE (ABSOLUTE POSITION) */}
               <div className="absolute top-2 right-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-muted" onClick={(e) => e.stopPropagation()}>
-                      <MoreHorizontal className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="border w-48">
-                    <Link href={`/requests/${req.id}/edit`}>
-                      <DropdownMenuItem className="cursor-pointer">
-                        <Edit className="mr-2 h-4 w-4" />Редактировать
-                      </DropdownMenuItem>
-                    </Link>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCancel(req.id);
-                      }}
+                 <Link href={`/requests/${req.id}/edit`}>
+                    <Button 
+                       variant="ghost" 
+                       size="icon" 
+                       className="h-9 w-9 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
+                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />Отменить
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                       <Edit className="h-4 w-4" />
+                    </Button>
+                 </Link>
               </div>
             </div>
           ))

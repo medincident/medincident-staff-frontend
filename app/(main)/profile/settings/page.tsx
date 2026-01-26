@@ -6,10 +6,8 @@ import {
   ArrowLeft,
   Save,
   Bell,
-  Clock,
   Mail,
   Moon,
-  Globe,
   Loader2
 } from "lucide-react";
 
@@ -19,14 +17,18 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+const WEEKDAYS = [
+  { id: 0, label: "Пн" },
+  { id: 1, label: "Вт" },
+  { id: 2, label: "Ср" },
+  { id: 3, label: "Чт" },
+  { id: 4, label: "Пт" },
+  { id: 5, label: "Сб" },
+  { id: 6, label: "Вс" },
+];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -35,12 +37,12 @@ export default function SettingsPage() {
   const [initialLoading, setInitialLoading] = useState(true);
 
   const [settings, setSettings] = useState({
-    timezone: "msk",
     emailNotification: false,
     quietMode: {
       enabled: false,
       from: "22:00",
-      to: "07:00"
+      to: "07:00",
+      days: [0, 1, 2, 3, 4, 5, 6]
     }
   });
 
@@ -51,7 +53,13 @@ export default function SettingsPage() {
         const res = await fetch("/api/settings");
         if (res.ok) {
           const data = await res.json();
-          setSettings(data);
+          setSettings(prev => ({
+            ...data,
+            quietMode: {
+              ...data.quietMode,
+              days: data.quietMode.days || prev.quietMode.days
+            }
+          }));
         }
       } catch (error) {
         console.error("Failed to load settings:", error);
@@ -84,73 +92,29 @@ export default function SettingsPage() {
     }
   };
 
-  if (initialLoading) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-6 pb-20">
-        <div className="flex items-center gap-2 mb-6">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-        </div>
+  const toggleDay = (dayId: number) => {
+    setSettings((prev) => {
+      const currentDays = prev.quietMode.days;
+      const newDays = currentDays.includes(dayId)
+        ? currentDays.filter((id: number) => id !== dayId)
+        : [...currentDays, dayId];
 
-        <div className="rounded-xl border bg-card text-card-foreground">
-          <div className="p-6 pb-4">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-10 w-10 rounded-lg" />
-              <Skeleton className="h-6 w-48" />
-            </div>
-          </div>
-          <div className="p-6 pt-0 space-y-4">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-3 w-64" />
-            </div>
-          </div>
-        </div>
+      newDays.sort((a: number, b: number) => a - b);
 
-        <div className="rounded-xl border bg-card text-card-foreground">
-          <div className="p-6 pb-4">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-10 w-10 rounded-lg" />
-              <div className="space-y-1">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
-            </div>
-          </div>
-          <div className="p-6 pt-0 space-y-6">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-lg" />
-                <div className="space-y-1">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-3 w-40" />
-                </div>
-              </div>
-              <Skeleton className="h-6 w-12 rounded-full" />
-            </div>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-lg" />
-                <div className="space-y-1">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-3 w-48" />
-                </div>
-              </div>
-              <Skeleton className="h-6 w-12 rounded-full" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+      return {
+        ...prev,
+        quietMode: {
+          ...prev.quietMode,
+          days: newDays,
+        },
+      };
+    });
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
 
+      {/* HEADER: Виден всегда */}
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
           <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -161,123 +125,172 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <Card className="bg-card">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-3 text-foreground">
-            <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
-              <Globe className="h-5 w-5" />
-            </div>
-            Региональные настройки
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-2">
-            <Label className="text-foreground">Часовой пояс</Label>
-            <Select
-              value={settings.timezone}
-              onValueChange={(val) => setSettings({ ...settings, timezone: val })}
-            >
-              <SelectTrigger className="bg-background border-input">
-                <div className="flex items-center gap-2 text-foreground">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Выберите пояс" />
+      {initialLoading ? (
+        /* --- SKELETON STATE (Точная копия карточки Уведомлений) --- */
+        <div className="space-y-6">
+          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+             
+             {/* Header Skeleton */}
+             <div className="flex flex-col space-y-1.5 p-6 pb-4">
+                <div className="flex items-center gap-3">
+                   <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
+                   <div className="space-y-2">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-3 w-56" />
+                   </div>
                 </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="kal">Калининград (UTC+2)</SelectItem>
-                <SelectItem value="msk">Москва (UTC+3)</SelectItem>
-                <SelectItem value="ekb">Екатеринбург (UTC+5)</SelectItem>
-                <SelectItem value="oms">Омск (UTC+6)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-[10px] text-muted-foreground">Время в отчетах будет отображаться согласно этой настройке.</p>
-          </div>
-        </CardContent>
-      </Card>
+             </div>
 
-      <Card className="bg-card pb-2!">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
-              <Bell className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-base text-foreground">Уведомления</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground mt-0.5">Настройка оповещений и режима тишины</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="divide-y divide-border">
+             {/* Content Skeleton */}
+             <div className="p-6 pt-0 pb-3 space-y-0">
+                
+                {/* Row 1: Email */}
+                <div className="py-4 flex items-center justify-between border-b">
+                   <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
+                      <div className="space-y-2">
+                         <Skeleton className="h-4 w-32" />
+                         <Skeleton className="h-3 w-40" />
+                      </div>
+                   </div>
+                   <Skeleton className="h-6 w-11 rounded-full" />
+                </div>
 
-          <div className="py-4 pt-0 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
-                <Mail className="h-5 w-5" />
-              </div>
-              <div>
-                <Label className="text-base text-foreground">Email оповещения</Label>
-                <p className="text-xs text-muted-foreground">Получать сводку на почту</p>
-              </div>
-            </div>
-            <Switch
-              checked={settings.emailNotification}
-              onCheckedChange={(v) => setSettings({ ...settings, emailNotification: v })}
-            />
+                {/* Row 2: Quiet Mode */}
+                <div className="py-4 flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
+                      <div className="space-y-2">
+                         <Skeleton className="h-4 w-40" />
+                         <Skeleton className="h-3 w-48" />
+                      </div>
+                   </div>
+                   <Skeleton className="h-6 w-11 rounded-full" />
+                </div>
+             </div>
           </div>
 
-          <div className="py-4 space-y-4">
-            <div className="flex items-center justify-between">
+          {/* Button Skeleton */}
+          <div className="flex justify-end pt-4">
+             <Skeleton className="h-10 w-full sm:w-40 rounded-md" />
+          </div>
+        </div>
+      ) : (
+        /* --- REAL CONTENT --- */
+        <>
+          <Card className="bg-card pb-2!">
+            <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
-                  <Moon className="h-5 w-5" />
+                  <Bell className="h-5 w-5" />
                 </div>
                 <div>
-                  <Label className="text-base text-foreground">Режим "Не беспокоить"</Label>
-                  <p className="text-xs text-muted-foreground">Отключать уведомления ночью</p>
+                  <CardTitle className="text-base text-foreground">Уведомления</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground mt-0.5">Настройка оповещений и режима тишины</CardDescription>
                 </div>
               </div>
-              <Switch
-                checked={settings.quietMode.enabled}
-                onCheckedChange={(v) => setSettings({ ...settings, quietMode: { ...settings.quietMode, enabled: v } })}
-              />
-            </div>
+            </CardHeader>
+            <CardContent className="divide-y divide-border">
 
-            {settings.quietMode.enabled && (
-              <div className="grid grid-cols-2 gap-4 pl-14 animate-in fade-in slide-in-from-top-1">
-                <div className="grid gap-1.5">
-                  <Label className="text-xs text-muted-foreground">С (время)</Label>
-                  <Input
-                    type="time"
-                    className="bg-background border-input"
-                    value={settings.quietMode.from}
-                    onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, from: e.target.value } })}
-                  />
+              <div className="py-4 pt-0 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
+                    <Mail className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <Label className="text-base text-foreground">Email оповещения</Label>
+                    <p className="text-xs text-muted-foreground">Получать сводку на почту</p>
+                  </div>
                 </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs text-muted-foreground">До (время)</Label>
-                  <Input
-                    type="time"
-                    className="bg-background border-input"
-                    value={settings.quietMode.to}
-                    onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, to: e.target.value } })}
-                  />
-                </div>
+                <Switch
+                  checked={settings.emailNotification}
+                  onCheckedChange={(v) => setSettings({ ...settings, emailNotification: v })}
+                />
               </div>
-            )}
+
+              <div className="py-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
+                      <Moon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <Label className="text-base text-foreground">Режим "Не беспокоить"</Label>
+                      <p className="text-xs text-muted-foreground">Отключать уведомления ночью</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.quietMode.enabled}
+                    onCheckedChange={(v) => setSettings({ ...settings, quietMode: { ...settings.quietMode, enabled: v } })}
+                  />
+                </div>
+
+                {settings.quietMode.enabled && (
+                  <div className="space-y-4 pl-14 animate-in fade-in slide-in-from-top-1">
+                    {/* Выбор времени */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs text-muted-foreground">С (время)</Label>
+                        <Input
+                          type="time"
+                          className="bg-background border-input"
+                          value={settings.quietMode.from}
+                          onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, from: e.target.value } })}
+                        />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs text-muted-foreground">До (время)</Label>
+                        <Input
+                          type="time"
+                          className="bg-background border-input"
+                          value={settings.quietMode.to}
+                          onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, to: e.target.value } })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Выбор дней недели */}
+                    <div className="grid gap-2">
+                      <Label className="text-xs text-muted-foreground">Повторять по дням</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {WEEKDAYS.map((day) => {
+                          const isSelected = settings.quietMode.days.includes(day.id);
+                          return (
+                            <button
+                              key={day.id}
+                              onClick={() => toggleDay(day.id)}
+                              type="button"
+                              className={cn(
+                                "h-9 w-9 rounded-full text-xs font-medium transition-all border flex items-center justify-center",
+                                isSelected
+                                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                  : "bg-transparent text-muted-foreground border-border hover:border-foreground/50 hover:bg-muted/50"
+                              )}
+                            >
+                              {day.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={handleSave}
+              disabled={loading}
+              className="w-full sm:w-auto"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {loading ? "Сохранение..." : "Сохранить изменения"}
+            </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end pt-4">
-        <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="w-full sm:w-auto"
-        >
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          {loading ? "Сохранение..." : "Сохранить изменения"}
-        </Button>
-      </div>
+        </>
+      )}
     </div>
   );
 }

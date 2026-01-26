@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Save, Plus } from "lucide-react";
 
-import { CLASSIFIER } from "@/lib/mock-db";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -20,6 +19,7 @@ import {
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
+import { Category } from "@/lib/types";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, { message: "Пожалуйста, выберите категорию" }),
@@ -31,59 +31,69 @@ type EventFormValues = z.infer<typeof formSchema>;
 
 interface EventFormProps {
   initialData?: EventFormValues & { id?: string };
+  classifier?: Category[];
 }
 
-export function EventForm({ initialData }: EventFormProps) {
+export function EventForm({ initialData, classifier = [] }: EventFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const isEditMode = !!initialData;
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      categoryId: initialData?.categoryId || "",
-      typeId: initialData?.typeId || "",
+      categoryId: initialData?.categoryId ? String(initialData.categoryId) : "",
+      typeId: initialData?.typeId ? String(initialData.typeId) : "",
       description: initialData?.description || "",
     },
   });
 
+  useEffect(() => {
+    if (initialData) {
+      form.reset({
+        categoryId: String(initialData.categoryId),
+        typeId: String(initialData.typeId),
+        description: initialData.description || "",
+      });
+    }
+  }, [initialData, form]);
+
   const selectedCategoryId = form.watch("categoryId");
-  const availableTypes = CLASSIFIER.find((c) => c.id === selectedCategoryId)?.types || [];
+
+  const availableTypes = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    
+    const category = classifier.find(
+      (c) => String(c.id) === String(selectedCategoryId)
+    );
+    
+    return category?.types || [];
+  }, [selectedCategoryId, classifier]);
 
   async function onSubmit(values: EventFormValues) {
     setIsSubmitting(true);
-
     try {
-      const url = isEditMode
-        ? `/api/events/${initialData?.id}`
+      const url = isEditMode && initialData?.id
+        ? `/api/events/${initialData.id}`
         : "/api/events";
-
-      const method = isEditMode ? "PATCH" : "POST";
+      
+      const method = isEditMode && initialData?.id ? "PATCH" : "POST";
 
       const response = await fetch(url, {
         method: method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
 
-      if (!response.ok) {
-        throw new Error("Ошибка при сохранении");
-      }
+      if (!response.ok) throw new Error("Ошибка при сохранении");
 
       const data = await response.json();
 
       if (isEditMode) {
-        toast.success(
-          "Изменения сохранены",
-          { description: `Событие #${initialData?.id} успешно обновлено.` }
-        );
+        toast.success("Изменения сохранены");
       } else {
-        toast.success(
-          "Событие зарегистрировано",
-          { description: `Присвоен номер #${data.id}. Ответственные оповещены.` }
-        );
+        toast.success("Событие зарегистрировано", { description: `Номер #${data.id}` });
       }
 
       router.push("/events");
@@ -91,10 +101,7 @@ export function EventForm({ initialData }: EventFormProps) {
 
     } catch (error) {
       console.error(error);
-      toast.error(
-        "Ошибка",
-        { description: "Не удалось сохранить данные. Попробуйте позже." }
-      );
+      toast.error("Ошибка", { description: "Не удалось сохранить данные" });
     } finally {
       setIsSubmitting(false);
     }
@@ -102,6 +109,8 @@ export function EventForm({ initialData }: EventFormProps) {
 
   return (
     <div className="max-w-2xl mx-auto pb-20">
+      
+      {/* HEADER */}
       <div className="flex items-center gap-2 mb-6">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5 text-foreground" />
@@ -111,9 +120,12 @@ export function EventForm({ initialData }: EventFormProps) {
         </h1>
       </div>
 
+      {/* FORM CARD */}
       <div className="bg-card p-6 rounded-xl border">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            
+            {/* CATEGORY */}
             <FormField
               control={form.control}
               name="categoryId"
@@ -122,11 +134,14 @@ export function EventForm({ initialData }: EventFormProps) {
                   <FormLabel>Категория</FormLabel>
                   <FormControl>
                     <SearchableSelect
-                      options={CLASSIFIER.map(c => ({ value: c.id, label: c.name }))}
+                      options={classifier.map(c => ({ value: String(c.id), label: c.name }))}
                       value={field.value}
                       onChange={(val) => {
                         field.onChange(val);
-                        if (val !== initialData?.categoryId) form.setValue("typeId", "");
+                        // Сбрасываем тип при смене категории
+                        if (val !== String(initialData?.categoryId)) {
+                             form.setValue("typeId", "");
+                        }
                       }}
                       placeholder="Выберите категорию..."
                     />
@@ -136,6 +151,7 @@ export function EventForm({ initialData }: EventFormProps) {
               )}
             />
 
+            {/* TYPE */}
             <FormField
               control={form.control}
               name="typeId"
@@ -144,11 +160,12 @@ export function EventForm({ initialData }: EventFormProps) {
                   <FormLabel>Тип события</FormLabel>
                   <FormControl>
                     <SearchableSelect
-                      options={availableTypes.map(t => ({ value: t.id, label: t.name }))}
+                      options={availableTypes.map(t => ({ value: String(t.id), label: t.name }))}
                       value={field.value}
                       onChange={field.onChange}
                       disabled={!selectedCategoryId}
                       placeholder={selectedCategoryId ? "Выберите тип..." : "Сначала выберите категорию"}
+                      emptyMessage="Нет типов в этой категории"
                     />
                   </FormControl>
                   <FormMessage />
@@ -156,6 +173,7 @@ export function EventForm({ initialData }: EventFormProps) {
               )}
             />
 
+            {/* DESCRIPTION */}
             <FormField
               control={form.control}
               name="description"

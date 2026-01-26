@@ -28,17 +28,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/providers/toast-provider";
+import { toast } from "sonner";
 
-// ИМПОРТ НОВЫХ ТИПОВ
 import { User, UserRole, UserStatus, Clinic } from "@/lib/types";
 import { ROLE_NAMES } from "@/lib/constants";
 
-export default function UsersPage() {
-  const toast = useToast();
-  
+export default function UsersPage() {  
   const [users, setUsers] = useState<User[]>([]);
-  const [clinics, setClinics] = useState<Clinic[]>([]); // Для выпадающих списков
+  const [clinics, setClinics] = useState<Clinic[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -65,7 +62,7 @@ export default function UsersPage() {
           throw new Error("Failed to load data");
       }
     } catch (error) {
-      toast.error("Ошибка", "Не удалось загрузить данные");
+      toast.error("Ошибка", {description: "Не удалось загрузить данные"});
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +85,6 @@ export default function UsersPage() {
   const handleSaveUser = async () => {
     if (!editingUser) return;
     
-    // Автоматическая активация при сохранении (если не гость)
     let updatedStatus = editingUser.status;
     if (editingUser.role !== 'guest' && editingUser.status === 'pending') {
         updatedStatus = 'active';
@@ -99,7 +95,6 @@ export default function UsersPage() {
         status: updatedStatus
     };
 
-    // Оптимистичное обновление UI
     const newUsers = users.map(u => u.id === editingUser.id ? updatedUser as User : u);
     setUsers(newUsers);
     setIsDialogOpen(false);
@@ -108,21 +103,17 @@ export default function UsersPage() {
         await fetch("/api/admin/users", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            // В нашем моке API принимает одного юзера для обновления или массив.
-            // Отправим обновленного юзера (или весь массив, зависит от реализации вашего API)
-            // Судя по вашему API - он принимает одного юзера в body (если это объект).
             body: JSON.stringify(updatedUser) 
         });
-        toast.success("Успешно", "Данные пользователя обновлены");
+        toast.success("Успешно", {description: "Данные пользователя обновлены"});
     } catch (e) {
-        toast.error("Ошибка", "Не удалось сохранить");
-        fetchAllData(); // Откат при ошибке
+        toast.error("Ошибка", {description: "Не удалось сохранить"});
+        fetchAllData(); 
     }
   };
 
   const handleDeleteUser = async (id: string) => {
     if(confirm("Удалить пользователя из системы?")) {
-        // Оптимистичное удаление
         const newUsers = users.filter(u => u.id !== id);
         setUsers(newUsers);
         
@@ -130,106 +121,24 @@ export default function UsersPage() {
             await fetch("/api/admin/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                // Отправляем массив, чтобы API перезаписал базу (согласно вашей реализации API)
                 body: JSON.stringify(newUsers)
             });
-            toast.success("Успешно", "Пользователь удален");
+            toast.success("Успешно", {description: "Пользователь удален"});
         } catch (e) {
-            toast.error("Ошибка", "Не удалось удалить");
+            toast.error("Ошибка", {description: "Не удалось удалить"});
             fetchAllData();
         }
     }
   };
 
-  // Вычисляем доступные отделения для выбранной клиники в модальном окне
   const availableDepts = useMemo(() => {
       return clinics.find(c => c.id === editingUser?.clinicId)?.departments || [];
   }, [clinics, editingUser?.clinicId]);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        {/* Заголовок и поиск (общие) */}
-        <div className="flex flex-col gap-4 mb-6">
-            <div className="space-y-2">
-                <Skeleton className="h-8 w-48" />
-                <Skeleton className="h-4 w-64" />
-            </div>
-            <Skeleton className="h-10 w-full" />
-        </div>
-        
-        {/* DESKTOP SKELETON (Таблица) */}
-        <div className="hidden md:block rounded-md border p-4 space-y-4">
-            <div className="flex justify-between border-b pb-4 mb-4">
-                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-4 w-32" />)}
-            </div>
-            {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div className="space-y-2">
-                        <Skeleton className="h-5 w-40" />
-                        <Skeleton className="h-3 w-24" />
-                    </div>
-                    <Skeleton className="h-6 w-24 rounded-full" />
-                    <div className="space-y-1">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-20" />
-                    </div>
-                    <div className="space-y-1">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-20" />
-                    </div>
-                    <div className="flex gap-2">
-                        <Skeleton className="h-8 w-8" />
-                        <Skeleton className="h-8 w-8" />
-                    </div>
-                </div>
-            ))}
-        </div>
-
-        {/* MOBILE SKELETON (Карточки) */}
-        <div className="md:hidden space-y-3">
-            {[1, 2, 3].map((i) => (
-                <div key={i} className="rounded-xl border bg-card p-4 space-y-4">
-                    {/* Верхняя часть: Имя и Статус */}
-                    <div className="flex justify-between items-start">
-                        <div className="space-y-2">
-                            <Skeleton className="h-5 w-40" />
-                            <Skeleton className="h-3 w-24" />
-                        </div>
-                        <Skeleton className="h-5 w-16 rounded-full" />
-                    </div>
-
-                    {/* Средняя часть: Информация */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                            <Skeleton className="h-4 w-4 rounded-full" />
-                            <div className="space-y-1">
-                                <Skeleton className="h-3 w-24" />
-                                <Skeleton className="h-2 w-16" />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Skeleton className="h-4 w-4 rounded-full" />
-                            <div className="space-y-1">
-                                <Skeleton className="h-3 w-32" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Нижняя часть: Кнопки */}
-                    <div className="flex gap-2 pt-2 border-t border-border/50">
-                        <Skeleton className="h-8 flex-1 rounded-md" /> {/* Большая кнопка редактирования */}
-                        <Skeleton className="h-8 w-8 rounded-md" />    {/* Кнопка удаления */}
-                    </div>
-                </div>
-            ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 pb-20">
+      
+      {/* HEADER: Виден всегда, без скелетона */}
       <div className="flex items-center gap-2">
         <div>
             <h1 className="text-2xl font-bold text-foreground">Пользователи</h1>
@@ -237,29 +146,71 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Поиск по ФИО, логину или должности..." 
-            className="pl-9 bg-background" 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* SEARCH INPUT: Скелетон во время загрузки */}
+      <div className="relative h-10">
+          {isLoading ? (
+              <Skeleton className="h-10 w-full rounded-md" />
+          ) : (
+              <>
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                <Input 
+                    placeholder="Поиск по ФИО, логину или должности..." 
+                    className="pl-9 bg-background w-full h-full" 
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+              </>
+          )}
       </div>
 
+      {/* DESKTOP TABLE */}
       <div className="hidden md:block bg-card rounded-lg border overflow-hidden">
         <Table>
             <TableHeader className="bg-muted/50">
                 <TableRow className="border-b">
-                    <TableHead className="text-muted-foreground">Сотрудник</TableHead>
-                    <TableHead className="text-muted-foreground">Статус</TableHead>
+                    <TableHead className="text-muted-foreground w-[250px]">Сотрудник</TableHead>
+                    <TableHead className="text-muted-foreground w-[150px]">Статус</TableHead>
                     <TableHead className="text-muted-foreground">Роль / Должность</TableHead>
                     <TableHead className="text-muted-foreground">Место работы</TableHead>
-                    <TableHead className="text-right text-muted-foreground">Действия</TableHead>
+                    <TableHead className="text-right text-muted-foreground w-[100px]">Действия</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {filteredUsers.map(user => {
+                {/* SKELETON STATE */}
+                {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`skel-${i}`} className="border-b">
+                        <TableCell>
+                            <div className="space-y-2">
+                                <Skeleton className="h-5 w-40" />
+                                <Skeleton className="h-3 w-32" />
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <Skeleton className="h-6 w-24 rounded-full" />
+                        </TableCell>
+                        <TableCell>
+                            <div className="space-y-1">
+                                <Skeleton className="h-4 w-32" />
+                                <Skeleton className="h-3 w-20" />
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <div className="space-y-1">
+                                <Skeleton className="h-4 w-32" />
+                                <Skeleton className="h-3 w-20" />
+                            </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                                <Skeleton className="h-8 w-8 rounded-md" />
+                                <Skeleton className="h-8 w-8 rounded-md" />
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ))}
+
+                {/* DATA STATE */}
+                {!isLoading && filteredUsers.map(user => {
                     const clinicName = clinics.find(c => c.id === user.clinicId)?.name || "—";
                     const deptName = clinics.find(c => c.id === user.clinicId)?.departments.find(d => d.id === user.departmentId)?.name;
                     const isNew = user.status === 'pending';
@@ -327,8 +278,42 @@ export default function UsersPage() {
         </Table>
       </div>
 
+      {/* MOBILE LIST */}
       <div className="md:hidden space-y-3">
-        {filteredUsers.map(user => {
+        {/* SKELETON STATE */}
+        {isLoading && Array.from({ length: 3 }).map((_, i) => (
+            <Card key={`skel-mob-${i}`} className="overflow-hidden p-0 border">
+                <CardContent className="p-4 space-y-4">
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                            <Skeleton className="h-5 w-40" />
+                            <Skeleton className="h-3 w-24" />
+                        </div>
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-4 rounded-full" />
+                            <div className="space-y-1">
+                                <Skeleton className="h-3 w-24" />
+                                <Skeleton className="h-2 w-16" />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-4 rounded-full" />
+                            <Skeleton className="h-3 w-32" />
+                        </div>
+                    </div>
+                    <div className="flex gap-2 pt-2 border-t border-border/50">
+                        <Skeleton className="h-8 flex-1 rounded-md" />
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                    </div>
+                </CardContent>
+            </Card>
+        ))}
+
+        {/* DATA STATE */}
+        {!isLoading && filteredUsers.map(user => {
             const clinicName = clinics.find(c => c.id === user.clinicId)?.name || "Не назначено";
             const deptName = clinics.find(c => c.id === user.clinicId)?.departments.find(d => d.id === user.departmentId)?.name;
             const isNew = user.status === 'pending';
@@ -406,6 +391,7 @@ export default function UsersPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        {/* Содержимое диалога без изменений */}
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Карточка сотрудника</DialogTitle>

@@ -167,39 +167,6 @@ export default function ClassifierPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
-          <div className="w-full md:w-auto">
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <div className="flex gap-2 w-full md:w-auto">
-            <Skeleton className="h-10 flex-1 md:w-64" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-xl border bg-card text-card-foreground h-[200px] flex flex-col p-0 overflow-hidden">
-              <div className="p-4 border-b bg-muted/20 flex justify-between items-center">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-8 w-8 rounded-md" />
-              </div>
-              <div className="p-4 flex-1 space-y-3">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
 
@@ -212,16 +179,20 @@ export default function ClassifierPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Поиск..."
-              className="pl-9 bg-background"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Button onClick={() => openCategoryModal()} className="shrink-0">
+          {isLoading ? (
+            <Skeleton className="h-10 w-full md:w-64 rounded-md" />
+          ) : (
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Поиск..."
+                className="pl-9 bg-background"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
+          <Button onClick={() => openCategoryModal()} className="shrink-0" disabled={isLoading}>
             <FolderPlus className="mr-2 h-4 w-4" />
             Категория
           </Button>
@@ -229,85 +200,119 @@ export default function ClassifierPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-        {filteredData.map((category) => (
-          <Card key={category.id} className="flex flex-col overflow-hidden gap-0 p-0">
-            <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <Layers className="h-4 w-4 text-primary shrink-0" />
-                <CardTitle className="text-sm font-bold truncate" title={category.name}>
-                  {category.name}
-                </CardTitle>
-                <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border ">
-                  {category.types.length}
-                </Badge>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => openCategoryModal(category)}>
-                    <Pencil className="mr-2 h-4 w-4" /> Переименовать
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                    onClick={() => deleteCategory(category.id)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" /> Удалить
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </CardHeader>
-
-            <CardContent className="p-0 flex-1">
-              <div className="divide-y">
-                {category.types.length > 0 ? (
-                  category.types.map((type) => (
-                    <div key={type.id} className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-sm">
-                      <span className="text-foreground truncate pr-2">{type.name}</span>
-
-                      <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
-                          onClick={() => openTypeModal(category.id, type)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteType(type.id, category.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-xs text-muted-foreground italic">
-                    Нет типов событий
+        {isLoading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="flex flex-col overflow-hidden gap-0 p-0 h-[280px]">
+                {/* Header Skeleton */}
+                <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
+                  <div className="flex items-center gap-2 w-full">
+                    <Skeleton className="h-4 w-4 rounded-sm shrink-0" />
+                    <Skeleton className="h-4 w-32 rounded-sm" />
+                    <Skeleton className="h-5 w-8 rounded-full" />
                   </div>
-                )}
-              </div>
-            </CardContent>
+                  <Skeleton className="h-8 w-8 rounded-md shrink-0" />
+                </CardHeader>
 
-            <div className="p-3 bg-muted/30 border-t">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent"
-                onClick={() => openTypeModal(category.id)}
-              >
-                <Plus className="mr-2 h-3.5 w-3.5" />
-                Добавить тип
-              </Button>
-            </div>
-          </Card>
-        ))}
+                {/* Content Skeleton */}
+                <CardContent className="p-0 flex-1">
+                  <div className="divide-y">
+                    {Array.from({ length: 3 }).map((_, j) => (
+                      <div key={j} className="p-3 flex items-center justify-between">
+                        <Skeleton className="h-4 w-3/4" />
+                        <div className="flex items-center gap-1">
+                          <Skeleton className="h-7 w-7 rounded-md" />
+                          <Skeleton className="h-7 w-7 rounded-md" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
 
-        {filteredData.length === 0 && (
+                {/* Footer Skeleton */}
+                <div className="p-3 bg-muted/30 border-t">
+                  <Skeleton className="h-8 w-full rounded-md" />
+                </div>
+              </Card>
+            ))
+          : filteredData.map((category) => (
+              <Card key={category.id} className="flex flex-col overflow-hidden gap-0 p-0">
+                <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Layers className="h-4 w-4 text-primary shrink-0" />
+                    <CardTitle className="text-sm font-bold truncate" title={category.name}>
+                      {category.name}
+                    </CardTitle>
+                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border ">
+                      {category.types.length}
+                    </Badge>
+                  </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openCategoryModal(category)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Переименовать
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                        onClick={() => deleteCategory(category.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Удалить
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardHeader>
+
+                <CardContent className="p-0 flex-1">
+                  <div className="divide-y">
+                    {category.types.length > 0 ? (
+                      category.types.map((type) => (
+                        <div key={type.id} className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-sm">
+                          <span className="text-foreground truncate pr-2">{type.name}</span>
+
+                          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={() => openTypeModal(category.id, type)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteType(type.id, category.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center text-xs text-muted-foreground italic">
+                        Нет типов событий
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+
+                <div className="p-3 bg-muted/30 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent"
+                    onClick={() => openTypeModal(category.id)}
+                  >
+                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    Добавить тип
+                  </Button>
+                </div>
+              </Card>
+            ))}
+
+        {!isLoading && filteredData.length === 0 && (
           <div className="col-span-full py-12 text-center text-muted-foreground">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
               <Search className="h-6 w-6 text-muted-foreground" />
@@ -318,6 +323,7 @@ export default function ClassifierPage() {
       </div>
 
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+        {/* ... (Dialog content remains unchanged) ... */}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Переименовать категорию' : 'Новая категория'}</DialogTitle>
@@ -340,6 +346,7 @@ export default function ClassifierPage() {
       </Dialog>
 
       <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
+        {/* ... (Dialog content remains unchanged) ... */}
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Переименовать тип' : 'Новый тип события'}</DialogTitle>

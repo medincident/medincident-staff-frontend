@@ -55,248 +55,235 @@ export default function ReportsPage() {
     fetchStats();
   }, []);
 
-  // --- SKELETON LOADING VIEW ---
-  if (isLoading || !stats) {
-    return (
-      <div className="space-y-6 pb-20 overflow-x-hidden">
-        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="rounded-xl border bg-card text-card-foreground p-6 space-y-2">
-              <div className="flex justify-between items-start">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-4 rounded-full" />
-              </div>
-              <Skeleton className="h-8 w-16" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-          ))}
-        </div>
-
-        <Separator />
-
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-full md:w-[400px] rounded-lg" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[400px] w-full rounded-xl" />
-            <Skeleton className="h-[400px] w-full rounded-xl" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- MAIN ANALYTICS VIEW ---
   return (
     <div className="space-y-6 pb-20 overflow-x-hidden">
 
+      {/* HEADER: Виден всегда (Статичный) */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-2xl font-bold">Отчеты и Аналитика</h1>
           <p className="text-muted-foreground">Сводная статистика работы клиники</p>
         </div>
         <div>
-          <Button>
+          <Button disabled={isLoading}>
             <Download className="mr-2 h-4 w-4" />
             Экспорт (PDF)
           </Button>
         </div>
       </div>
 
-      {/* KPI Cards Section */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard
-          title="Всего заявок"
-          value={stats.kpi.totalRequests}
-          trend="+12% за месяц"
-          icon={FileText}
-        />
-        <KPICard
-          title="Активные ремонты"
-          value={stats.kpi.activeRequests}
-          trend="Текущая нагрузка"
-          icon={Wrench}
-          className="bg-info/10 border-info/20 text-info"
-          iconColor="text-info"
-        />
-        <KPICard
-          title="Инциденты (НС)"
-          value={stats.kpi.totalEvents}
-          trend="Всего за период"
-          icon={AlertTriangle}
-          className="bg-warning/10 border-warning/20 text-warning"
-          iconColor="text-warning"
-        />
-        <KPICard
-          title="Критические НС"
-          value={stats.kpi.criticalEvents}
-          trend="Требуют разбора"
-          icon={TrendingUp}
-          className="bg-destructive/10 border-destructive/20 text-destructive"
-          iconColor="text-destructive"
-        />
-      </div>
-
-      <Separator />
-
-      {/* Analytics Tabs */}
-      <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-auto min-h-12 p-1 bg-muted rounded-lg md:w-150 border">
-          <TabsTrigger
-            value="requests"
-            className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight"
-          >
-            Заявки
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="safety"
-            className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight"
-          >
-            Нежелательные события
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="summary"
-            className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight"
-          >
-            Сводка
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="requests" className="space-y-6 mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Статусы заявок</CardTitle>
-                <CardDescription>Воронка обработки</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DynamicChart type="donut" data={stats.charts.requestsByStatus} height={300} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>По категориям</CardTitle>
-                <CardDescription>Нагрузка на отделы</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DynamicChart
-                  type="bar"
-                  data={stats.charts.requestsByCategory}
-                  height={300}
-                  color="hsl(var(--primary))"
-                />
-              </CardContent>
-            </Card>
+      {isLoading || !stats ? (
+        /* --- SKELETON STATE --- */
+        <div className="space-y-6">
+          
+          {/* KPI Cards Skeleton (3 items) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-xl border bg-card text-card-foreground p-6 space-y-8 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <Skeleton className="h-4 w-24" /> {/* Title */}
+                  <Skeleton className="h-4 w-4 rounded-full" /> {/* Icon */}
+                </div>
+                <div className="space-y-2">
+                   <Skeleton className="h-8 w-16" /> {/* Value */}
+                   <Skeleton className="h-3 w-24 opacity-70" /> {/* Trend */}
+                </div>
+              </div>
+            ))}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Приоритетность выполнения</CardTitle>
-              <CardDescription>Распределение задач по степени срочности</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DynamicChart
-                type="bar-vertical"
-                data={stats.charts.requestsByPriority}
-                height={300}
-                color="hsl(var(--info))"
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <Separator className="opacity-50" />
 
-        <TabsContent value="safety" className="space-y-6 mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Тяжесть последствий</CardTitle>
-                <CardDescription>Классификация рисков</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DynamicChart type="pie" data={stats.charts.eventsBySeverity} height={300} />
-              </CardContent>
-            </Card>
+          {/* Tabs & Charts Skeleton */}
+          <div className="space-y-6">
+            {/* Tabs List */}
+            <Skeleton className="h-12 w-full md:w-100 rounded-lg bg-muted" />
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Типы инцидентов</CardTitle>
-                <CardDescription>Частота возникновения событий</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DynamicChart
-                  type="bar-vertical"
-                  data={stats.charts.eventsByCategory}
-                  height={300}
-                  color="hsl(var(--warning))"
-                />
-              </CardContent>
-            </Card>
+            {/* Charts Grid (Mimics "Safety" tab structure) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Chart 1: Severity Pie Chart */}
+              <div className="rounded-xl border bg-card p-6 space-y-4 pb-12">
+                 <div className="space-y-2">
+                    <Skeleton className="h-5 w-40" /> {/* Title */}
+                    <Skeleton className="h-4 w-32" /> {/* Desc */}
+                 </div>
+                 <div className="flex items-center justify-center py-4">
+                    <Skeleton className="h-62.5 w-62.5 rounded-full" />
+                 </div>
+              </div>
 
-            <Card className="lg:col-span-2 border-l-4 border-l-destructive">
-              <CardHeader>
-                <CardTitle className="text-base text-destructive flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  Последние критические инциденты
-                </CardTitle>
-              </CardHeader>
-            </Card>
+              {/* Chart 2: Category Bar Chart */}
+              <div className="rounded-xl border bg-card p-6 space-y-4 pb-12">
+                 <div className="space-y-2">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-4 w-48" />
+                 </div>
+                 <div className="flex items-end justify-between h-62.5 gap-2 px-4 pb-2">
+                    {[60, 40, 80, 50, 90, 30].map((height, idx) => (
+                       <Skeleton 
+                          key={idx} 
+                          className="w-full rounded-t-md" 
+                          style={{ height: `${height}%` }}
+                       />
+                    ))}
+                 </div>
+              </div>
+
+              {/* Bottom Card: Critical Incidents List */}
+              <div className="lg:col-span-2 rounded-xl border bg-card p-6 space-y-4">
+                 <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-5 rounded-full" />
+                    <Skeleton className="h-5 w-64" />
+                 </div>
+                 <div className="space-y-3 pt-2">
+                    {[1, 2, 3].map((i) => (
+                       <div key={i} className="flex justify-between items-center border-b pb-3 last:border-0 last:pb-0">
+                          <Skeleton className="h-4 w-1/3" />
+                          <Skeleton className="h-4 w-20" />
+                       </div>
+                    ))}
+                 </div>
+              </div>
+            </div>
           </div>
-        </TabsContent>
+        </div>
+      ) : (
+        /* --- REAL CONTENT --- */
+        <>
+          {/* KPI Cards Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KPICard
+              title="Всего заявок"
+              value={stats.kpi.totalRequests}
+              trend="+12% за месяц"
+              icon={FileText}
+            />
+            <KPICard
+              title="Активные ремонты"
+              value={stats.kpi.activeRequests}
+              trend="Текущая нагрузка"
+              icon={Wrench}
+              className="bg-info/10 border-info/20 text-info"
+              iconColor="text-info"
+            />
+            <KPICard
+              title="Инциденты (НС)"
+              value={stats.kpi.totalEvents}
+              trend="Всего за период"
+              icon={AlertTriangle}
+              className="bg-warning/10 border-warning/20 text-warning"
+              iconColor="text-warning"
+            />
+          </div>
 
-        <TabsContent value="summary" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Динамика активности за год
-              </CardTitle>
-              <CardDescription>Количество созданных заявок и инцидентов по месяцам</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
+          <Separator />
 
-              <div className="h-[300px] w-full">
-                <DynamicChart
-                  type="area"
-                  data={stats.charts.yearlyTrend}
-                  dataKey="requests"
-                  categoryKey="name"
-                  color="hsl(var(--primary))"
-                  height={300}
-                />
+          {/* Analytics Tabs */}
+          <Tabs defaultValue="safety" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 h-auto min-h-12 p-1 bg-muted rounded-lg md:w-[400px] border">
+              
+              <TabsTrigger
+                value="safety"
+                className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight"
+              >
+                Нежелательные события
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="summary"
+                className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight"
+              >
+                Сводка
+              </TabsTrigger>
+
+            </TabsList>
+
+            <TabsContent value="safety" className="space-y-6 mt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Тяжесть последствий</CardTitle>
+                    <CardDescription>Классификация рисков</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <DynamicChart type="pie" data={stats.charts.eventsBySeverity} height={300} />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Типы инцидентов</CardTitle>
+                    <CardDescription>Частота возникновения событий</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <DynamicChart
+                      type="bar-vertical"
+                      data={stats.charts.eventsByCategory}
+                      height={300}
+                      color="hsl(var(--warning))"
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-2 border-l-4 border-l-destructive">
+                  <CardHeader>
+                    <CardTitle className="text-base text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Последние критические инциденты
+                    </CardTitle>
+                  </CardHeader>
+                </Card>
               </div>
+            </TabsContent>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <SummaryStat
-                  val={stats.performance.closedOnTime}
-                  label="Заявок закрыто в срок"
-                  className="bg-success/10 text-success border border-success/20"
-                />
-                <SummaryStat
-                  val={stats.performance.avgReactionTime}
-                  label="Среднее время реакции"
-                  className="bg-info/10 text-info border border-info/20"
-                />
-                <SummaryStat
-                  val={stats.performance.bestDepartment}
-                  label="Самый эффективный отдел"
-                  className="bg-purple/10 text-purple border border-purple/20"
-                  icon={Users}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="summary" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Динамика активности за год
+                  </CardTitle>
+                  <CardDescription>Количество созданных заявок и инцидентов по месяцам</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+
+                  <div className="h-[300px] w-full">
+                    <DynamicChart
+                      type="area"
+                      data={stats.charts.yearlyTrend}
+                      dataKey="requests"
+                      categoryKey="name"
+                      color="hsl(var(--primary))"
+                      height={300}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <SummaryStat
+                      val={stats.performance.closedOnTime}
+                      label="Заявок закрыто в срок"
+                      className="bg-success/10 text-success border border-success/20"
+                    />
+                    <SummaryStat
+                      val={stats.performance.avgReactionTime}
+                      label="Среднее время реакции"
+                      className="bg-info/10 text-info border border-info/20"
+                    />
+                    <SummaryStat
+                      val={stats.performance.bestDepartment}
+                      label="Самый эффективный отдел"
+                      className="bg-purple/10 text-purple border border-purple/20"
+                      icon={Users}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+          </Tabs>
+        </>
+      )}
     </div>
   );
 }
