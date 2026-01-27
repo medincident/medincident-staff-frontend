@@ -12,6 +12,8 @@ import {
   UserCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_CONFIG } from "@/lib/constants";
+import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -35,11 +37,11 @@ export function Sidebar() {
     <aside className="hidden md:flex w-64 flex-col border-r bg-card h-screen sticky top-0 z-20 transition-colors duration-300">
 
       {/* Логотип */}
-      <div className="h-14 flex items-center px-6 border-b">
-        <div className="h-7 w-7 bg-primary rounded-lg flex items-center justify-center mr-3 shadow-sm">
-            <Shield className="h-4 w-4 text-primary-foreground" />
+      <div className="h-14 flex items-center px-4 border-b">
+        <div className="h-9 w-9 flex items-center justify-center">
+            <MedIncidentLogo className="h-7 w-7 text-primary-foreground" />
         </div>
-        <span className="font-bold text-lg text-foreground tracking-tight">MedSafety</span>
+        <span className="font-bold text-lg text-foreground tracking-tight">{APP_CONFIG.name}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-8">
@@ -108,9 +110,9 @@ export function Sidebar() {
       {/* ФУТЕР */}
       <div className="p-4 text-center border-t">
         <p className="text-[10px] text-muted-foreground">
-            MedSafety v1.0.0
+            {APP_CONFIG.name} {APP_CONFIG.version}
             <br />
-            © 2026
+            © {APP_CONFIG.year}
         </p>
       </div>
     </aside>
