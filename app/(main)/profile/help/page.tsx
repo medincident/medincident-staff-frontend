@@ -97,7 +97,7 @@ export default function HelpPage() {
             </div>
             
             <div className="p-6 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {[1, 2].map((i) => (
                    <div key={i} className="h-auto p-4 border rounded-xl flex items-center gap-4">
                       <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
@@ -155,7 +155,7 @@ export default function HelpPage() {
                 Официальные инструкции и приказы
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
               <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 hover:border-primary/50 group border-border">
                 <div className="p-2.5 bg-muted rounded-lg text-muted-foreground mr-4 shrink-0 transition-colors group-hover:text-foreground">

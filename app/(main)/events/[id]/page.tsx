@@ -173,7 +173,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
   };
 
   return (
-    <div className="flex flex-col gap-4 h-[calc(100vh-6rem)] md:h-auto pb-4 md:pb-20">
+    <div className="flex flex-col gap-4 h-[calc(100vh-6rem)] xl:h-auto pb-4 xl:pb-20">
       
       {/* HEADER: Виден всегда, shrink-0 чтобы не сжимался */}
       <div className="flex items-center gap-3 shrink-0">
@@ -209,7 +209,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
         <div className="flex-1 flex flex-col min-h-0"> {/* flex-1 чтобы занять остаток высоты */}
             
             {/* Desktop Skeleton */}
-            <div className="hidden md:grid grid-cols-3 gap-6 items-start">
+            <div className="hidden xl:grid grid-cols-3 gap-6 items-start">
                 <div className="col-span-2 space-y-6">
                     <div className="border rounded-xl bg-card p-6 space-y-4">
                         <Skeleton className="h-4 w-24" />
@@ -235,7 +235,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
             </div>
 
             {/* Mobile Skeleton (имитация табов и контента) */}
-            <div className="md:hidden flex flex-col h-full">
+            <div className="xl:hidden flex flex-col h-full">
                 <Skeleton className="h-12 w-full rounded-lg mb-4 shrink-0" />
                 <div className="space-y-6">
                     <div className="border rounded-xl bg-card p-6 space-y-4">
@@ -255,7 +255,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
         /* --- REAL CONTENT --- */
         <>
           {/* MOBILE VIEW: Вернул твою структуру с flex-1 min-h-0 */}
-          <div className="md:hidden flex-1 flex flex-col min-h-0">
+          <div className="xl:hidden flex-1 flex flex-col min-h-0">
             <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
               <TabsList className="grid w-full grid-cols-2 h-12 p-1 mb-4 bg-muted rounded-lg border shrink-0">
                 <TabsTrigger value="details" className="flex gap-2 data-[state=active]:bg-background">
@@ -277,7 +277,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* DESKTOP VIEW */}
-          <div className="hidden md:grid grid-cols-3 gap-6 items-start">
+          <div className="hidden xl:grid grid-cols-3 gap-6 items-start">
             <div className="col-span-2 space-y-6">
               <DetailsSection />
             </div>
