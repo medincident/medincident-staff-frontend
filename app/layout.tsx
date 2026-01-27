@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { APP_CONFIG } from "@/lib/constants";
+import { Metadata } from "next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MedSafety",
-  description: "Система мониторинга НС",
+  title: {
+    template: `%s | ${APP_CONFIG.name}`,
+    default: APP_CONFIG.name,
+  },
+  description: APP_CONFIG.description,
 };
 
 export default function RootLayout({

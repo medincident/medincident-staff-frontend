@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { User } from "@/lib/types";
+import { APP_CONFIG } from "@/lib/constants";
 
 export default function MenuPage() {
   const router = useRouter();
@@ -303,7 +304,7 @@ export default function MenuPage() {
               <LogOut className="mr-2 h-4 w-4" />
               Выйти из аккаунта
             </Button>
-            <p className="text-center text-[10px] text-muted-foreground mt-6">Версия системы 1.0.0</p>
+            <p className="text-center text-[10px] text-muted-foreground mt-6">Версия системы {APP_CONFIG.version}</p>
           </div>
 
         </div>

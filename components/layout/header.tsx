@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { User, Notification } from "@/lib/types";
 import { getIconColor } from "@/lib/status-helper";
+import { APP_CONFIG } from "@/lib/constants";
+import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
 
 const NOTIFICATION_ICONS: Record<string, any> = {
   info: Info,
@@ -93,14 +95,14 @@ export function Header() {
 
       {/* ЛОГОТИП / НАЗВАНИЕ */}
       <div className="flex items-center gap-3">
-        <div className="flex md:hidden items-center gap-2">
-          <div className="h-7 w-7 bg-primary rounded-lg flex items-center justify-center">
-            <Shield className="h-4 w-4 text-primary-foreground" />
+        <div className="flex md:hidden items-center">
+          <div className="h-9 w-9 flex items-center justify-center">
+            <MedIncidentLogo className="h-7 w-7 text-primary-foreground" />
           </div>
-          <span className="font-bold text-base text-foreground tracking-tight">MedSafety</span>
+          <span className="font-bold text-lg text-foreground tracking-tight">{APP_CONFIG.name}</span>
         </div>
         <h2 className="hidden md:block text-sm font-semibold text-muted-foreground">
-          Система мониторинга НС
+          {APP_CONFIG.description}
         </h2>
       </div>
 

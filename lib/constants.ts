@@ -1,5 +1,12 @@
 import { EventStatus, Priority, UserRole } from "./types";
 
+export const APP_CONFIG = {
+  name: "MedIncident",
+  description: "Система мониторинга НС",
+  version: "1.0.0",
+  year: 2026,
+};
+
 export const ROLE_NAMES: Record<UserRole, string> = {
   admin_system: "Системный администратор",
   admin_org: "Администратор организации",
