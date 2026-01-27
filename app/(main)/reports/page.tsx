@@ -79,7 +79,7 @@ export default function ReportsPage() {
           {/* KPI Cards Skeleton (3 items) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border bg-card text-card-foreground p-6 space-y-8 shadow-sm">
+              <div key={i} className="rounded-xl border bg-card text-card-foreground p-6 space-y-8">
                 <div className="flex justify-between items-start">
                   <Skeleton className="h-4 w-24" /> {/* Title */}
                   <Skeleton className="h-4 w-4 rounded-full" /> {/* Icon */}
@@ -131,7 +131,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Bottom Card: Critical Incidents List */}
-              <div className="lg:col-span-2 rounded-xl border bg-card p-6 space-y-4">
+              {/* <div className="lg:col-span-2 rounded-xl border bg-card p-6 space-y-4">
                  <div className="flex items-center gap-2">
                     <Skeleton className="h-5 w-5 rounded-full" />
                     <Skeleton className="h-5 w-64" />
@@ -144,7 +144,7 @@ export default function ReportsPage() {
                        </div>
                     ))}
                  </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
@@ -226,14 +226,14 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-2 border-l-4 border-l-destructive">
+                {/* <Card className="lg:col-span-2 border-l-4 border-l-destructive">
                   <CardHeader>
                     <CardTitle className="text-base text-destructive flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4" />
                       Последние критические инциденты
                     </CardTitle>
                   </CardHeader>
-                </Card>
+                </Card> */}
               </div>
             </TabsContent>
 

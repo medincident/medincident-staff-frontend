@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  nextjs:
+    build:
+      context: .
+      dockerfile: ./deployment/site.Dockerfile
+    container_name: nextjs_app
+    restart: unless-stopped
+    ports:
+      - "8092:3000"
+    environment:
+      NODE_ENV: production

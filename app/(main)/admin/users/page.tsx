@@ -164,7 +164,7 @@ export default function UsersPage() {
       </div>
 
       {/* DESKTOP TABLE */}
-      <div className="hidden md:block bg-card rounded-lg border overflow-hidden">
+      <div className="hidden lg:block bg-card rounded-lg border overflow-hidden">
         <Table>
             <TableHeader className="bg-muted/50">
                 <TableRow className="border-b">
@@ -279,7 +279,7 @@ export default function UsersPage() {
       </div>
 
       {/* MOBILE LIST */}
-      <div className="md:hidden space-y-3">
+      <div className="lg:hidden space-y-3">
         {/* SKELETON STATE */}
         {isLoading && Array.from({ length: 3 }).map((_, i) => (
             <Card key={`skel-mob-${i}`} className="overflow-hidden p-0 border">

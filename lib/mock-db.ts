@@ -73,7 +73,6 @@ export let eventsDb: IncidentEvent[] = [
     description:
       "Падение пациента в коридоре при транспортировке на каталке. Ушиб мягких тканей.",
     status: "completed",
-    severity: "moderate",
     author: "Петрова А.С.",
     categoryName: "Безопасность пациента",
     typeName: "Падение пациента",
@@ -87,7 +86,6 @@ export let eventsDb: IncidentEvent[] = [
     description:
       "Остановка работы МРТ аппарата Siemens. Ошибка системы охлаждения. Пациент не пострадал, процедура прервана.",
     status: "in_work",
-    severity: "critical", // Критический, т.к. простой дорогого оборудования
     author: "Рентгенолог Смирнов",
     categoryName: "Медицинское оборудование",
     typeName: "Сбой в работе / Поломка",
@@ -99,7 +97,6 @@ export let eventsDb: IncidentEvent[] = [
     categoryId: "medication",
     typeId: "wrong_dose",
     status: "created",
-    severity: "minor",
     author: "Иванов И.И.",
     categoryName: "Лекарственная безопасность",
     typeName: "Введение неверной дозировки",
@@ -113,7 +110,6 @@ export let eventsDb: IncidentEvent[] = [
     description:
       "Посетитель в состоянии алкогольного опьянения пытался пройти в реанимацию. Вызвана охрана.",
     status: "completed",
-    severity: "moderate",
     author: "Охрана",
     categoryName: "Физическая безопасность",
     typeName: "Нарушение общественного порядка",
@@ -126,7 +122,6 @@ export let eventsDb: IncidentEvent[] = [
     typeId: "identification",
     description: "Перепутали анализы пациентов однофамильцев.",
     status: "investigation",
-    severity: "severe",
     author: "Лаборант Сидорова",
     categoryName: "Безопасность пациента",
     typeName: "Ошибка идентификации",

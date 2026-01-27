@@ -15,7 +15,7 @@ export default function AdminLayout({
 
   const adminTabs = [
     { href: "/admin/classifier", label: "Классификатор", icon: Shield },
-    { href: "/admin/department", label: "Отдел", icon: UserCheck },
+    { href: "/admin/department", label: "Подразделение", icon: UserCheck },
     { href: "/admin/structure", label: "Структура", icon: Building },
     { href: "/admin/users", label: "Пользователи", icon: Users },
   ];
@@ -23,7 +23,7 @@ export default function AdminLayout({
   return (
     <div className="flex flex-col h-full">
       <div className="md:hidden w-full pb-4">
-        <nav className="grid w-full grid-cols-3 items-center rounded-lg bg-muted p-1 text-muted-foreground">
+        <nav className="grid w-full grid-flow-col auto-cols-fr items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto">
           {adminTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = pathname === tab.href;

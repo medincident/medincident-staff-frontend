@@ -27,13 +27,11 @@ const ROLE_NAMES: Record<string, string> = {
 };
 
 export default function DepartmentSettingsPage() {
-  // Settings State
   const [headId, setHeadId] = useState("");
   const [isActingEnabled, setIsActingEnabled] = useState(false);
   const [actingId, setActingId] = useState("");
   const [departmentName, setDepartmentName] = useState("");
 
-  // Data State
   const [staff, setStaff] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,7 +40,6 @@ export default function DepartmentSettingsPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        // Вернул твой путь к API
         const res = await fetch("/api/admin/department");
         if (res.ok) {
           const data = await res.json();
@@ -66,7 +63,6 @@ export default function DepartmentSettingsPage() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      // Вернул твой путь к API
       const res = await fetch("/api/admin/department", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,46 +83,71 @@ export default function DepartmentSettingsPage() {
     }
   };
 
+  const renderSelectItem = (u: User) => (
+    <SelectItem key={u.id} value={u.id} className="cursor-pointer">
+       <div className="flex flex-col sm:flex-row sm:items-center w-full max-w-60 sm:max-w-md overflow-hidden text-left">
+         <span className="truncate text-sm font-normal text-foreground">{u.name}</span>
+         <span className="truncate text-muted-foreground text-xs sm:ml-2">
+            ({u.position || ROLE_NAMES[u.role] || u.role})
+         </span>
+       </div>
+    </SelectItem>
+  );
+
   return (
     <div className="space-y-6 pb-20">
       
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
+        <div className="w-full sm:w-auto">
             <h1 className="text-2xl font-bold text-foreground">
                 {isLoading ? <Skeleton className="h-8 w-48" /> : departmentName}
             </h1>
             <p className="text-sm text-muted-foreground">Управление заведующими и доступом</p>
         </div>
         
-        {/* Кнопка всегда на месте, но неактивна при загрузке/сохранении */}
-        <Button onClick={handleSave} disabled={isSaving || isLoading}>
+        <Button onClick={handleSave} disabled={isSaving || isLoading} className="w-full sm:w-auto">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Сохранить
         </Button>
       </div>
 
       {isLoading ? (
-        /* SKELETON STATE */
-        <div className="space-y-6">
-           <div className="border rounded-xl bg-card p-6 space-y-6">
+        /* --- SKELETON STATE --- */
+        <div className="max-w-4xl space-y-6">
+           <div className="border rounded-xl bg-card p-4 sm:p-6 space-y-6">
+              
+              {/* Заголовок карточки */}
               <div className="space-y-2">
-                 <Skeleton className="h-5 w-48" />
-                 <Skeleton className="h-10 w-full sm:w-100" />
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center p-4 border rounded-xl">
-                 <div className="space-y-2">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-4 w-64" />
+                 <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-5 rounded-full" />
+                    <Skeleton className="h-6 w-32 sm:w-48" />
                  </div>
-                 <Skeleton className="h-6 w-12 rounded-full" />
+                 <Skeleton className="h-4 w-48 sm:w-64 opacity-60" />
+              </div>
+
+              {/* Поле выбора заведующего */}
+              <div className="space-y-3 pt-2">
+                 <Skeleton className="h-5 w-40" /> {/* Label */}
+                 <Skeleton className="h-4 w-full sm:w-96 opacity-60" /> {/* Hint text */}
+                 <Skeleton className="h-14 w-full sm:w-[400px] rounded-md" />
+              </div>
+
+              <Separator />
+
+              {/* Блок переключателя */}
+              <div className="p-4 border rounded-xl flex flex-col sm:flex-row justify-between gap-4">
+                 <div className="space-y-2 w-full">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-4 w-full sm:w-80 opacity-60" />
+                 </div>
+                 <Skeleton className="h-6 w-10 rounded-full shrink-0 mt-2 sm:mt-0" />
               </div>
            </div>
         </div>
       ) : (
         /* REAL CONTENT */
-        <div className="space-y-6">
+        <div className="max-w-4xl space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -141,16 +162,15 @@ export default function DepartmentSettingsPage() {
               <div className="grid gap-3">
                 <Label className="text-base font-medium">Заведующий отделением</Label>
                 <p className="text-sm text-muted-foreground">Имеет полный доступ к управлению заявками и графиком.</p>
+                
                 <Select value={headId} onValueChange={setHeadId}>
-                  <SelectTrigger className="w-full sm:w-100">
-                    <SelectValue placeholder="Выберите сотрудника" />
+                  <SelectTrigger className="w-full sm:w-[400px] h-auto min-h-12 py-3 px-4 bg-background text-left">
+                    <div className="truncate w-full pr-2">
+                        <SelectValue placeholder="Выберите сотрудника" />
+                    </div>
                   </SelectTrigger>
-                  <SelectContent>
-                    {staff.map(u => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name} <span className="text-muted-foreground text-xs ml-2">({u.position || ROLE_NAMES[u.role] || u.role})</span>
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="max-w-[90vw] sm:max-w-none max-h-[40vh]">
+                    {staff.map(renderSelectItem)}
                   </SelectContent>
                 </Select>
               </div>
@@ -162,7 +182,7 @@ export default function DepartmentSettingsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border rounded-xl bg-card transition-colors hover:bg-accent/5">
                   <div className="space-y-1">
                     <Label className="text-base font-medium">Режим замещения (И.О.)</Label>
-                    <p className="text-xs text-muted-foreground max-w-100">
+                    <p className="text-xs text-muted-foreground max-w-[400px] leading-relaxed">
                       Включите на время отпуска или болезни, чтобы временно передать права другому сотруднику.
                     </p>
                   </div>
@@ -176,22 +196,20 @@ export default function DepartmentSettingsPage() {
                   <div className="p-5 bg-warning/10 border border-warning/20 rounded-xl animate-in fade-in slide-in-from-top-2">
                     <div className="grid gap-4">
                       <div className="flex items-center gap-2">
-                        <Label className="font-semibold text-warning-foreground">Исполняющий обязанности</Label>
-                        <Badge variant="outline" className="text-[10px] bg-warning/20 text-warning-foreground border-warning/30 px-2 py-0.5">
+                        <Label className="font-semibold text-foreground">Исполняющий обязанности</Label>
+                        <Badge variant="outline" className="text-[10px] bg-warning/20 text-muted-foreground border-warning/30 px-2 py-0.5">
                           Временный доступ
                         </Badge>
                       </div>
 
                       <Select value={actingId} onValueChange={setActingId}>
-                        <SelectTrigger className="w-full sm:w-100 bg-background">
-                          <SelectValue placeholder="Выберите заместителя" />
+                        <SelectTrigger className="w-full sm:w-100 h-auto min-h-12 py-3 px-4 bg-background text-left">
+                          <div className="truncate w-full pr-2">
+                             <SelectValue placeholder="Выберите заместителя" />
+                          </div>
                         </SelectTrigger>
-                        <SelectContent>
-                          {staff.filter(u => u.id !== headId).map(u => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {u.name} <span className="text-muted-foreground text-xs ml-2">({u.position || ROLE_NAMES[u.role] || u.role})</span>
-                            </SelectItem>
-                          ))}
+                        <SelectContent className="max-w-[90vw] sm:max-w-none max-h-[40vh]">
+                          {staff.filter(u => u.id !== headId).map(renderSelectItem)}
                         </SelectContent>
                       </Select>
 

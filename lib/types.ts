@@ -116,13 +116,6 @@ export interface ServiceRequest {
 }
 
 // --- СОБЫТИЯ / ИНЦИДЕНТЫ (НС) ---
-export type EventSeverity =
-  | "near_miss"
-  | "minor"
-  | "moderate"
-  | "severe"
-  | "critical";
-
 export type EventStatus =
   | "created" // Новое (у диспетчера)
   | "in_work" // В работе (назначено ответственному)
@@ -144,7 +137,6 @@ export interface IncidentEvent {
   description?: string;
 
   status: EventStatus;
-  severity: EventSeverity;
 
   authorId?: string; // ID автора
   author: string; // Имя автора

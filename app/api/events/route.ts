@@ -33,8 +33,7 @@ export async function POST(request: Request) {
     id: `evt_${Date.now()}`,
     code: `INC-${Math.floor(Math.random() * 10000)}`,
     createdAt: new Date().toISOString(),
-    status: "new",
-    severity: "moderate",
+    status: "created",
     author: "Текущий Пользователь",
     ...body,
   };

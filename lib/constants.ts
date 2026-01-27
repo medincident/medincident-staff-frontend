@@ -1,4 +1,4 @@
-import { EventSeverity, EventStatus, Priority, UserRole } from "./types";
+import { EventStatus, Priority, UserRole } from "./types";
 
 export const ROLE_NAMES: Record<UserRole, string> = {
   admin_system: "Системный администратор",

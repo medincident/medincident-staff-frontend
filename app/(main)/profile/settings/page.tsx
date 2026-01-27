@@ -128,7 +128,7 @@ export default function SettingsPage() {
       {initialLoading ? (
         /* --- SKELETON STATE (Точная копия карточки Уведомлений) --- */
         <div className="space-y-6">
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+          <div className="rounded-xl border bg-card text-card-foreground">
              
              {/* Header Skeleton */}
              <div className="flex flex-col space-y-1.5 p-6 pb-4">
@@ -263,7 +263,7 @@ export default function SettingsPage() {
                               className={cn(
                                 "h-9 w-9 rounded-full text-xs font-medium transition-all border flex items-center justify-center",
                                 isSelected
-                                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                  ? "bg-primary text-primary-foreground border-primary"
                                   : "bg-transparent text-muted-foreground border-border hover:border-foreground/50 hover:bg-muted/50"
                               )}
                             >

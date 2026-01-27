@@ -261,16 +261,16 @@ export default function StructurePage() {
   return (
     <div className="space-y-6 pb-20">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Структура</h1>
           <p className="text-sm text-muted-foreground">Клиники, филиалы и отделения</p>
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
           {isLoading ? (
-            <Skeleton className="h-10 w-full md:w-64 rounded-md" />
+            <Skeleton className="h-10 w-full lg:w-64 rounded-md" />
           ) : (
-            <div className="relative flex-1 md:w-64">
+            <div className="relative flex-1 lg:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Название или адрес..."
@@ -287,12 +287,12 @@ export default function StructurePage() {
       </div>
 
       {/* LIST GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
         
         {/* === SKELETON LOADING STATE === */}
         {/* Используем те же стили контейнеров, что и в реальном компоненте */}
         {isLoading && Array.from({ length: 6 }).map((_, i) => (
-          <Card key={`skel-${i}`} className="flex flex-col overflow-hidden gap-0 p-0 border h-[240px]">
+          <Card key={`skel-${i}`} className="flex flex-col overflow-hidden gap-0 p-0 border">
             {/* Header Skeleton */}
             <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
               <div className="flex justify-between items-start w-full">
@@ -406,7 +406,7 @@ export default function StructurePage() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1 shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                             <Button
                               variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
                               onClick={() => openDeptModal(clinic.id, dept)}

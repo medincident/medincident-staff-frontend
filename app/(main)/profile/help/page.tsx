@@ -62,7 +62,7 @@ export default function HelpPage() {
         <div className="space-y-6">
 
           {/* FAQ Card Skeleton */}
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+          <div className="rounded-xl border bg-card text-card-foreground">
             <div className="p-6 pb-2">
               <div className="flex items-center gap-3 mb-2">
                 <Skeleton className="h-10 w-10 rounded-lg shrink-0" />
@@ -85,7 +85,7 @@ export default function HelpPage() {
           </div>
 
           {/* Documentation Card Skeleton */}
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+          <div className="rounded-xl border bg-card text-card-foreground">
             <div className="p-6 pb-2">
               <div className="flex items-center gap-3 mb-2">
                 <Skeleton className="h-10 w-10 rounded-lg shrink-0" />

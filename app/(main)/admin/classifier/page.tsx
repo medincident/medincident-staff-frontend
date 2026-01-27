@@ -170,7 +170,7 @@ export default function ClassifierPage() {
   return (
     <div className="space-y-6">
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Классификатор</h1>
@@ -178,11 +178,11 @@ export default function ClassifierPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
           {isLoading ? (
-            <Skeleton className="h-10 w-full md:w-64 rounded-md" />
+            <Skeleton className="h-10 w-full lg:w-64 rounded-md" />
           ) : (
-            <div className="relative flex-1 md:w-64">
+            <div className="relative flex-1 lg:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Поиск..."
@@ -199,10 +199,10 @@ export default function ClassifierPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => (
-              <Card key={i} className="flex flex-col overflow-hidden gap-0 p-0 h-[280px]">
+              <Card key={i} className="flex flex-col overflow-hidden gap-0 p-0">
                 {/* Header Skeleton */}
                 <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
                   <div className="flex items-center gap-2 w-full">
@@ -274,7 +274,7 @@ export default function ClassifierPage() {
                         <div key={type.id} className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-sm">
                           <span className="text-foreground truncate pr-2">{type.name}</span>
 
-                          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                             <Button
                               variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
                               onClick={() => openTypeModal(category.id, type)}

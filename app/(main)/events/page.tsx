@@ -154,7 +154,7 @@ export default function EventsListPage() {
       </div>
 
       {/* TABLE (DESKTOP) */}
-      <div className="hidden md:block bg-card rounded-xl border overflow-hidden">
+      <div className="hidden xl:block bg-card rounded-xl border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50 border-b">
             <TableRow className="hover:bg-transparent">
@@ -200,11 +200,11 @@ export default function EventsListPage() {
                     {event.code}
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col max-w-[350px]">
+                    <div className="flex flex-col max-w-87.5">
                       <span className="font-semibold text-foreground truncate">
                         {typeNamesMap[event.typeId || ""] || event.typeName || event.typeId}
                       </span>
-                      <span className="text-xs text-muted-foreground line-clamp-1">
+                      <span className="truncate text-xs text-muted-foreground line-clamp-1">
                         {event.description}
                       </span>
                     </div>
@@ -251,7 +251,7 @@ export default function EventsListPage() {
       </div>
 
       {/* CARDS (MOBILE) */}
-      <div className="md:hidden space-y-4">
+      <div className="xl:hidden space-y-4">
         {/* SKELETON STATE (Mobile) */}
         {isLoading && Array.from({ length: 3 }).map((_, i) => (
             <div key={`mob-skel-${i}`} className="border rounded-xl bg-card overflow-hidden">

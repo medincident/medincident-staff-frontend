@@ -13,7 +13,8 @@ import {
   ShieldAlert,
   ChevronRight,
   ArrowRight,
-  Activity
+  Activity,
+  FileText // Added icon for the header
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -140,14 +141,14 @@ export default function DashboardPage() {
 
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <Link href="/requests/new" className={`w-full sm:w-auto flex-1 ${isLoading ? 'pointer-events-none' : ''}`}>
-            <Button
+            {/* <Button
               variant="outline"
               disabled={isLoading}
               className="w-full h-12 px-6 text-base font-medium border border-primary text-primary hover:text-primary hover:bg-primary/5 transition-all"
             >
               <Wrench className="mr-2 h-5 w-5" />
               Тех. заявка
-            </Button>
+            </Button> */}
           </Link>
 
           <Link href="/events/new" className={`w-full sm:w-auto flex-1 ${isLoading ? 'pointer-events-none' : ''}`}>
@@ -163,21 +164,7 @@ export default function DashboardPage() {
       </div>
 
       {/* STATS CARDS */}
-      {/* 1. Используем flex-1 или grid с авто-растягиванием. 
-          Если у тебя 2 карточки, используем sm:grid-cols-2. Если вернешь третью, поменяй на md:grid-cols-3.
-      */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* <StatsCard
-          title="Критические заявки"
-          value={isLoading ? <Skeleton className="h-8 w-12 rounded-md" /> : criticalRequestsCount}
-          desc="Требуют реакции"
-          icon={Siren}
-          iconColor="text-destructive"
-          iconBg="bg-destructive/10"
-          className={criticalRequestsCount > 0 && !isLoading ? "border-destructive/50 bg-destructive/5" : ""}
-          pulse={criticalRequestsCount > 0 && !isLoading}
-        /> */}
-        
         <StatsCard
           title="В расследовании (НС)"
           value={isLoading ? <Skeleton className="h-8 w-12 rounded-md" /> : activeEvents.length}
@@ -203,14 +190,17 @@ export default function DashboardPage() {
         {/* LEFT COLUMN: TABS (Journal & Requests) */}
         <div className="xl:col-span-2 space-y-6 min-w-0">
           <Tabs defaultValue="ns" className="w-full">
-            <div className="mb-4">
-              {/* 2. ИСПОЛЬЗУЕМ FLEX ВМЕСТО GRID.
-                  flex-1 заставляет таб занимать все доступное пространство.
-              */}
-              <TabsList className="flex w-full p-1 bg-muted rounded-lg">
+            <div>
+              {/* Пока что так */}
+              <div className="flex items-center gap-2">
+                 <h2 className="text-lg font-semibold text-foreground">Журнал событий</h2>
+              </div>
+              
+              {/* <TabsList className="flex w-full p-1 bg-muted rounded-lg">
                 <TabsTrigger value="ns" className="flex-1 truncate">Журнал событий</TabsTrigger>
-                {/* <TabsTrigger value="requests" className="flex-1 truncate">Заявки</TabsTrigger> */}
-              </TabsList>
+                <TabsTrigger value="requests" className="flex-1 truncate">Заявки</TabsTrigger>
+              </TabsList> 
+              */}
             </div>
 
             <TabsContent value="ns" className="space-y-3 mt-0">
@@ -253,40 +243,7 @@ export default function DashboardPage() {
             </TabsContent>
 
             <TabsContent value="requests" className="space-y-3 mt-0">
-              {isLoading ? (
-                 /* SKELETONS FOR REQUESTS */
-                 Array.from({length: 3}).map((_, i) => (
-                    <div key={`req-skel-${i}`} className="flex items-center justify-between p-4 bg-card border rounded-xl border-border">
-                        <div className="flex items-center gap-4 w-full">
-                            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-                            <div className="space-y-2 flex-1 py-0.5">
-                                <div className="flex gap-2">
-                                    <Skeleton className="h-3.5 w-16 rounded-sm" />
-                                    <Skeleton className="h-3.5 w-24 rounded-sm" />
-                                </div>
-                                <Skeleton className="h-4 w-2/3 rounded-sm" />
-                            </div>
-                        </div>
-                        <div className="flex gap-3 ml-2 shrink-0">
-                            <Skeleton className="h-5 w-20 rounded-full" />
-                            <Skeleton className="h-5 w-5 rounded-full opacity-20" />
-                        </div>
-                    </div>
-                 ))
-              ) : myActiveRequests.length > 0 ? (
-                <>
-                  {myActiveRequests.map(req => <RequestItem key={req.id} req={req} />)}
-
-                  <Link href="/requests" className="block pt-2">
-                    <Button variant="outline" className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary">
-                      Показать все заявки
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </>
-              ) : (
-                <EmptyState text="Нет активных заявок" />
-              )}
+              {/* Контент заявок (скрыт, так как нет триггера) */}
             </TabsContent>
           </Tabs>
         </div>
@@ -346,7 +303,6 @@ export default function DashboardPage() {
 }
 
 // --- КОМПОНЕНТЫ ---
-
 function EventItem({ evt, typeMap, catMap }: { evt: IncidentEvent, typeMap: Record<string, string>, catMap: Record<string, string> }) {
   const typeName = typeMap[evt.typeId || ""] || evt.typeName || evt.typeId;
   const categoryName = catMap[evt.categoryId] || evt.categoryName || evt.categoryId;
@@ -391,7 +347,7 @@ function RequestItem({ req }: { req: ServiceRequest }) {
       className={`
         group flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer
         ${isCritical 
-          ? "bg-destructive/5 border-destructive hover:border-destructive shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" 
+          ? "bg-destructive/5 border-destructive hover:border-destructive" 
           : "bg-card border-border hover:border-primary/30"
         }
       `}
