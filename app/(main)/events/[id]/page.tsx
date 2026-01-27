@@ -153,7 +153,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
               </Select>
             </div>
 
-            <div className="pt-2 border-t border-primary/10 flex flex-col gap-2">
+            {/* <div className="pt-2 border-t border-primary/10 flex flex-col gap-2">
               <Button
                 variant="outline"
                 className="w-full justify-start text-foreground border-primary/20 hover:bg-background hover:border-primary/40 transition-colors"
@@ -165,7 +165,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
               <p className="text-[10px] text-muted-foreground px-1">
                 Создаст наряд на работы, привязанный к этому инциденту.
               </p>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       </div>
@@ -222,7 +222,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                     <div className="border rounded-xl bg-card p-6 space-y-8">
                         <Skeleton className="h-5 w-48 mb-10" />
                         <Skeleton className="h-12 w-full rounded-md" />
-                        <Skeleton className="h-12 w-full rounded-md" />
+                        {/* <Skeleton className="h-12 w-full rounded-md" /> */}
                     </div>
                 </div>
                 <div className="col-span-1 h-[600px] rounded-xl border bg-card p-4 flex flex-col">
@@ -246,7 +246,7 @@ export default function EventDetailsPage({ params }: { params: Promise<{ id: str
                     <div className="border rounded-xl bg-card p-6 space-y-4">
                         <Skeleton className="h-5 w-40 mb-10" />
                         <Skeleton className="h-14 w-full" />
-                        <Skeleton className="h-14 w-full" />
+                        {/* <Skeleton className="h-14 w-full" /> */}
                     </div>
                 </div>
             </div>
