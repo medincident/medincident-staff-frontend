@@ -2,10 +2,13 @@ import { EventForm } from "@/components/events/event-form";
 import { headers } from "next/headers";
 
 export default async function NewEventPage() {
+  const headersList = await headers();
   
   const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/classifier`, {
     method: "GET",
-    headers: await headers(),
+    headers: {
+        Cookie: headersList.get("cookie") || ""
+    },
     cache: "no-store"
   });
 
