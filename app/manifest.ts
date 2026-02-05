@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
-    theme_color: "#1f1f23",
+    theme_color: "#ffffff",
     icons: [
       {
         src: "/icon-192.png",
@@ -28,5 +28,12 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
       },
     ],
+    // @ts-ignore
+    user_preferences: {
+      color_scheme_dark: {
+        background_color: "#1f1f23",
+        theme_color: "#1f1f23",
+      },
+    },
   };
 }
