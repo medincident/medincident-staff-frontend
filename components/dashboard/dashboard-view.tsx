@@ -79,7 +79,7 @@ export function DashboardView() {
     loadData();
   }, []);
   
-  // --- MAPPINGS & FILTERS ---
+  // --- MAPPINGS & FILTERS
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const types: Record<string, string> = {};
     const cats: Record<string, string> = {};
