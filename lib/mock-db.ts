@@ -3,51 +3,45 @@ import {
   Category,
   Clinic,
   DashboardStats,
+  DepartmentData,
+  FaqItem,
   IncidentEvent,
   Notification,
   ServiceRequest,
   User,
+  UserSettings,
 } from "./types";
 
 // --- USERS (Пользователи) ---
-export const MOCK_USERS: User[] = [
+export const USERS_LIST_DB: User[] = [
   {
     id: "u_1",
-    name: "Иванов Иван Иванович",
-    email: "ivanov@hospital.ru",
+    name: "Иванов И.И.",
     role: "head_dept",
-    position: "Зав. терапией",
+    position: "Зав. отделением",
+    email: "ivanov@test.com",
     status: "active",
-    clinicId: "cl_1",
-    departmentId: "dep_3",
-    login: "i.ivanov",
   },
   {
     id: "u_2",
-    name: "Петрова Анна Сергеевна",
-    email: "petrova@hospital.ru",
-    role: "worker",
-    position: "Старшая медсестра",
+    name: "Петрова А.С.",
+    role: "admin_system",
+    position: "Главный врач",
+    email: "petrova@test.com",
     status: "active",
-    clinicId: "cl_1",
-    departmentId: "dep_3",
-    login: "a.petrova",
   },
   {
-    id: "u_5",
-    name: "Новикова Елена",
-    email: "novikova@hospital.ru",
-    role: "guest",
-    position: "Стажер",
-    status: "pending",
-    clinicId: "cl_1",
-    departmentId: "dep_1",
-    login: "e.novikova",
+    id: "u_3",
+    name: "Сидоров В.К.",
+    role: "worker",
+    position: "Врач",
+    email: "sidorov@test.com",
+    status: "active",
   },
 ];
 
 // --- CLINICS (Структура) ---
-export const MOCK_CLINICS: Clinic[] = [
+export const STRUCTURE_DB: Clinic[] = [
   {
     id: "cl_1",
     name: "ГКБ №1 им. Пирогова",
@@ -281,7 +275,7 @@ export const MOCK_STATS: DashboardStats = {
 };
 
 // --- CLASSIFIER (Справочник категорий НС) ---
-export const CLASSIFIER: Category[] = [
+export const CLASSIFIER_DB: Category[] = [
   {
     id: "safety",
     name: "Безопасность пациента",
@@ -331,3 +325,76 @@ export const CLASSIFIER: Category[] = [
     ],
   },
 ];
+
+export const FAQ_DB: FaqItem[] = [
+  {
+    question: "Я выбрал неверную категорию при создании события. Что делать?",
+    answer:
+      "Если статус события 'Зарегистрировано', вы можете его отредактировать. Если событие уже 'В работе', свяжитесь с Ответственным лицом или напишите в чат события.",
+  },
+  {
+    question: "Как изменить свой пароль?",
+    answer:
+      "Пароль меняется через настройки вашего профиля в Telegram или MAX, так как вход осуществляется через эти сервисы. В самой системе пароль менять не нужно.",
+  },
+  {
+    question: "Кто видит мои сообщения о событиях?",
+    answer:
+      "Ваше сообщение видит только Ответственное лицо по данной категории (например, Зав. отделением) и Администраторы системы. Анонимность гарантируется внутренними регламентами.",
+  },
+  {
+    question: "Приложение не загружается или работает медленно.",
+    answer:
+      "Попробуйте очистить кэш браузера или зайти через другую сеть (например, переключиться с Wi-Fi на мобильный интернет). Если проблема сохраняется, напишите в техподдержку.",
+  },
+  {
+    question: "Как скачать отчет в Excel?",
+    answer:
+      "Перейдите в раздел 'Отчеты' в меню навигации. В правом верхнем углу нажмите кнопку 'Excel', выберите период и дождитесь загрузки файла.",
+  },
+];
+
+export const SETTINGS_DB: UserSettings = {
+  emailNotification: true,
+  quietMode: {
+    enabled: true,
+    from: "23:00",
+    to: "08:00",
+    days: [0, 1, 2, 3, 4], // Пн-Пт
+  },
+};
+
+export const DEPARTMENT_DB: DepartmentData = {
+  settings: {
+    headId: "u_1", // ID of current head
+    isActingEnabled: false,
+    actingId: "",
+    departmentName: "Терапевтическое отделение №1",
+  },
+  staff: [
+    {
+      id: "u_1",
+      name: "Иванов И.И.",
+      role: "head_dept",
+      position: "Зав. отделением",
+    },
+    {
+      id: "u_2",
+      name: "Петрова А.С.",
+      role: "doctor",
+      position: "Врач-терапевт",
+    },
+    {
+      id: "u_3",
+      name: "Сидоров В.К.",
+      role: "doctor",
+      position: "Врач-терапевт",
+    },
+    {
+      id: "u_4",
+      name: "Кузнецова Е.М.",
+      role: "nurse",
+      position: "Старшая медсестра",
+    },
+  ] as any[],
+};

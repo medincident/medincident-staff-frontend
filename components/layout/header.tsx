@@ -21,6 +21,8 @@ import { User, Notification } from "@/lib/types";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
+import { getCurrentUser } from "@/lib/services/users";
+import { getNotifications, markAllAsRead } from "@/lib/services/notifications";
 
 const NOTIFICATION_ICONS: Record<string, any> = {
   info: Info,
@@ -52,19 +54,14 @@ export function Header() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [userRes, notifRes] = await Promise.all([
-          fetch("/api/user/me"),
-          fetch("/api/notifications") // Предполагаем, что этот роут существует
+        // Используем сервисы вместо fetch
+        const [userData, notifData] = await Promise.all([
+          getCurrentUser(),
+          getNotifications()
         ]);
 
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          setUser(userData);
-        }
-
-        if (notifRes.ok) {
-          setNotifications(await notifRes.json());
-        }
+        setUser(userData);
+        setNotifications(notifData);
       } catch (error) {
         console.error("Header data load failed", error);
       } finally {
@@ -76,17 +73,20 @@ export function Header() {
 
   const handleMarkAllRead = async (e: React.MouseEvent) => {
     e.preventDefault();
+    // Оптимистичное обновление
+    const prevNotifications = notifications;
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    
     try {
-      // Здесь был бы реальный вызов API
-      // await fetch("/api/notifications/read-all", { method: "POST" });
+      await markAllAsRead();
     } catch (error) {
       console.error("Failed to mark read on server");
+      setNotifications(prevNotifications); // Откат
     }
   };
 
   const handleLogout = () => {
-    // Очистка кук/токенов
+    // В реальном приложении здесь был бы вызов API для логаута
     router.push("/login");
   };
 
