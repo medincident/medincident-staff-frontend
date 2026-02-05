@@ -21,17 +21,10 @@ export interface User {
   email: string;
   role: UserRole;
   status: UserStatus;
-
-  // Привязка к структуре (для п. 3, 4, 5)
   clinicId?: string;
   departmentId?: string;
-
-  // Доп. данные
   position?: string;
-  login?: string;
   avatar?: string;
-
-  // --- ДЛЯ ПУНКТОВ 9 и 10 (МАТРИЦА ОТВЕТСТВЕННОСТИ) ---
   // Массив ID категорий или типов, за которые отвечает пользователь.
   // Например: ["plumbing", "electric"] или ["safety", "medication"]
   responsibleCategories?: string[];
@@ -131,7 +124,7 @@ export interface IncidentEvent {
   categoryId: string; // ID категории из справочника
   categoryName?: string;
 
-  typeId?: string; // ID типа из справочника
+  typeId: string; // ID типа из справочника
   typeName?: string;
 
   description?: string;
@@ -194,4 +187,26 @@ export interface DashboardStats {
 export interface FaqItem {
   question: string;
   answer: string;
+}
+
+export interface UserSettings {
+  emailNotification: boolean;
+  quietMode: {
+    enabled: boolean;
+    from: string;
+    to: string;
+    days: number[];
+  };
+}
+
+export interface DepartmentSettings {
+  headId: string;
+  isActingEnabled: boolean;
+  actingId: string;
+  departmentName: string;
+}
+
+export interface DepartmentData {
+  settings: DepartmentSettings;
+  staff: User[];
 }

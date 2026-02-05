@@ -1,36 +1,88 @@
-// lib/services/events.ts
+import { eventsDb } from "@/lib/mock-db";
+import { IncidentEvent } from "@/lib/types";
 
-// Мок-данные для примера
-const MOCK_EVENT_DETAILS = {
-  id: "evt_1",
-  categoryId: "safety",
-  typeId: "fall_patient",
-  description:
-    "Пациент упал при попытке встать с кровати. Медсестра оказала помощь.",
-  status: "in_work",
-  createdAt: "2025-11-24T10:30:00Z",
-};
+let memoryEvents: IncidentEvent[] = [...eventsDb];
 
-export async function getEventById(id: string) {
-  // ------------------------------------------------------------------
-  // ЗДЕСЬ БУДЕТ ЗАПРОС К ВНЕШНЕМУ БЕКЕНДУ
-  // const res = await fetch(`${process.env.BACKEND_URL}/api/v1/incidents/${id}`);
-  // if (!res.ok) return null;
-  // return res.json();
-  // ------------------------------------------------------------------
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
 
-  // Имитация задержки базы данных
-  await new Promise((resolve) => setTimeout(resolve, 100));
+// --- ПОЛУЧЕНИЕ ВСЕХ СОБЫТИЙ ---
+export async function getEvents(): Promise<IncidentEvent[]> {
+  // --- БУДУЩЕЕ (Golang) ---
+  /*
+  const res = await fetch(`${API_URL}/events`, { cache: 'no-store' });
+  if (!res.ok) throw new Error("Failed to fetch events");
+  return res.json();
+  */
 
-  // Если ID специфический, вернем мок, иначе сгенерируем заглушку
-  if (id === "evt_1") {
-    return MOCK_EVENT_DETAILS;
+  // --- СЕЙЧАС (Mock) ---
+  await new Promise((resolve) => setTimeout(resolve, 600)); // Имитация задержки
+
+  // Сортируем по дате (новые сверху)
+  return [...memoryEvents].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+// --- ПОЛУЧЕНИЕ ОДНОГО СОБЫТИЯ ---
+export async function getEventById(id: string): Promise<IncidentEvent | null> {
+  // --- БУДУЩЕЕ (Golang) ---
+  /*
+  try {
+    const res = await fetch(`${API_URL}/events/${id}`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error("Failed to fetch event");
+    }
+
+    return res.json();
+  } catch (error) {
+    console.error("Error fetching event:", error);
+    return null;
   }
+  */
 
-  // Возвращаем заглушку с правильным ID, чтобы форма открылась
-  return {
-    ...MOCK_EVENT_DETAILS,
-    id: id,
-    description: `Редактирование события ${id} (автогенерирация)`,
-  };
+  // --- СЕЙЧАС (Mock) ---
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  const event = memoryEvents.find((e) => e.id === id);
+  return event || null;
+}
+
+// --- СОХРАНЕНИЕ СОБЫТИЯ (СОЗДАНИЕ / ОБНОВЛЕНИЕ) ---
+export async function saveEvent(event: IncidentEvent): Promise<void> {
+  // --- БУДУЩЕЕ (Golang) ---
+  /*
+  const method = event.id ? "PUT" : "POST"; // Или проверяем, есть ли ID
+  const url = event.id ? `${API_URL}/events/${event.id}` : `${API_URL}/events`;
+
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(event),
+  });
+
+  if (!res.ok) throw new Error("Failed to save event");
+  */
+
+  // --- СЕЙЧАС (Mock) ---
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  const existingIndex = memoryEvents.findIndex((e) => e.id === event.id);
+
+  if (existingIndex >= 0) {
+    // Обновление существующего
+    memoryEvents[existingIndex] = event;
+  } else {
+    // Создание нового (генерируем фейковый ID, если его нет)
+    const newEvent = {
+      ...event,
+      id: event.id || `evt_${Date.now()}`,
+      createdAt: event.createdAt || new Date().toISOString(),
+    };
+    memoryEvents.unshift(newEvent);
+  }
 }

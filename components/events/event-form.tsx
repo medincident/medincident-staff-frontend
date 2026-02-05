@@ -5,10 +5,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Save, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Plus, AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Form,
   FormControl,
@@ -19,7 +20,11 @@ import {
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
-import { Category } from "@/lib/types";
+import { Category, IncidentEvent } from "@/lib/types";
+
+// Импортируем сервисы
+import { getClassifier } from "@/lib/services/classifier";
+import { getEventById, saveEvent } from "@/lib/services/events";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, { message: "Пожалуйста, выберите категорию" }),
@@ -30,74 +35,111 @@ const formSchema = z.object({
 type EventFormValues = z.infer<typeof formSchema>;
 
 interface EventFormProps {
-  initialData?: EventFormValues & { id?: string };
-  classifier?: Category[];
+  eventId?: string;
 }
 
-export function EventForm({ initialData, classifier = [] }: EventFormProps) {
+export function EventForm({ eventId }: EventFormProps) {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const isEditMode = !!initialData;
+  const isEditMode = !!eventId;
 
+  // --- STATE ---
+  const [classifier, setClassifier] = useState<Category[]>([]);
+  const [existingEvent, setExistingEvent] = useState<IncidentEvent | null>(null);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  // --- FORM SETUP ---
   const form = useForm<EventFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      categoryId: initialData?.categoryId ? String(initialData.categoryId) : "",
-      typeId: initialData?.typeId ? String(initialData.typeId) : "",
-      description: initialData?.description || "",
+      categoryId: "",
+      typeId: "",
+      description: "",
     },
   });
 
+  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
-    if (initialData) {
-      form.reset({
-        categoryId: String(initialData.categoryId),
-        typeId: String(initialData.typeId),
-        description: initialData.description || "",
-      });
-    }
-  }, [initialData, form]);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Запускаем загрузку классификатора
+        const classifierPromise = getClassifier();
+        
+        // Если редактирование, запускаем и загрузку события
+        const eventPromise = (isEditMode && eventId) ? getEventById(eventId) : Promise.resolve(null);
 
+        const [classifierData, eventData] = await Promise.all([classifierPromise, eventPromise]);
+
+        setClassifier(classifierData);
+
+        // Логика для режима редактирования
+        if (isEditMode) {
+            if (!eventData) {
+                setNotFound(true);
+            } else {
+                setExistingEvent(eventData);
+                form.reset({
+                    categoryId: String(eventData.categoryId),
+                    typeId: String(eventData.typeId),
+                    description: eventData.description || "",
+                });
+            }
+        }
+      } catch (error) {
+        console.error("Failed to load form data:", error);
+        toast.error("Ошибка загрузки данных");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [eventId, isEditMode, form]);
+
+  // --- LOGIC ---
   const selectedCategoryId = form.watch("categoryId");
 
   const availableTypes = useMemo(() => {
     if (!selectedCategoryId) return [];
-    
     const category = classifier.find(
       (c) => String(c.id) === String(selectedCategoryId)
     );
-    
     return category?.types || [];
   }, [selectedCategoryId, classifier]);
 
+  // --- SUBMIT ---
   async function onSubmit(values: EventFormValues) {
     setIsSubmitting(true);
     try {
-      const url = isEditMode && initialData?.id
-        ? `/api/events/${initialData.id}`
-        : "/api/events";
-      
-      const method = isEditMode && initialData?.id ? "PATCH" : "POST";
+      const eventPayload: IncidentEvent = {
+        id: existingEvent?.id || "", 
+        code: existingEvent?.code || "",
+        createdAt: existingEvent?.createdAt || "",
+        status: existingEvent?.status || "created",
+        author: existingEvent?.author || "Текущий пользователь",
+        
+        categoryId: values.categoryId,
+        typeId: values.typeId,
+        description: values.description,
+        
+        categoryName: classifier.find(c => c.id === values.categoryId)?.name,
+        typeName: availableTypes.find(t => t.id === values.typeId)?.name
+      };
 
-      const response = await fetch(url, {
-        method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) throw new Error("Ошибка при сохранении");
-
-      const data = await response.json();
+      await saveEvent(eventPayload);
 
       if (isEditMode) {
         toast.success("Изменения сохранены");
       } else {
-        toast.success("Событие зарегистрировано", { description: `Номер #${data.id}` });
+        toast.success("Событие зарегистрировано");
       }
 
       router.push("/events");
-      router.refresh();
+      router.refresh(); 
 
     } catch (error) {
       console.error(error);
@@ -105,6 +147,43 @@ export function EventForm({ initialData, classifier = [] }: EventFormProps) {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  // --- RENDER STATES ---
+  if (isLoading && isEditMode) {
+    return (
+        <div className="max-w-2xl mx-auto pb-20">
+            <div className="flex items-center gap-2 mb-6">
+               <Skeleton className="h-9 w-9" />
+               <Skeleton className="h-8 w-48" />
+            </div>
+            <div className="bg-card p-6 rounded-xl border space-y-6">
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8.25 w-full" />
+                </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8.25 w-full" />
+                </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-24 w-full" />
+                </div>
+                <Skeleton className="h-12 w-full mt-2" />
+            </div>
+        </div>
+    );
+  }
+
+  if (isEditMode && notFound) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[50vh] text-center">
+            <AlertTriangle className="h-10 w-10 text-muted-foreground/50 mb-4" />
+            <h1 className="text-xl font-bold">Событие не найдено</h1>
+            <Button variant="link" onClick={() => router.push("/events")}>Вернуться к списку</Button>
+        </div>
+      )
   }
 
   return (
@@ -116,7 +195,7 @@ export function EventForm({ initialData, classifier = [] }: EventFormProps) {
           <ArrowLeft className="h-5 w-5 text-foreground" />
         </Button>
         <h1 className="text-2xl font-bold text-foreground">
-          {isEditMode ? "Редактирование события" : "Новое событие"}
+          {isEditMode ? `Редактирование ${existingEvent?.code || ''}` : "Новое событие"}
         </h1>
       </div>
 
@@ -134,16 +213,17 @@ export function EventForm({ initialData, classifier = [] }: EventFormProps) {
                   <FormLabel>Категория</FormLabel>
                   <FormControl>
                     <SearchableSelect
+                      // Если классификатор еще грузится (isLoading=true), список будет пустым, но поле отобразится
                       options={classifier.map(c => ({ value: String(c.id), label: c.name }))}
                       value={field.value}
                       onChange={(val) => {
                         field.onChange(val);
-                        // Сбрасываем тип при смене категории
-                        if (val !== String(initialData?.categoryId)) {
-                             form.setValue("typeId", "");
+                        if (val !== String(existingEvent?.categoryId)) {
+                           form.setValue("typeId", "");
                         }
                       }}
-                      placeholder="Выберите категорию..."
+                      placeholder={isLoading ? "Загрузка..." : "Выберите категорию..."}
+                      disabled={isLoading} // Блокируем селект пока грузятся справочники
                     />
                   </FormControl>
                   <FormMessage />
@@ -163,7 +243,7 @@ export function EventForm({ initialData, classifier = [] }: EventFormProps) {
                       options={availableTypes.map(t => ({ value: String(t.id), label: t.name }))}
                       value={field.value}
                       onChange={field.onChange}
-                      disabled={!selectedCategoryId}
+                      disabled={!selectedCategoryId || isLoading}
                       placeholder={selectedCategoryId ? "Выберите тип..." : "Сначала выберите категорию"}
                       emptyMessage="Нет типов в этой категории"
                     />
@@ -192,7 +272,7 @@ export function EventForm({ initialData, classifier = [] }: EventFormProps) {
               )}
             />
 
-            <Button type="submit" disabled={isSubmitting} className="w-full h-12 text-lg">
+            <Button type="submit" disabled={isSubmitting || isLoading} className="w-full h-12 text-lg">
               {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : isEditMode ? (
                 <><Save className="mr-2 h-5 w-5" /> Сохранить изменения</>
               ) : (
