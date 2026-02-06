@@ -1,4 +1,4 @@
-import { APP_CONFIG } from "@/lib/constants";
+import { APP_CONFIG, THEME_COLORS } from "@/lib/constants";
 import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: APP_CONFIG.description,
     start_url: "/",
     display: "standalone",
-    background_color: "#1f1f23",
-    theme_color: "#1f1f23",
+    background_color: THEME_COLORS.dark,
+    theme_color: THEME_COLORS.dark,
     categories: ["medicine"],
     icons: [
       {
@@ -27,6 +27,11 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/webp",
         purpose: "maskable",
+      },
+      {
+        src: "/apple-icon.png",
+        sizes: "180x180",
+        type: "image/png",
       },
     ],
   };

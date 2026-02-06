@@ -3,11 +3,23 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_CONFIG } from "@/lib/constants";
-import { Metadata } from "next";
+import { Metadata, Viewport } from "next";
+import { THEME_COLORS } from "@/lib/constants";
 
 const geistSans = Geist({
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: {
@@ -15,6 +27,11 @@ export const metadata: Metadata = {
     default: APP_CONFIG.name,
   },
   description: APP_CONFIG.description,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: APP_CONFIG.name,
+  },
 };
 
 export default function RootLayout({
