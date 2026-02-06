@@ -8,9 +8,14 @@ export default function manifest(): MetadataRoute.Manifest {
     description: APP_CONFIG.description,
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#ffffff",
+    background_color: "#1f1f23",
+    theme_color: "#1f1f23",
     icons: [
+      {
+        src: "/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+      },
       {
         src: "/icon-192.png",
         sizes: "192x192",
@@ -28,12 +33,5 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
       },
     ],
-    // @ts-ignore
-    user_preferences: {
-      color_scheme_dark: {
-        background_color: "#1f1f23",
-        theme_color: "#1f1f23",
-      },
-    },
   };
 }
