@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { APP_CONFIG } from "@/lib/constants";
 import { Metadata, Viewport } from "next";
 import { THEME_COLORS } from "@/lib/constants";
+import { ThemeColorManager } from "@/components/providers/theme-color-manager";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -47,6 +48,7 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
+          <ThemeColorManager />
           {children}
           <Toaster />
         </ThemeProvider>
