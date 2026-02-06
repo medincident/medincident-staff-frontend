@@ -7,6 +7,12 @@ export const APP_CONFIG = {
   year: 2026,
 };
 
+export const THEME_COLORS = {
+  light: "#ffffff",
+  dark: "#1f1f23",
+  primary: "#44712e",
+} as const;
+
 export const ROLE_NAMES: Record<UserRole, string> = {
   admin_system: "Системный администратор",
   admin_org: "Администратор организации",
