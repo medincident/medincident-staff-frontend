@@ -10,7 +10,6 @@ export const APP_CONFIG = {
 export const THEME_COLORS = {
   light: "#ffffff",
   dark: "#1f1f23",
-  primary: "#44712e",
 } as const;
 
 export const ROLE_NAMES: Record<UserRole, string> = {

@@ -6,6 +6,8 @@ import { APP_CONFIG } from "@/lib/constants";
 import { Metadata, Viewport } from "next";
 import { THEME_COLORS } from "@/lib/constants";
 import { ThemeColorManager } from "@/components/providers/theme-color-manager";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -48,6 +50,8 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
+          <ServiceWorkerRegister />
+          <InstallPrompt />
           <ThemeColorManager />
           {children}
           <Toaster />
