@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String             @id @default(cuid())
+  subscriptions PushSubscription[] // Связь с подписками
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique // Уникальный URL устройства
+  p256dh    String   // Ключ шифрования
+  auth      String   // Ключ аутентификации
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
