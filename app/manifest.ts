@@ -10,6 +10,7 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#1f1f23",
     theme_color: "#1f1f23",
+    categories: ["medicine"],
     icons: [
       {
         src: "/icon.svg",
@@ -17,20 +18,15 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/svg+xml",
       },
       {
-        src: "/icon-192.png",
+        src: "/icon-192.webp",
         sizes: "192x192",
-        type: "image/png",
+        type: "image/webp",
       },
       {
-        src: "/icon-512.png",
+        src: "/icon-512.webp",
         sizes: "512x512",
-        type: "image/png",
+        type: "image/webp",
         purpose: "maskable",
-      },
-      {
-        src: "/apple-icon.png",
-        sizes: "180x180",
-        type: "image/png",
       },
     ],
   };
