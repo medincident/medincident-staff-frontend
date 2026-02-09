@@ -67,15 +67,14 @@ export function InstallPrompt() {
               <li>
                 Нажмите кнопку{" "}
                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border bg-background text-foreground font-bold mx-1">
-                  Поделиться <SquareArrowUp className="h-4 w-4 mb-0.5" />
+                  <SquareArrowUp className="h-4 w-4 mb-0.5" /> Поделиться
                 </span>
               </li>
               <li>
                 Внизу выберите{" "}
                 <span className="font-semibold text-foreground">
-                  «Добавить на экран "Домой"»
+                  « <SquarePlus className="inline h-5 w-5 ml-1" /> Добавить на экран "Домой"»
                 </span>{" "}
-                <SquarePlus className="inline h-5 w-5 ml-1" />
               </li>
             </ol>
           </div>
