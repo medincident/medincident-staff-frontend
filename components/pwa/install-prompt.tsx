@@ -63,17 +63,17 @@ export function InstallPrompt() {
         {isIOS && (
           <div className="mt-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg border text-center">
             <p className="mb-2 font-medium">Как установить на iOS:</p>
-            <ol className="list-decimal list-inside space-y-1 text-left inline-block">
+            <ol className="list-decimal list-inside space-y-2 text-left inline-block">
               <li>
                 Нажмите кнопку{" "}
-                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border bg-background text-foreground font-bold mx-1">
-                  <SquareArrowUp className="h-4 w-4 mb-0.5" /> Поделиться
+                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border bg-background text-foreground font-bold mx-1 gap-1 leading-none">
+                  <SquareArrowUp className="h-4 w-4" /> Поделиться
                 </span>
               </li>
               <li>
                 Внизу выберите{" "}
-                <span className="font-semibold text-foreground">
-                  « <SquarePlus className="inline h-5 w-5 ml-1" /> Добавить на экран "Домой"»
+                <span className="inline-flex items-center font-semibold text-foreground">
+                  «<SquarePlus className="h-5 w-5 mx-1" /> Добавить на экран "Домой"»
                 </span>{" "}
               </li>
             </ol>
