@@ -66,13 +66,13 @@ export function InstallPrompt() {
             <ol className="list-decimal list-inside space-y-2 text-left inline-block">
               <li>
                 Нажмите кнопку{" "}
-                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border bg-background text-foreground font-bold mx-1 gap-1 leading-none">
+                <span className="inline-flex items-center justify-center py-0.5 rounded border bg-background text-foreground font-bold mx-1 gap-1 leading-none">
                   <SquareArrowUp className="h-4 w-4" /> Поделиться
                 </span>
               </li>
               <li>
                 Внизу выберите{" "}
-                <span className="inline-flex items-center font-semibold text-foreground">
+                <span className="inline-flex items-center justify-center py-0.5 rounded border bg-background text-foreground font-bold mx-1 gap-1 leading-none">
                   «<SquarePlus className="h-5 w-5 mx-1" /> Добавить на экран "Домой"»
                 </span>{" "}
               </li>
