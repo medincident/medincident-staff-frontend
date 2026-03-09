@@ -25,9 +25,7 @@ export interface User {
   departmentId?: string;
   position?: string;
   avatar?: string;
-  // Массив ID категорий или типов, за которые отвечает пользователь.
-  // Например: ["plumbing", "electric"] или ["safety", "medication"]
-  responsibleCategories?: string[];
+  scopes?: string[];
 }
 
 // --- СТРУКТУРА ОРГАНИЗАЦИИ ---

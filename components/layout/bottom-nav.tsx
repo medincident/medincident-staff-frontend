@@ -47,7 +47,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 pb-safe bg-card border-t transition-colors duration-300 md:hidden">
-      <div className="flex justify-around items-center h-full px-2">
+      <div className="flex justify-around items-center h-full px-4">
         {links.map((link) => {
           const Icon = link.icon;
           const isActive = link.isActiveOverride || (link.href !== '/dashboard' && pathname.startsWith(link.href)) || pathname === link.href;

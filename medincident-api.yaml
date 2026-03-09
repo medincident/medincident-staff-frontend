@@ -1,0 +1,642 @@
+openapi: 3.0.3
+info:
+  title: MedIncident API Contract
+  version: 1.0.0
+  description: Полный API контракт между Next.js Frontend и Backend сервисом.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Основной сервер API
+
+tags:
+  - name: Events (НС)
+    description: Нежелательные события
+  - name: Requests (Заявки)
+    description: Заявки АХО и ИТ
+  - name: Classifier
+    description: Справочник категорий
+  - name: Admin (Структура)
+    description: Управление клиникой и отделениями
+  - name: Users
+    description: Управление пользователями
+  - name: Notifications
+    description: Уведомления системы
+  - name: Reports
+    description: Аналитика и статистика
+  - name: Settings
+    description: Пользовательские настройки
+  - name: Help
+    description: Справочная информация
+
+paths:
+  # ================= СОБЫТИЯ (НС) =================
+  /events:
+    get:
+      summary: Получить список всех инцидентов 
+      tags: [Events (НС)]
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IncidentEvent'
+    post:
+      summary: Создать новый инцидент 
+      tags: [Events (НС)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentEvent'
+      responses:
+        '201':
+          description: Инцидент создан
+
+  /events/{id}:
+    get:
+      summary: Получить инцидент по ID 
+      tags: [Events (НС)]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentEvent'
+        '404':
+          description: Инцидент не найден
+    put:
+      summary: Обновить существующий инцидент 
+      tags: [Events (НС)]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentEvent'
+      responses:
+        '200':
+          description: Инцидент обновлен
+
+  # ================= ЗАЯВКИ (АХО/ИТ) =================
+  /requests:
+    get:
+      summary: Получить список всех заявок
+      tags: [Requests (Заявки)]
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceRequest'
+
+  /requests/{id}:
+    get:
+      summary: Получить заявку по ID 
+      tags: [Requests (Заявки)]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRequest'
+
+  # ================= СПРАВОЧНИКИ =================
+  /classifier:
+    get:
+      summary: Получить классификатор (категории и типы) 
+      tags: [Classifier]
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+    post:
+      summary: Обновить весь классификатор 
+      tags: [Classifier]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Category'
+      responses:
+        '200':
+          description: Классификатор успешно обновлен
+
+  # ================= АДМИНКА (СТРУКТУРА) =================
+  /department/settings:
+    get:
+      summary: Получить данные отделения 
+      tags: [Admin (Структура)]
+      responses:
+        '200':
+          description: Настройки и список сотрудников
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentData'
+    post:
+      summary: Сохранить настройки отделения 
+      tags: [Admin (Структура)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentSettings'
+      responses:
+        '200':
+          description: Настройки сохранены
+
+  /structure:
+    get:
+      summary: Получить структуру всей организации (Клиники и Отделения)
+      tags: [Admin (Структура)]
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Clinic'
+    post:
+      summary: Сохранить структуру организации 
+      tags: [Admin (Структура)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Clinic'
+      responses:
+        '200':
+          description: Структура сохранена
+
+  # ================= ПОЛЬЗОВАТЕЛИ =================
+  /users:
+    get:
+      summary: Получить список пользователей 
+      tags: [Users]
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      summary: Создать или обновить пользователя 
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Пользователь сохранен
+
+  /users/me:
+    get:
+      summary: Получить текущего авторизованного пользователя
+      tags: [Users]
+      responses:
+        '200':
+          description: Данные текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    delete:
+      summary: Удалить пользователя
+      tags: [Users]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Пользователь удален
+
+  # ================= УВЕДОМЛЕНИЯ =================
+  /notifications:
+    get:
+      summary: Получить список уведомлений пользователя 
+      tags: [Notifications]
+      responses:
+        '200':
+          description: Список уведомлений
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+  /notifications/read-all:
+    post:
+      summary: Отметить все уведомления как прочитанные 
+      tags: [Notifications]
+      responses:
+        '200':
+          description: Успешно
+
+  # ================= АНАЛИТИКА =================
+  /reports/stats:
+    get:
+      summary: Получить статистику для Дашборда 
+      tags: [Reports]
+      responses:
+        '200':
+          description: Данные графиков и KPI
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+
+  # ================= НАСТРОЙКИ ПРОФИЛЯ =================
+  /settings:
+    get:
+      summary: Получить настройки текущего пользователя 
+      tags: [Settings]
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+    post:
+      summary: Сохранить настройки пользователя 
+      tags: [Settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettings'
+      responses:
+        '200':
+          description: Настройки сохранены
+
+  # ================= ПОМОЩЬ =================
+  /help/faq:
+    get:
+      summary: Получить список вопросов и ответов (FAQ) 
+      tags: [Help]
+      responses:
+        '200':
+          description: Список FAQ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FaqItem'
+
+
+components:
+  schemas:
+    # --- Схема: НС (IncidentEvent) ---
+    IncidentEvent:
+      type: object
+      required: [id, code, categoryId, typeId, status, author, createdAt]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        categoryId:
+          type: string
+        categoryName:
+          type: string
+        typeId:
+          type: string
+        typeName:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [created, in_work, investigation, measures, completed, closed]
+        authorId:
+          type: string
+        author:
+          type: string
+        responsibleId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    # --- Схема: Заявка (ServiceRequest) ---
+    ServiceRequest:
+      type: object
+      required: [id, number, type, responsibleDept, priority, status, description, location, authorName, createdAt]
+      properties:
+        id:
+          type: string
+        number:
+          type: integer
+        type:
+          type: string
+        typeName:
+          type: string
+        responsibleDept:
+          type: string
+        executorId:
+          type: string
+        priority:
+          type: string
+          enum: [normal, high, critical]
+        status:
+          type: string
+          enum: [created, in_work, purchase, completed, refused, cancelled]
+        description:
+          type: string
+        location:
+          type: string
+        authorId:
+          type: string
+        authorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        linkedEventId:
+          type: string
+        refusalReason:
+          type: string
+
+    # --- Схема: Категория классификатора ---
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventType'
+            
+    EventType:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    # --- Схема: Пользователь ---
+    User:
+      type: object
+      required: [id, name, email, role, status]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin_system, admin_org, head_clinic, head_dept, dispatcher_ns, dispatcher_req, manager_ns, manager_req, worker, guest]
+        status:
+          type: string
+          enum: [active, blocked, pending]
+        clinicId:
+          type: string
+        departmentId:
+          type: string
+        position:
+          type: string
+        avatar:
+          type: string
+        responsibleCategories:
+          type: array
+          items:
+            type: string
+
+    # --- Схемы: Структура и Отделения ---
+    Clinic:
+      type: object
+      required: [id, name, address, departments]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        headId:
+          type: string
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+            
+    Department:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        headId:
+          type: string
+
+    DepartmentSettings:
+      type: object
+      properties:
+        headId:
+          type: string
+        isActingEnabled:
+          type: boolean
+        actingId:
+          type: string
+        departmentName:
+          type: string
+
+    DepartmentData:
+      type: object
+      properties:
+        settings:
+          $ref: '#/components/schemas/DepartmentSettings'
+        staff:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
+    # --- Схема: Уведомления ---
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        desc:
+          type: string
+        time:
+          type: string
+        date:
+          type: string
+        type:
+          type: string
+          enum: [info, success, warning, error]
+        read:
+          type: boolean
+        userId:
+          type: string
+
+    # --- Схема: Аналитика ---
+    DashboardStats:
+      type: object
+      properties:
+        kpi:
+          type: object
+          properties:
+            totalRequests:
+              type: integer
+            activeRequests:
+              type: integer
+            totalEvents:
+              type: integer
+            criticalEvents:
+              type: integer
+        charts:
+          type: object
+          properties:
+            requestsByStatus:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  value: { type: integer }
+            requestsByCategory:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  value: { type: integer }
+            requestsByPriority:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  value: { type: integer }
+            eventsBySeverity:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  value: { type: integer }
+            eventsByCategory:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  value: { type: integer }
+            yearlyTrend:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  requests: { type: integer }
+        performance:
+          type: object
+          properties:
+            closedOnTime:
+              type: string
+            avgReactionTime:
+              type: string
+            bestDepartment:
+              type: string
+
+    # --- Схема: Настройки пользователя ---
+    UserSettings:
+      type: object
+      properties:
+        emailNotification:
+          type: boolean
+        quietMode:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            from:
+              type: string
+            to:
+              type: string
+            days:
+              type: array
+              items:
+                type: integer
+
+    # --- Схема: FAQ ---
+    FaqItem:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+
+
+
+https://forge.etsi.org/swagger/editor/
