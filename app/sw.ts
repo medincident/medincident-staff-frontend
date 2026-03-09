@@ -1,16 +1,34 @@
+import { BackgroundSyncPlugin } from "workbox-background-sync";
 import { clientsClaim } from "workbox-core";
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
+import { registerRoute } from "workbox-routing";
+import { NetworkOnly } from "workbox-strategies";
 
 declare const self: ServiceWorkerGlobalScope;
-
-interface ExtendedNotificationOptions extends NotificationOptions {
-  vibrate?: number[];
-}
 
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 self.skipWaiting();
 clientsClaim();
+
+const bgSyncPlugin = new BackgroundSyncPlugin("medincident-offline-queue", {
+  maxRetentionTime: 24 * 60,
+});
+
+registerRoute(
+  ({ request }) =>
+    request.method === "POST" ||
+    request.method === "PUT" ||
+    request.method === "DELETE" ||
+    request.method === "PATCH",
+  new NetworkOnly({
+    plugins: [bgSyncPlugin],
+  }),
+);
+
+interface ExtendedNotificationOptions extends NotificationOptions {
+  vibrate?: number[];
+}
 
 self.addEventListener("push", (event) => {
   if (event.data) {
