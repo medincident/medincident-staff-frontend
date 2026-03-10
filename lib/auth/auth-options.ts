@@ -7,35 +7,32 @@ export const authOptions: NextAuthOptions = {
             issuer: process.env.ZITADEL_ISSUER as string,
             clientId: process.env.ZITADEL_CLIENT_ID as string,
             clientSecret: process.env.ZITADEL_CLIENT_SECRET as string,
-            // Запрашиваем нужные скоупы у Zitadel
-            authorization: { params: { scope: "openid profile offline_access" } },
+            authorization: { params: { scope: "openid email profile offline_access urn:zitadel:iam:user:project:roles" } }, // Добавил скоуп ролей Zitadel
         }),
     ],
     callbacks: {
-        // 1. JWT коллбек вызывается при логине и рефреше
         async jwt({ token, account, profile }) {
-            // Если юзер только что залогинился, сохраняем access_token и данные
             if (account) {
                 token.accessToken = account.access_token;
-                // В Zitadel роли обычно приходят в profile. Вытаскиваем их (замени на свой формат, если нужно)
-                token.scopes = profile?.['urn:zitadel:iam:user:project:roles']
-                    ? Object.keys(profile['urn:zitadel:iam:user:project:roles'])
-                    : ["worker", "requests:read:own"]; // Фолбэк для теста
+
+                // Приводим profile к типу, который разрешает любые ключи-строки
+                const zitadelProfile = profile as Record<string, any>;
+                const rolesObj = zitadelProfile?.['urn:zitadel:iam:user:project:roles'];
+
+                token.scopes = rolesObj
+                    ? Object.keys(rolesObj)
+                    : ["worker", "requests:read:own"]; // Фолбэк на случай, если ролей нет
             }
             return token;
         },
-        // 2. Session коллбек передает данные на клиент и в серверные компоненты
         async session({ session, token }) {
             if (session.user) {
+                // Приводим к any, чтобы легко прокинуть кастомные поля на фронт
                 (session.user as any).id = token.sub as string;
-                (session as any).scopes = token.scopes; // Прокидываем права для RoleGate
-                (session as any).accessToken = token.accessToken; // Для запросов к API
+                (session as any).scopes = token.scopes;
+                (session as any).accessToken = token.accessToken;
             }
             return session;
         }
-    },
-    // Кастомные страницы (если не указывать, next-auth сгенерирует дефолтную)
-    // pages: {
-    //   signIn: '/login', 
-    // }
+    }
 };
