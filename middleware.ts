@@ -1,30 +1,16 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { withAuth } from "next-auth/middleware";
 
-export function middleware(request: NextRequest) {
-  const accessToken = request.cookies.get("access_token")?.value;
-  const refreshToken = request.cookies.get("refresh_token")?.value;
-
-  const { pathname, search } = request.nextUrl;
-
-  // Пропускаем системные API-роуты авторизации, чтобы они могли работать
-  if (pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
-  }
-
-  // Если нет токенов — отправляем на наш генератор PKCE
-  // if (!accessToken && !refreshToken) {
-  //   const url = new URL("/api/auth/login", request.url);
-  //   // Сохраняем путь, куда шел пользователь (включая query параметры)
-  //   url.searchParams.set("callbackUrl", encodeURIComponent(pathname + search));
-  //   return NextResponse.redirect(url);
-  // }
-
-  return NextResponse.next();
-}
+// withAuth автоматически защищает все роуты, подходящие под matcher
+export default withAuth({
+  pages: {
+    // Если хочешь, чтобы при отсутствии сессии сразу кидало на Zitadel:
+    signIn: '/api/auth/signin',
+  },
+});
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|sw.js|workbox-.*|manifest.json|icon-.*).*)",
+    // Защищаем всё, кроме апи, статики и манифестов PWA
+    '/((?!api|_next/static|_next/image|favicon.ico|sw.js|workbox-.*|manifest.json|icon-.*).*)',
   ],
 };
