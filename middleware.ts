@@ -13,12 +13,12 @@ export function middleware(request: NextRequest) {
   }
 
   // Если нет токенов — отправляем на наш генератор PKCE
-  if (!accessToken && !refreshToken) {
-    const url = new URL("/api/auth/login", request.url);
-    // Сохраняем путь, куда шел пользователь (включая query параметры)
-    url.searchParams.set("callbackUrl", encodeURIComponent(pathname + search));
-    return NextResponse.redirect(url);
-  }
+  // if (!accessToken && !refreshToken) {
+  //   const url = new URL("/api/auth/login", request.url);
+  //   // Сохраняем путь, куда шел пользователь (включая query параметры)
+  //   url.searchParams.set("callbackUrl", encodeURIComponent(pathname + search));
+  //   return NextResponse.redirect(url);
+  // }
 
   return NextResponse.next();
 }
