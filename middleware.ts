@@ -2,12 +2,15 @@ import { withAuth } from "next-auth/middleware";
 
 export default withAuth({
   pages: {
-    signIn: "/login",
+    signIn: "/api/auth/signin",
   },
 });
 
 export const config = {
   matcher: [
-    "/((?!api/auth|login|_next/static|_next/image|favicon.ico|sw.js|workbox-.*|manifest.json|icon-.*).*)",
+    // Защищаем ВСЁ приложение, кроме:
+    // - /api/auth/*
+    // - статических файлов, картинок, манифестов PWA
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|sw.js|workbox-.*|manifest.json|icon-.*).*)",
   ],
 };
