@@ -5,12 +5,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log("🔥 INCOMING FROM ZITADEL:", JSON.stringify(body, null, 2));
 
-    // 1. Берем данные из request
+    // 1. Берем данные из присланного request
     const reqData = body.request;
 
-    // Если по какой-то причине request пуст, возвращаем всё как есть
+    // Если данных нет, возвращаем пустой объект (ничего не трогаем)
     if (!reqData) {
-      return NextResponse.json(body);
+      return NextResponse.json({});
     }
 
     const profile = reqData.profile;
@@ -21,26 +21,25 @@ export async function POST(req: Request) {
         profile.displayName || reqData.username || "TelegramUser";
       console.log(`Patching user! Setting givenName to: ${fallbackName}`);
 
-      // 3. Мутируем присланный объект
+      // 3. Мутируем нужные поля
       profile.givenName = fallbackName;
       profile.familyName = profile.familyName || "Unknown";
+
+      // ❗️ 4. ИСПРАВЛЕНИЕ: Возвращаем САМ ОБЪЕКТ reqData напрямую!
+      // Без обертки { request: ... }
+      console.log(
+        "🚀 OUTGOING TO ZITADEL (MUTATED):",
+        JSON.stringify(reqData, null, 2),
+      );
+      return NextResponse.json(reqData);
     }
 
-    // ❗️ 4. САМОЕ ГЛАВНОЕ: ВСЕГДА возвращаем request обратно!
-    const responseBody = {
-      request: reqData,
-    };
-
-    console.log(
-      "🚀 OUTGOING TO ZITADEL:",
-      JSON.stringify(responseBody, null, 2),
-    );
-    return NextResponse.json(responseBody);
+    // Если всё ок и менять не нужно, просто возвращаем пустой объект
+    console.log("✅ OUTGOING TO ZITADEL (NO CHANGES)");
+    return NextResponse.json({});
   } catch (err) {
     console.error("❌ Zitadel Action Error:", err);
-    // При ошибке возвращаем статус 500. Так Zitadel поймет, что скрипт упал,
-    // и либо отменит регистрацию (если стоит галочка Interrupt on Error),
-    // либо пропустит оригинальный запрос, но точно не заменит его на пустоту!
+    // При ошибке возвращаем 500, чтобы не перезаписать юзера пустотой
     return NextResponse.json({ error: "Webhook failed" }, { status: 500 });
   }
 }
