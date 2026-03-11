@@ -91,6 +91,8 @@ export const authOptions: NextAuthOptions = {
         (session as any).scopes = token.scopes;
         (session as any).accessToken = token.accessToken;
         (session as any).error = token.error; // Прокидываем ошибку на клиент, если рефреш сдох
+
+        console.log("🔥 ТОКЕН ДЛЯ ПОСТМАНА:\n", token.accessToken);
       }
       return session;
     },
