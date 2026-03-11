@@ -5,28 +5,46 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log("🔥 INCOMING FROM ZITADEL:", JSON.stringify(body, null, 2));
 
-    // 1. Берем данные из присланного request
     const reqData = body.request;
+    if (!reqData) return NextResponse.json({});
 
-    // Если данных нет, возвращаем пустой объект (ничего не трогаем)
-    if (!reqData) {
-      return NextResponse.json({});
+    let isMutated = false;
+
+    // 1. БРОНЕБОЙНАЯ ПРОВЕРКА ИМЕНИ
+    // Если профиля вообще нет — создаем его
+    if (!reqData.profile) {
+      reqData.profile = {};
     }
 
-    const profile = reqData.profile;
-
-    // 2. Проверяем, есть ли профиль и пустое ли имя
-    if (profile && (!profile.givenName || profile.givenName.trim() === "")) {
+    // Теперь безопасно проверяем и перезаписываем поля
+    if (!reqData.profile.givenName || reqData.profile.givenName.trim() === "") {
       const fallbackName =
-        profile.displayName || reqData.username || "TelegramUser";
-      console.log(`Patching user! Setting givenName to: ${fallbackName}`);
+        reqData.profile.displayName || reqData.username || "TelegramUser";
 
-      // 3. Мутируем нужные поля
-      profile.givenName = fallbackName;
-      profile.familyName = profile.familyName || "Unknown";
+      reqData.profile.givenName = fallbackName;
+      reqData.profile.familyName = reqData.profile.familyName || "Unknown";
+      isMutated = true;
 
-      // ❗️ 4. ИСПРАВЛЕНИЕ: Возвращаем САМ ОБЪЕКТ reqData напрямую!
-      // Без обертки { request: ... }
+      console.log(`[Action] Patched Profile: ${fallbackName} Unknown`);
+    }
+
+    // 2. БРОНЕБОЙНАЯ ПРОВЕРКА EMAIL
+    if (!reqData.email?.email || reqData.email.email.trim() === "") {
+      const safeUsername = reqData.username || `user_${Date.now()}`;
+      const dummyEmail = `${safeUsername}@telegram.local`;
+
+      // Полностью формируем объект email
+      reqData.email = {
+        email: dummyEmail,
+        isVerified: true, // Чтобы Zitadel не слал код подтверждения
+      };
+      isMutated = true;
+
+      console.log(`[Action] Patched Email: ${dummyEmail}`);
+    }
+
+    // 3. ОТПРАВЛЯЕМ РЕЗУЛЬТАТ
+    if (isMutated) {
       console.log(
         "🚀 OUTGOING TO ZITADEL (MUTATED):",
         JSON.stringify(reqData, null, 2),
@@ -34,12 +52,10 @@ export async function POST(req: Request) {
       return NextResponse.json(reqData);
     }
 
-    // Если всё ок и менять не нужно, просто возвращаем пустой объект
     console.log("✅ OUTGOING TO ZITADEL (NO CHANGES)");
     return NextResponse.json({});
   } catch (err) {
     console.error("❌ Zitadel Action Error:", err);
-    // При ошибке возвращаем 500, чтобы не перезаписать юзера пустотой
     return NextResponse.json({ error: "Webhook failed" }, { status: 500 });
   }
 }
