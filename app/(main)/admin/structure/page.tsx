@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { StructureView } from "@/components/admin/structure-view";
+import { StructureView } from "@/app/(main)/admin/structure/view";
 
 export const metadata: Metadata = {
   title: "Структура организации",

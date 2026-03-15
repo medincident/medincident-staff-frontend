@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { HelpView } from "@/components/profile/help-view";
+import { HelpView } from "@/app/(main)/profile/help/view";
 
 export const metadata: Metadata = {
   title: "Помощь и справка",

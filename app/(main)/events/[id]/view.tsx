@@ -19,7 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EventChatContainer } from "@/components/events/event-chat-container";
+import { ChatContainer } from "@/components/chat/chat-container";
 
 import { EVENT_STATUS_MAP } from "@/lib/constants";
 import { IncidentEvent, EventStatus, Category } from "@/lib/types";
@@ -293,7 +293,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
             </TabsContent>
 
             <TabsContent value="chat" className="flex-1 h-full mt-0 overflow-hidden">
-                <EventChatContainer eventId={event.id} className="h-full" />
+                <ChatContainer entityId={eventId} entityType="events" />
             </TabsContent>
         </Tabs>
       </div>
@@ -304,7 +304,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
             <DetailsSection />
         </div>
         <div className="col-span-1 sticky top-24 h-[600px]">
-            <EventChatContainer eventId={event.id} />
+            <ChatContainer entityId={eventId} entityType="events" />
         </div>
       </div>
     </div>

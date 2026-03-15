@@ -3,35 +3,45 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ChatSection, ChatMessage } from "@/components/ui/chat-section";
+import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
 
-interface EventChatContainerProps {
-  eventId: string;
+interface ChatContainerProps {
+  entityId: string;
+  entityType: "events" | "requests"; // Определяем, к чему относится чат
+  title?: string;
   className?: string;
 }
 
-export function EventChatContainer({ eventId, className }: EventChatContainerProps) {
+export function ChatContainer({ 
+  entityId, 
+  entityType, 
+  title, 
+  className 
+}: ChatContainerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Формируем базовый путь в зависимости от типа сущности
+  const apiPath = `/api/${entityType}/${entityId}/messages`;
 
   useEffect(() => {
     const fetchMessages = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(`/api/events/${eventId}/messages`);
-        if (res.ok) {
-          const data = await res.json();
-          setMessages(data);
-        }
+        // Используем apiClient вместо нативного fetch
+        const res = await apiClient.get<ChatMessage[]>(apiPath);
+        setMessages(res.data);
       } catch (error) {
         console.error("Ошибка загрузки чата:", error);
+        toast.error("Ошибка", { description: "Не удалось загрузить сообщения" });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchMessages();
-  }, [eventId]);
+  }, [apiPath]);
 
   const handleSendMessage = async (text: string) => {
     const tempId = Date.now();
@@ -46,22 +56,16 @@ export function EventChatContainer({ eventId, className }: EventChatContainerPro
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      const res = await fetch(`/api/events/${eventId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      const res = await apiClient.post<ChatMessage>(apiPath, { text });
+      const serverMsg = res.data;
 
-      if (!res.ok) throw new Error("Ошибка отправки");
-
-      const serverMsg = await res.json();
-
+      // Заменяем временное сообщение серверным
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? serverMsg : m))
       );
-
     } catch (error) {
       toast.error("Ошибка", { description: "Не удалось отправить сообщение" });
+      // Удаляем оптимистичное сообщение при ошибке
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
@@ -74,9 +78,14 @@ export function EventChatContainer({ eventId, className }: EventChatContainerPro
     );
   }
 
+  // Дефолтный заголовок, если не передан кастомный
+  const defaultTitle = entityType === "events" 
+    ? `Чат по событию #${entityId.split('_')[1] || entityId}`
+    : "Ход работ";
+
   return (
     <ChatSection
-      title={`Чат по событию #${eventId.split('_')[1] || eventId}`}
+      title={title || defaultTitle}
       messages={messages}
       onSendMessage={handleSendMessage}
       className={className}

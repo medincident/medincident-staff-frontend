@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { ProfileView } from "@/components/profile/profile-view";
+import { ProfileView } from "@/app/(main)/profile/view";
 
 export const metadata: Metadata = {
   title: "Профиль пользователя",

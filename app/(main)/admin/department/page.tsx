@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { DepartmentView } from "@/components/admin/department-view";
+import { DepartmentView } from "@/app/(main)/admin/department/view";
 
 export const metadata: Metadata = {
   title: "Настройки отделения",

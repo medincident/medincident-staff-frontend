@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { ReportsView } from "@/components/reports/reports-view";
+import { ReportsView } from "@/app/(main)/reports/view";
 
 export const metadata: Metadata = {
   title: "Отчёты и аналитика",

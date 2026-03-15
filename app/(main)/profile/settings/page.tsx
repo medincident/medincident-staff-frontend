@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { SettingsView } from "@/components/settings/settings-view";
+import { SettingsView } from "@/app/(main)/profile/settings/view";
 
 export const metadata: Metadata = {
   title: "Настройки уведомлений | Профиль",
