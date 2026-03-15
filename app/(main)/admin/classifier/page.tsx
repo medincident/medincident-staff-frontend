@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { ClassifierView } from "@/components/admin/classifier-view";
+import { ClassifierView } from "@/app/(main)/admin/classifier/view";
 
 export const metadata: Metadata = {
   title: "Классификатор событий",

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getSession } from "next-auth/react";
+import { getSession, signOut } from "next-auth/react";
 
 export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1",
@@ -19,10 +19,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      window.location.href =
-        "/api/auth/signin?callbackUrl=" +
-        encodeURIComponent(window.location.pathname);
+      signOut({ callbackUrl: window.location.pathname });
     }
+
+    if (error.response?.status === 403) {
+      console.error("Нет прав для выполнения операции");
+    }
+
     return Promise.reject(error);
   },
 );

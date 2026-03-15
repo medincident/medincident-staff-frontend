@@ -19,27 +19,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { Category, EventType } from "@/lib/types";
-
-// Импортируем сервисы
 import { getClassifier, saveClassifier } from "@/lib/services/classifier";
 
 export function ClassifierView() {
-  // --- STATE ---
   const [data, setData] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
-
-  // Модальные окна
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
-
-  // Редактирование
   const [editingItem, setEditingItem] = useState<{ id: string, name: string } | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
     loadData();
   }, []);

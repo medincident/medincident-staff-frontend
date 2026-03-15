@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { EventsListView } from "@/components/events/events-list-view";
+import { EventsListView } from "@/app/(main)/events/view";
 
 export const metadata: Metadata = {
   title: "Журнал событий",
