@@ -18,8 +18,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Category, EventType } from "@/lib/types";
-import { getClassifier, saveClassifier } from "@/lib/services/classifier";
+
+// --- НОВЫЕ ИМПОРТЫ ---
+import { Category, EventType } from "@/lib/types"; 
+import { ClassifierService } from "@/lib/api";
 
 export function ClassifierView() {
   const [data, setData] = useState<Category[]>([]);
@@ -39,7 +41,8 @@ export function ClassifierView() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const result = await getClassifier();
+      // --- НОВЫЙ ВЫЗОВ СЕРВИСА OpenAPI ---
+      const result = await ClassifierService.getClassifier();
       setData(result);
     } catch (error) {
       console.error(error);
@@ -56,7 +59,8 @@ export function ClassifierView() {
     setIsSaving(true);
 
     try {
-      await saveClassifier(newData);
+      // --- НОВЫЙ ВЫЗОВ СЕРВИСА OpenAPI (генератор назвал метод по HTTP-глаголу POST) ---
+      await ClassifierService.postClassifier(newData);
       toast.success("Сохранено", { description: "Изменения успешно применены" });
     } catch (e) {
       console.error(e);
