@@ -11,6 +11,6 @@ export const config = {
     // Защищаем ВСЁ приложение, кроме:
     // - /api/auth/*
     // - статических файлов, картинок, манифестов PWA
-    "/((?!api/auth|api/zitadel|_next/static|_next/image|favicon.ico|sw.js|workbox-.*|manifest.json|icon-.*).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|sw.js|workbox-.*|manifest.json|icon-.*).*)",
   ],
 };

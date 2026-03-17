@@ -1,31 +1,23 @@
 import axios from "axios";
 import { getSession, signOut } from "next-auth/react";
+import { OpenAPI } from "./api";
 
-export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1",
-});
+OpenAPI.BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
 
-apiClient.interceptors.request.use(async (config) => {
+OpenAPI.TOKEN = async () => {
   const session = await getSession();
+  return (session as any)?.accessToken || "";
+};
 
-  if (session && (session as any).accessToken) {
-    config.headers.Authorization = `Bearer ${(session as any).accessToken}`;
-  }
-
-  return config;
-});
-
-apiClient.interceptors.response.use(
+axios.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       signOut({ callbackUrl: window.location.pathname });
     }
-
-    if (error.response?.status === 403) {
-      console.error("Нет прав для выполнения операции");
-    }
-
     return Promise.reject(error);
   },
 );
+
+export const apiClient = axios;
