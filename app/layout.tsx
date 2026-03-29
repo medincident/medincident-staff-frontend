@@ -9,6 +9,7 @@ import { ThemeColorManager } from "@/components/providers/theme-color-manager";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { NextAuthSessionProvider } from "@/components/providers/session-provider";
+import { ApiProvider } from "@/components/providers/api-provider";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -55,7 +56,9 @@ export default function RootLayout({
           <InstallPrompt />
           <ThemeColorManager />
           <NextAuthSessionProvider>
+            <ApiProvider>
             {children}
+            </ApiProvider>
           </NextAuthSessionProvider>
           <Toaster />
         </ThemeProvider>

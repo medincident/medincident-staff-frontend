@@ -36,6 +36,7 @@ import {
   ClinicsService, 
   DepartmentsService 
 } from "@/lib/api";
+import { getBadgeColor } from "@/lib/status-helper"; // <--- Импорт нашей функции
 
 export function UsersView() {  
   // --- STATE ---
@@ -259,9 +260,10 @@ export function UsersView() {
                     const emp = user.employment;
                     const clinicName = emp?.clinic?.name || "—";
                     const deptName = emp?.department?.name;
+                    const isActive = user.isActive !== false; // По умолчанию true
 
                     return (
-                        <TableRow key={user.id} className={`border-b ${user.isActive === false ? "opacity-60 bg-muted/20" : ""}`}>
+                        <TableRow key={user.id} className={`border-b ${!isActive ? "opacity-60 bg-muted/20" : ""}`}>
                             <TableCell>
                                 <div className="font-medium text-foreground">{user.name || `${user.givenName} ${user.familyName}`}</div>
                                 <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-0.5">
@@ -271,15 +273,11 @@ export function UsersView() {
                                 </div>
                             </TableCell>
                             <TableCell>
-                                {user.isActive !== false ? (
-                                    <Badge variant="outline" className="bg-success/15 text-success border-success/20">
-                                        <CheckCircle2 className="w-3 h-3 mr-1" /> Активен
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/20">
-                                        <Ban className="w-3 h-3 mr-1" /> Деактивирован
-                                    </Badge>
-                                )}
+                                {/* НОВЫЙ БЕЙДЖ С ФУНКЦИЕЙ */}
+                                <Badge variant="outline" className={getBadgeColor(isActive ? "active" : "inactive")}>
+                                    {isActive ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <Ban className="w-3 h-3 mr-1" />}
+                                    {isActive ? "Активен" : "Деактивирован"}
+                                </Badge>
                             </TableCell>
                             <TableCell>
                                 <div className="flex flex-col">
@@ -304,8 +302,8 @@ export function UsersView() {
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => handleEditUser(user)}>
                                         <Pencil className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleUserStatus(user.id, user.isActive !== false)}>
-                                        {user.isActive !== false ? <PowerOff className="h-4 w-4 text-warning" /> : <Power className="h-4 w-4 text-emerald-500" />}
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleUserStatus(user.id, isActive)}>
+                                        {isActive ? <PowerOff className="h-4 w-4 text-warning" /> : <Power className="h-4 w-4 text-emerald-500" />}
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteUser(user.id)}>
                                         <Trash2 className="h-4 w-4" />
@@ -334,24 +332,20 @@ export function UsersView() {
             const emp = user.employment;
             const clinicName = emp?.clinic?.name || "Не назначено";
             const deptName = emp?.department?.name;
+            const isActive = user.isActive !== false;
 
             return (
-                <Card key={user.id} className={`overflow-hidden p-0 border ${user.isActive === false ? 'opacity-60 bg-muted/20' : 'bg-card'}`}>
+                <Card key={user.id} className={`overflow-hidden p-0 border ${!isActive ? 'opacity-60 bg-muted/20' : 'bg-card'}`}>
                     <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-3">
                             <div>
                                 <div className="font-semibold text-foreground text-sm">{user.name || `${user.givenName} ${user.familyName}`}</div>
                             </div>
                             
-                            {user.isActive !== false ? (
-                                <Badge variant="outline" className="bg-success/15 text-success border-success/20 whitespace-nowrap text-[10px]">
-                                    Активен
-                                </Badge>
-                            ) : (
-                                <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/20 whitespace-nowrap text-[10px]">
-                                    Отключен
-                                </Badge>
-                            )}
+                            {/* НОВЫЙ БЕЙДЖ ДЛЯ МОБИЛОК */}
+                            <Badge variant="outline" className={`${getBadgeColor(isActive ? "active" : "inactive")} whitespace-nowrap`}>
+                                {isActive ? "Активен" : "Отключен"}
+                            </Badge>
                         </div>
 
                         <div className="space-y-2 text-sm mb-4">
