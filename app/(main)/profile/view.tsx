@@ -25,12 +25,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-
-import { User } from "@/lib/types";
-import { APP_CONFIG, ROLE_NAMES } from "@/lib/constants";
-
-// Импортируем сервис
-import { getCurrentUser } from "@/lib/services/users";
+import { APP_CONFIG } from "@/lib/constants";
+import { UsersService } from "@/lib/api";
 
 export function ProfileView() {
   const router = useRouter();
@@ -38,7 +34,7 @@ export function ProfileView() {
   const [mounted, setMounted] = useState(false);
   
   // --- STATE ---
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // 1. ЗАГРУЗКА ДАННЫХ
@@ -46,7 +42,7 @@ export function ProfileView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const userData = await getCurrentUser();
+        const userData = await UsersService.getMe();
         setUser(userData);
       } catch (error) {
         console.error("Failed to load profile:", error);
@@ -65,8 +61,10 @@ export function ProfileView() {
   };
 
   const getInitials = (name: string) => {
+    if (!name) return "U";
     return name
       .split(' ')
+      .filter(Boolean)
       .map(n => n[0])
       .join('')
       .toUpperCase()
@@ -77,14 +75,12 @@ export function ProfileView() {
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto space-y-8 pb-20">
-        
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Профиль</h1>
             <p className="text-muted-foreground mt-1">Управление аккаунтом и настройки</p>
           </div>
-          {/* Кнопка неактивна, но видна (не скелетон) */}
           <Button
             variant="outline"
             disabled={true}
@@ -95,25 +91,20 @@ export function ProfileView() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
           {/* LEFT COLUMN SKELETON */}
           <div className="lg:col-span-5 space-y-3">
             <div className="rounded-xl border bg-card text-card-foreground overflow-hidden gap-6 py-0">
               <Skeleton className="h-32 w-full rounded-none" />
-              
               <div className="px-6 pb-6 relative">
                 <div className="-mt-22 mb-4 flex justify-between items-end">
                   <Skeleton className="h-24 w-24 rounded-full border-4 border-card" />
                   <Skeleton className="h-6 w-20 rounded-full mb-2" />
                 </div>
-
                 <div className="space-y-2 mb-4">
                   <Skeleton className="h-7 w-3/4" />
                   <Skeleton className="h-3 w-1/4" />
                 </div>
-
                 <Separator className="my-4" />
-
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="flex items-center gap-3">
@@ -128,14 +119,11 @@ export function ProfileView() {
 
           {/* RIGHT COLUMN SKELETON */}
           <div className="lg:col-span-7 space-y-6">
-
-            {/* Параметры */}
             <div>
                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
                   Параметры
                </h3>
                <div className="rounded-xl border bg-card p-2 space-y-1">
-                  
                   <div className="p-4 space-y-3">
                       <div className="flex items-center gap-4">
                          <Skeleton className="h-10 w-10 rounded-lg" />
@@ -146,9 +134,7 @@ export function ProfileView() {
                       </div>
                       <Skeleton className="h-12.25 w-full rounded-lg" />
                   </div>
-
                   <Separator className="my-1 opacity-50" />
-
                   {[1, 2].map((i) => (
                       <div key={i} className="flex items-center p-4 gap-4">
                          <Skeleton className="h-10.5 w-10 rounded-lg shrink-0" />
@@ -171,7 +157,6 @@ export function ProfileView() {
                   <Skeleton className="h-3 w-32" />
                </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -180,6 +165,13 @@ export function ProfileView() {
 
   // --- RENDER DATA STATE ---
   if (!user) return null;
+
+  // Формируем данные для отображения из новой схемы API
+  const displayName = user.name || `${user.givenName || ""} ${user.familyName || ""}`.trim() || "Пользователь";
+  const roleName = user.isAdmin ? "Администратор" : "Сотрудник";
+  const positionName = user.employment?.position || "Сотрудник";
+  const clinicName = user.employment?.clinic?.name || "Клиника не указана";
+  const departmentName = user.employment?.department?.name || "Отделение не указано";
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -208,17 +200,17 @@ export function ProfileView() {
               <div className="-mt-28 mb-4 flex justify-between items-end">
                 <Avatar className="h-24 w-24 border-4 border-card bg-background">
                   <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
-                    {getInitials(user.name)}
+                    {getInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
-                <Badge variant="secondary" className="mb-2 bg-primary/10 text-primary">
-                  {user ? (ROLE_NAMES[user.role] || user.role) : "Гость"}
+                <Badge variant={user.isAdmin ? "default" : "secondary"} className="mb-2">
+                  {roleName}
                 </Badge>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-xl font-bold text-foreground leading-tight">{user.name}</h2>
+                  <h2 className="text-xl font-bold text-foreground leading-tight">{displayName}</h2>
                   <p className="text-sm text-muted-foreground mt-1">ID: {user.id}</p>
                 </div>
 
@@ -227,15 +219,20 @@ export function ProfileView() {
                 <div className="space-y-3 text-sm">
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <Briefcase className="h-4 w-4 shrink-0 opacity-70" />
-                    <span className="text-foreground">{user.position || "Сотрудник"}</span>
+                    <span className="text-foreground">{positionName}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <Building className="h-4 w-4 shrink-0 opacity-70" />
-                    <span className="text-foreground">{user.departmentId || "Отделение не указано"}</span>
-                  </div>
+                  {!user.isAdmin && (
+                    <div className="flex items-start gap-3 text-muted-foreground">
+                      <Building className="h-4 w-4 shrink-0 opacity-70 mt-0.5" />
+                      <div className="flex flex-col">
+                        <span className="text-foreground">{clinicName}</span>
+                        <span className="text-xs">{departmentName}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <Mail className="h-4 w-4 shrink-0 opacity-70" />
-                    <span className="text-foreground">{user.email}</span>
+                    <span className="text-foreground">{user.email || "Email не указан"}</span>
                   </div>
                 </div>
               </div>
@@ -317,7 +314,7 @@ export function ProfileView() {
               <LogOut className="mr-2 h-4 w-4" />
               Выйти из аккаунта
             </Button>
-            <p className="text-center text-[10px] text-muted-foreground mt-6">Версия системы {APP_CONFIG.version}</p>
+            <p className="text-center text-[10px] text-muted-foreground mt-6">Версия системы {APP_CONFIG?.version || "1.0.0"}</p>
           </div>
 
         </div>

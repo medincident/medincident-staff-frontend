@@ -21,8 +21,8 @@ import { User, Notification } from "@/lib/types";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
-import { getCurrentUser } from "@/lib/services/users";
 import { getNotifications, markAllAsRead } from "@/lib/services/notifications";
+import { UsersService } from "@/lib/api";
 
 const NOTIFICATION_ICONS: Record<string, any> = {
   info: Info,
@@ -35,7 +35,7 @@ const NOTIFICATION_ICONS: Record<string, any> = {
 export function Header() {
   const router = useRouter();
 
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null); // Используем any или тип из нового API
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,6 +45,7 @@ export function Header() {
     if (!name) return "U";
     return name
       .split(' ')
+      .filter(Boolean)
       .map(n => n[0])
       .join('')
       .substring(0, 2)
@@ -54,10 +55,9 @@ export function Header() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Используем сервисы вместо fetch
         const [userData, notifData] = await Promise.all([
-          getCurrentUser(),
-          getNotifications()
+          UsersService.getMe(), // Получаем профиль через новый API
+          getNotifications()    // Пока оставляем старый сервис для уведомлений
         ]);
 
         setUser(userData);
@@ -86,9 +86,11 @@ export function Header() {
   };
 
   const handleLogout = () => {
-    // В реальном приложении здесь был бы вызов API для логаута
     router.push("/login");
   };
+
+  // Формируем имя для отображения
+  const displayName = user?.name || `${user?.givenName || ""} ${user?.familyName || ""}`.trim() || "Пользователь";
 
   return (
     <header className="bg-card border-b sticky top-0 z-30 h-14 px-4 flex justify-between items-center transition-colors duration-300">
@@ -180,7 +182,7 @@ export function Header() {
                 <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
                   {isLoading
                     ? <Loader2 className="h-3 w-3 animate-spin" />
-                    : (getUserInitials(user?.name || ""))
+                    : (getUserInitials(displayName))
                   }
                 </AvatarFallback>
               </Avatar>
@@ -196,8 +198,8 @@ export function Header() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm font-medium leading-none text-foreground">{user?.name}</p>
-                    <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email}</p>
+                    <p className="text-sm font-medium leading-none text-foreground">{displayName}</p>
+                    <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email || "Email не указан"}</p>
                   </>
                 )}
               </div>

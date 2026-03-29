@@ -9,7 +9,8 @@ import {
   Shield,
   Users,
   Building,
-  UserCheck
+  UserCheck,
+  Network
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/constants";
@@ -27,6 +28,7 @@ export function Sidebar() {
   ];
 
   const adminLinks = [
+    { href: "/admin/organizations", label: "Организации", icon: Network },
     { href: "/admin/classifier", label: "Классификатор", icon: Shield },
     { href: "/admin/department", label: "Подразделение", icon: UserCheck },
     { href: "/admin/structure", label: "Структура", icon: Building },
