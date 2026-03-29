@@ -30,6 +30,11 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
   completed: "success",
   closed: "success",
 
+  // --- Статусы активности ---
+  active: "success",
+  inactive: "muted",
+  deactivated: "muted",
+
   // --- Опасность/Отказ (Красные) ---
   refused: "destructive",
   cancelled: "destructive",
@@ -132,6 +137,12 @@ export const CHART_COLORS: Record<string, string> = {
   "В работе": "hsl(var(--warning))",
   Завершены: "hsl(var(--success))",
   Отменены: "hsl(var(--destructive))",
+
+  // Активность
+  Активна: "hsl(var(--success))",
+  Активные: "hsl(var(--success))",
+  Неактивна: "hsl(var(--muted-foreground))",
+  Неактивные: "hsl(var(--muted-foreground))",
 
   // Тяжесть / Приоритет
   Легкий: "hsl(var(--success))",

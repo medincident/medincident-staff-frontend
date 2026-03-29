@@ -29,9 +29,9 @@ export function Sidebar() {
 
   const adminLinks = [
     { href: "/admin/organizations", label: "Организации", icon: Network },
-    { href: "/admin/classifier", label: "Классификатор", icon: Shield },
-    { href: "/admin/department", label: "Подразделение", icon: UserCheck },
     { href: "/admin/structure", label: "Структура", icon: Building },
+    { href: "/admin/department", label: "Подразделение", icon: UserCheck },
+    { href: "/admin/classifier", label: "Классификатор", icon: Shield },
     { href: "/admin/users", label: "Пользователи", icon: Users },
   ];
 

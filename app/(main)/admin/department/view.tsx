@@ -21,8 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { User } from "@/lib/types";
-import { Input } from "@/components/ui/input";
 import { DepartmentsService } from "@/lib/api";
+import { getBadgeColor } from "@/lib/status-helper";
 
 export function DepartmentView() {
   // --- STATE ---
@@ -163,28 +163,11 @@ export function DepartmentView() {
               <h1 className="text-2xl font-bold text-foreground">
                   {isLoading ? <Skeleton className="h-8 w-64 rounded-md" /> : departmentName}
               </h1>
-              {!isLoading && (
-                <Badge variant={isActive ? "default" : "destructive"}>
-                  {isActive ? "Активно" : "Деактивировано"}
-                </Badge>
-              )}
             </div>
             <p className="text-sm text-muted-foreground mt-1">Управление настройками и доступом отделения</p>
         </div>
         
         <div className="flex w-full sm:w-auto items-center gap-2">
-          {!isLoading && (
-            <Button 
-              variant={isActive ? "outline" : "secondary"} 
-              onClick={toggleStatus} 
-              disabled={isTogglingStatus || isSaving}
-              className="w-full sm:w-auto"
-            >
-              {isTogglingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 
-               isActive ? <PowerOff className="mr-2 h-4 w-4 text-destructive" /> : <Power className="mr-2 h-4 w-4 text-emerald-500" />}
-              {isActive ? "Деактивировать" : "Активировать"}
-            </Button>
-          )}
           <Button onClick={handleSave} disabled={isSaving || isLoading} className="w-full sm:w-auto">
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Сохранить
@@ -199,36 +182,8 @@ export function DepartmentView() {
         </div>
       ) : (
         <div className="max-w-4xl space-y-6">
-          
-          {/* General Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-primary" />
-                Общие настройки
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3">
-                <Label>Название отделения</Label>
-                <Input 
-                  value={departmentName} 
-                  onChange={(e) => setDepartmentName(e.target.value)} 
-                  placeholder="Например: Кардиология" 
-                />
-              </div>
-              <div className="grid gap-3">
-                <Label>Описание отделения</Label>
-                <Input 
-                  value={description} 
-                  onChange={(e) => setDescription(e.target.value)} 
-                  placeholder="Дополнительная информация (необязательно)" 
-                />
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Leadership Settings (старая карточка) */}
+          {/* Leadership Settings */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

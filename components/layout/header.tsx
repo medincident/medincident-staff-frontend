@@ -21,7 +21,6 @@ import { User, Notification } from "@/lib/types";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
-import { getNotifications, markAllAsRead } from "@/lib/services/notifications";
 import { UsersService } from "@/lib/api";
 
 const NOTIFICATION_ICONS: Record<string, any> = {
@@ -57,11 +56,9 @@ export function Header() {
       try {
         const [userData, notifData] = await Promise.all([
           UsersService.getMe(), // Получаем профиль через новый API
-          getNotifications()    // Пока оставляем старый сервис для уведомлений
         ]);
 
         setUser(userData);
-        setNotifications(notifData);
       } catch (error) {
         console.error("Header data load failed", error);
       } finally {
@@ -70,20 +67,6 @@ export function Header() {
     };
     loadData();
   }, []);
-
-  const handleMarkAllRead = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    // Оптимистичное обновление
-    const prevNotifications = notifications;
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    
-    try {
-      await markAllAsRead();
-    } catch (error) {
-      console.error("Failed to mark read on server");
-      setNotifications(prevNotifications); // Откат
-    }
-  };
 
   const handleLogout = () => {
     router.push("/login");
@@ -128,7 +111,6 @@ export function Header() {
                   variant="ghost"
                   size="sm"
                   className="h-auto py-1 px-2 text-[10px] text-primary hover:bg-primary/10"
-                  onClick={handleMarkAllRead}
                 >
                   <CheckCheck className="w-3 h-3 mr-1" />
                   Пометить все

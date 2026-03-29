@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { getBadgeColor } from "@/lib/status-helper";
 
 // Импорт нового сервиса
 import { OrganizationsService } from "@/lib/api";
@@ -243,13 +244,18 @@ export function OrganizationsView() {
             const head = org.responsibles?.find((r: any) => r.isDirectlyAssigned)?.user;
 
             return (
-              <Card key={org.id} className={`transition-all ${org.isActive === false ? 'opacity-70 grayscale-[30%]' : ''}`}>
+              <Card key={org.id} className={`gap-2 transition-all ${org.isActive === false ? 'opacity-70 grayscale-[30%]' : ''}`}>
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                   <div className="space-y-1 overflow-hidden pr-4">
                     <div className="flex items-center gap-2">
                       <Building className="h-5 w-5 text-primary shrink-0" />
                       <CardTitle className="truncate text-lg">{org.name}</CardTitle>
-                      {org.isActive === false && <Badge variant="destructive" className="text-[10px]">Неактивна</Badge>}
+                      {org.isActive === false && <Badge 
+                        variant="outline" 
+                        className={getBadgeColor(org.isActive ? "active" : "inactive")}
+                      >
+                        {org.isActive ? "Активна" : "Неактивна"}
+                      </Badge>}
                     </div>
                     <CardDescription className="flex items-center gap-1 truncate text-xs">
                       <MapPin className="h-3 w-3 shrink-0" /> {org.legalAddress?.value || "Юридический адрес не указан"}
@@ -293,7 +299,12 @@ export function OrganizationsView() {
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Главный Руководитель</p>
                       <p className="text-sm font-medium">{head ? `${head.name || head.givenName}` : <span className="italic text-muted-foreground">Не назначен</span>}</p>
                     </div>
-                    <Button variant="secondary" size="sm" onClick={() => openResponsiblesDialog(org.id)}>
+                      <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent transition-all"
+                      onClick={() => openResponsiblesDialog(org.id)}
+                    >
                       Управление
                     </Button>
                   </div>

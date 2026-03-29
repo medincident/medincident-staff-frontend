@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Save,
   Building,
@@ -25,7 +25,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -53,14 +52,15 @@ import {
 
 export function StructureView() {
   // --- STATE ---
-  // Так как мы работаем внутри конкретной организации, нам нужен ее ID
-  const organizationId = "YOUR_ORG_ID"; 
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+  const [isOrgsLoading, setIsOrgsLoading] = useState(true);
 
   const [clinics, setClinics] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   
   // UI State
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -76,19 +76,37 @@ export function StructureView() {
   const [newHeadId, setNewHeadId] = useState<string>("none");
   const [targetClinicId, setTargetClinicId] = useState<string | null>(null);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
+  // 1. ЗАГРУЗКА ОРГАНИЗАЦИЙ
+  useEffect(() => {
+    const loadOrgs = async () => {
+      try {
+        // Загружаем только активные организации (или true, если нужно видеть деактивированные)
+        const res = await OrganizationsService.listOrganizations(true);
+        setOrganizations(res.items);
+        if (res.items.length > 0) {
+          setSelectedOrgId(res.items[0].id);
+        }
+      } catch (error) {
+        toast.error("Ошибка", { description: "Не удалось загрузить список организаций" });
+      } finally {
+        setIsOrgsLoading(false);
+      }
+    };
+    loadOrgs();
+  }, []);
+
+  // 2. ЗАГРУЗКА СТРУКТУРЫ (Зависит от выбранной организации)
   const loadData = async () => {
+    if (!selectedOrgId) return;
+
     try {
       setIsLoading(true);
       
-      // Загружаем список пользователей для выбора руководителей (лимит 100 для примера)
       const usersRes = await UsersService.listUsers(false, undefined, undefined, 100);
       setUsers(usersRes.items);
 
-      // Загружаем клиники организации (включая неактивные)
-      const clinicsRes = await ClinicsService.listOrganizationClinics(organizationId, true, search || undefined);
+      const clinicsRes = await ClinicsService.listOrganizationClinics(selectedOrgId, true, search || undefined);
       
-      // Для каждой клиники параллельно грузим ее отделения и прямых руководителей
       const builtClinics = await Promise.all(clinicsRes.items.map(async (clinic) => {
         const [deptsRes, respRes] = await Promise.all([
           DepartmentsService.listClinicDepartments(clinic.id, true, search || undefined),
@@ -97,7 +115,6 @@ export function StructureView() {
 
         const directHead = respRes.items.find(r => r.isDirectlyAssigned)?.user.id;
 
-        // Для каждого отделения грузим его руководителей
         const builtDepts = await Promise.all(deptsRes.items.map(async (dept) => {
           const dRespRes = await DepartmentsService.listDepartmentResponsibles(dept.id);
           const dDirectHead = dRespRes.items.find(r => r.isDirectlyAssigned)?.user.id;
@@ -110,7 +127,7 @@ export function StructureView() {
       setClinics(builtClinics);
     } catch (error) {
       console.error("Failed to load structure:", error);
-      toast.error("Ошибка", { description: "Не удалось загрузить структуру" });
+      toast.error("Ошибка", { description: "Не удалось загрузить структуру клиник" });
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +135,7 @@ export function StructureView() {
 
   useEffect(() => {
     loadData();
-  }, [search]); // Перезагружаем при поиске через API
+  }, [selectedOrgId, search]); // Перезагружаем при смене организации или поиске
 
   // --- HELPERS ---
   const getUserName = (userId?: string) => {
@@ -127,7 +144,6 @@ export function StructureView() {
     return user ? (user.name || `${user.givenName} ${user.familyName}`) : null;
   };
 
-  // Метод для синхронизации руководителя (одинаковая логика для клиник и отделений)
   const syncResponsible = async (
     targetId: string, 
     oldHeadId: string | undefined, 
@@ -161,7 +177,7 @@ export function StructureView() {
   };
 
   const saveClinic = async () => {
-    if (!newName.trim() || !newAddress.trim()) return;
+    if (!newName.trim() || !newAddress.trim() || !selectedOrgId) return;
     setIsSaving(true);
     try {
       if (editingItem?.id) {
@@ -178,7 +194,7 @@ export function StructureView() {
           ClinicsService.removeClinicResponsible
         );
       } else {
-        const newClinic = await ClinicsService.createClinic(organizationId, {
+        const newClinic = await ClinicsService.createClinic(selectedOrgId, {
           name: newName,
           description: newDescription || null,
           physicalAddress: { value: newAddress }
@@ -309,185 +325,222 @@ export function StructureView() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Структура</h1>
-          <p className="text-sm text-muted-foreground">Клиники, филиалы и отделения</p>
+          <p className="text-sm text-muted-foreground">Управление филиалами и отделениями</p>
         </div>
-        <div className="flex items-center gap-2 w-full lg:w-auto">
-          {isLoading ? (
-            <Skeleton className="h-9 flex-1 lg:w-64 rounded-md" />
+        
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
+          {/* СЕЛЕКТ ОРГАНИЗАЦИИ */}
+          {isOrgsLoading ? (
+            <Skeleton className="h-10 w-full sm:w-48 rounded-md shrink-0" />
           ) : (
-            <div className="relative flex-1 lg:w-64">
+            <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+              <SelectTrigger className="w-full sm:w-48 bg-background shrink-0">
+                <SelectValue placeholder="Выберите организацию" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.length === 0 && (
+                  <SelectItem value="none" disabled>Нет организаций</SelectItem>
+                )}
+                {organizations.map(org => (
+                  <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* ПОИСК */}
+          {isLoading && !clinics.length ? (
+            <Skeleton className="h-10 flex-1 w-full sm:w-48 lg:w-64 rounded-md" />
+          ) : (
+            <div className="relative flex-1 w-full sm:w-48 lg:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Поиск..."
-                className="pl-9 bg-background"
+                className="pl-9 bg-background w-full"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                disabled={!selectedOrgId}
               />
             </div>
           )}
           
-          <Button onClick={() => openClinicModal()} className="shrink-0" disabled={isSaving || isLoading}>
+          <Button 
+            onClick={() => openClinicModal()} 
+            className="shrink-0 w-full sm:w-auto" 
+            disabled={isSaving || isLoading || !selectedOrgId}
+          >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building className="mr-2 h-4 w-4" />}
             Клиника
           </Button>
         </div>
       </div>
 
+      {/* ОТОБРАЖЕНИЕ ЕСЛИ НЕТ ОРГАНИЗАЦИЙ */}
+      {!isOrgsLoading && organizations.length === 0 && (
+         <div className="py-16 text-center border rounded-xl bg-card">
+           <Building className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+           <h3 className="text-lg font-medium">Нет организаций</h3>
+           <p className="text-sm text-muted-foreground mt-1 mb-4">Сначала создайте медицинскую сеть (организацию).</p>
+         </div>
+      )}
+
       {/* LIST GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-        
-        {/* SKELETON STATE */}
-        {isLoading && clinics.length === 0 && Array.from({ length: 6 }).map((_, i) => (
-          <Card key={`skel-${i}`} className="flex flex-col overflow-hidden gap-0 p-0 border">
-            <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
-              <div className="flex justify-between items-start w-full">
-                <div className="space-y-2 w-full">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-5 w-32 rounded-sm" />
-                    <Skeleton className="h-5 w-8 rounded-full" />
-                  </div>
-                  <Skeleton className="h-3 w-48 rounded-sm" />
-                </div>
-                <Skeleton className="h-8 w-8 rounded-md shrink-0 ml-2" />
-              </div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1">
-              <div className="p-3"><Skeleton className="h-8 w-full" /></div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {/* REAL DATA */}
-        {!isLoading && clinics.map((clinic) => {
-          const clinicHeadName = getUserName(clinic.headId);
-
-          return (
-            <Card key={clinic.id} className={`flex flex-col overflow-hidden gap-0 p-0 border ${clinic.isActive === false ? 'opacity-70 grayscale-[30%]' : ''}`}>
+      {selectedOrgId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+          
+          {/* SKELETON STATE */}
+          {isLoading && clinics.length === 0 && Array.from({ length: 6 }).map((_, i) => (
+            <Card key={`skel-${i}`} className="flex flex-col overflow-hidden gap-0 p-0 border">
               <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1 overflow-hidden">
+                <div className="flex justify-between items-start w-full">
+                  <div className="space-y-2 w-full">
                     <div className="flex items-center gap-2">
-                      <CardTitle className="text-sm font-bold truncate" title={clinic.name}>
-                        {clinic.name}
-                      </CardTitle>
-                      {clinic.isActive === false ? (
-                        <Badge variant="destructive" className="text-[10px] h-5 px-1.5">Неактивна</Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border ">
-                          {clinic.departments.length} отд.
-                        </Badge>
-                      )}
+                      <Skeleton className="h-5 w-32 rounded-sm" />
+                      <Skeleton className="h-5 w-8 rounded-full" />
                     </div>
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate" title={clinic.physicalAddress?.value || clinic.address}>
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        {clinic.physicalAddress?.value || clinic.address || "Адрес не указан"}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-primary/80 truncate font-medium">
-                        <UserIcon className="h-3 w-3 shrink-0" />
-                        {clinicHeadName
-                          ? `Главврач: ${clinicHeadName}`
-                          : <span className="text-muted-foreground italic font-normal">Нет руководителя</span>}
-                      </div>
-                    </div>
+                    <Skeleton className="h-3 w-48 rounded-sm" />
                   </div>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-2 text-muted-foreground hover:text-foreground">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openClinicModal(clinic)}>
-                        <Pencil className="mr-2 h-4 w-4" /> Изменить
-                      </DropdownMenuItem>
-                      {clinic.isActive !== false ? (
-                        <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, true)}>
-                          <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, false)}>
-                          <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                        onClick={() => deleteClinic(clinic.id)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" /> Удалить навсегда
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Skeleton className="h-8 w-8 rounded-md shrink-0 ml-2" />
                 </div>
               </CardHeader>
-
               <CardContent className="p-0 flex-1">
-                <div className="divide-y divide-border/50">
-                  {clinic.departments.length > 0 ? (
-                    clinic.departments.map((dept: any) => {
-                      const deptHeadName = getUserName(dept.headId);
-
-                      return (
-                        <div key={dept.id} className={`group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm ${dept.isActive === false ? 'opacity-60' : ''}`}>
-                          <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
-                            <div className="p-1.5 text-info transition-colors">
-                              <Stethoscope className="h-3.5 w-3.5" />
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-foreground font-medium truncate block w-full flex items-center gap-2">
-                                {dept.name}
-                                {dept.isActive === false && <Badge variant="outline" className="text-[9px] h-4 py-0 px-1">откл</Badge>}
-                              </span>
-                              <span className="text-xs text-muted-foreground truncate block w-full opacity-80">
-                                {deptHeadName || "Руководитель не назначен"}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1 shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openDeptModal(clinic.id, dept)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleDeptStatus(dept.id, dept.isActive !== false)}>
-                              {dept.isActive !== false ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5 text-emerald-500" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteDept(dept.id)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="p-6 text-center text-xs text-muted-foreground italic">
-                      Нет отделений
-                    </div>
-                  )}
-                </div>
+                <div className="p-3"><Skeleton className="h-8 w-full" /></div>
               </CardContent>
-
-              <div className="p-3 bg-muted/30 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent transition-all"
-                  onClick={() => openDeptModal(clinic.id)}
-                >
-                  <Building className="mr-2 h-3.5 w-3.5" /> Добавить отделение
-                </Button>
-              </div>
             </Card>
-          );
-        })}
+          ))}
 
-        {!isLoading && clinics.length === 0 && (
-          <div className="col-span-full py-12 text-center text-muted-foreground">
-            <Building className="h-10 w-10 mx-auto text-muted-foreground/30 mb-4" />
-            <p>Ничего не найдено</p>
-          </div>
-        )}
-      </div>
+          {/* REAL DATA */}
+          {!isLoading && clinics.map((clinic) => {
+            const clinicHeadName = getUserName(clinic.headId);
+
+            return (
+              <Card key={clinic.id} className={`flex flex-col overflow-hidden gap-0 p-0 border ${clinic.isActive === false ? 'opacity-70 grayscale-[30%]' : ''}`}>
+                <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1 overflow-hidden pr-2">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-sm font-bold truncate" title={clinic.name}>
+                          {clinic.name}
+                        </CardTitle>
+                        {clinic.isActive === false ? (
+                          <Badge variant="destructive" className="text-[10px] h-5 px-1.5 shrink-0">Неактивна</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border shrink-0">
+                            {clinic.departments.length} отд.
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate" title={clinic.physicalAddress?.value || clinic.address}>
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{clinic.physicalAddress?.value || clinic.address || "Адрес не указан"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-primary/80 truncate font-medium">
+                          <UserIcon className="h-3 w-3 shrink-0" />
+                          {clinicHeadName
+                            ? <span className="truncate">Главврач: {clinicHeadName}</span>
+                            : <span className="text-muted-foreground italic font-normal">Нет руководителя</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 -mr-2 shrink-0 text-muted-foreground hover:text-foreground">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openClinicModal(clinic)}>
+                          <Pencil className="mr-2 h-4 w-4" /> Изменить
+                        </DropdownMenuItem>
+                        {clinic.isActive !== false ? (
+                          <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, true)}>
+                            <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, false)}>
+                            <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                          onClick={() => deleteClinic(clinic.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Удалить навсегда
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-0 flex-1">
+                  <div className="divide-y divide-border/50">
+                    {clinic.departments.length > 0 ? (
+                      clinic.departments.map((dept: any) => {
+                        const deptHeadName = getUserName(dept.headId);
+
+                        return (
+                          <div key={dept.id} className={`group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm ${dept.isActive === false ? 'opacity-60' : ''}`}>
+                            <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
+                              <div className="p-1.5 text-info transition-colors">
+                                <Stethoscope className="h-3.5 w-3.5" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-foreground font-medium truncate block w-full flex items-center gap-2">
+                                  {dept.name}
+                                  {dept.isActive === false && <Badge variant="outline" className="text-[9px] h-4 py-0 px-1">откл</Badge>}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate block w-full opacity-80">
+                                  {deptHeadName || "Руководитель не назначен"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openDeptModal(clinic.id, dept)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleDeptStatus(dept.id, dept.isActive !== false)}>
+                                {dept.isActive !== false ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5 text-emerald-500" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteDept(dept.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="p-6 text-center text-xs text-muted-foreground italic">
+                        Нет отделений
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+
+                <div className="p-3 bg-muted/30 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent transition-all"
+                    onClick={() => openDeptModal(clinic.id)}
+                  >
+                    <Building className="mr-2 h-3.5 w-3.5" /> Добавить отделение
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
+
+          {!isLoading && clinics.length === 0 && (
+            <div className="col-span-full py-12 text-center text-muted-foreground">
+              <Building className="h-10 w-10 mx-auto text-muted-foreground/30 mb-4" />
+              <p>В этой организации пока нет клиник</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* DIALOGS */}
       <Dialog open={isClinicDialogOpen} onOpenChange={setIsClinicDialogOpen}>

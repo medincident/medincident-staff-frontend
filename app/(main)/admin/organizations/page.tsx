@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { OrganizationsView } from "@/app/(main)/admin/organization/view";
+import { OrganizationsView } from "@/app/(main)/admin/organizations/view";
 
 export const metadata: Metadata = {
   title: "Организации",

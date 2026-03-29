@@ -25,6 +25,13 @@ import {
   CreateCategoryRequest, 
   CreateEventTypeRequest 
 } from "@/lib/api";
+import { getBadgeColor } from "@/lib/status-helper";
+
+// Функция для правильного склонения слов (например: 1 тип, 2 типа, 5 типов)
+const getDeclension = (number: number, words: string[]) => {
+  const cases = [2, 0, 1, 1, 1, 2];
+  return words[(number % 100 > 4 && number % 100 < 20) ? 2 : cases[(number % 10 < 5) ? number % 10 : 5]];
+};
 
 export function ClassifierView() {
   const [categories, setCategories] = useState<CategoryBrief[]>([]);
@@ -45,39 +52,42 @@ export function ClassifierView() {
 
   useEffect(() => {
     loadCategories();
-  }, [search]); // Перезагружаем при поиске, так как API поддерживает параметр q
+  }, [search]); // Перезагружаем при поиске
 
-  // Загрузка категорий через новый API
+  // Загрузка категорий и всех типов сразу
   const loadCategories = async () => {
     try {
       setIsLoading(true);
-      // includeDeactivated=true, чтобы видеть все
       const result = await EventsService.listEventCategories(true, search || undefined);
-      setCategories(result.items);
+      const fetchedCats = result.items;
+      setCategories(fetchedCats);
+
+      const typesPromises = fetchedCats.map(cat => 
+        EventsService.listEventCategoryTypes(cat.id).then(res => ({ id: cat.id, types: res.items }))
+      );
+      
+      const typesResults = await Promise.all(typesPromises);
+      
+      const newTypesMap: Record<string, EventType[]> = {};
+      typesResults.forEach(res => {
+        newTypesMap[res.id] = res.types;
+      });
+      
+      setTypesMap(newTypesMap);
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка", { description: "Не удалось загрузить категории" });
+      toast.error("Ошибка", { description: "Не удалось загрузить справочник" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Раскрытие категории и ленивая подгрузка типов
-  const toggleCategory = async (categoryId: string) => {
+  const toggleCategory = (categoryId: string) => {
     const newExpanded = new Set(expandedCats);
     if (newExpanded.has(categoryId)) {
       newExpanded.delete(categoryId);
     } else {
       newExpanded.add(categoryId);
-      // Если типы для этой категории еще не загружены, грузим их
-      if (!typesMap[categoryId]) {
-        try {
-          const typesResult = await EventsService.listEventCategoryTypes(categoryId);
-          setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
-        } catch (error) {
-          toast.error("Ошибка", { description: "Не удалось загрузить типы событий" });
-        }
-      }
     }
     setExpandedCats(newExpanded);
   };
@@ -141,7 +151,7 @@ export function ClassifierView() {
   const openCategoryModal = (cat?: CategoryBrief & { description?: string }, parentId?: string) => {
     setEditingItem(cat ? { id: cat.id, name: cat.name } : null);
     setNewItemName(cat ? cat.name : "");
-    setNewItemDescription(cat?.description || ""); // Загружаем описание
+    setNewItemDescription(cat?.description || "");
     setTargetCategoryId(parentId || null);
     setIsCategoryDialogOpen(true);
   };
@@ -199,7 +209,6 @@ export function ClassifierView() {
     if (confirm("Удалить этот тип события?")) {
       try {
         await EventsService.deleteEventType(typeId);
-        // Обновляем список типов
         const typesResult = await EventsService.listEventCategoryTypes(categoryId);
         setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
         toast.success("Тип удален");
@@ -230,7 +239,6 @@ export function ClassifierView() {
         </div>
         <div className="flex items-center gap-2 w-full lg:w-auto">
           {isLoading ? (
-             /* SEARCH SKELETON */
              <Skeleton className="h-10 flex-1 lg:w-64 rounded-md" />
           ) : (
              <div className="relative flex-1 lg:w-64">
@@ -248,10 +256,10 @@ export function ClassifierView() {
 
       {/* TABLE VIEW */}
       <div className="border rounded-md bg-card">
-        <div className="grid grid-cols-[1fr_200px_100px_100px] gap-4 p-4 border-b bg-muted/50 text-sm font-medium text-muted-foreground">
+        {/* Обновили сетку на 3 колонки вместо 4 */}
+        <div className="grid grid-cols-[1fr_200px_100px] gap-4 p-4 border-b bg-muted/50 text-sm font-medium text-muted-foreground">
           <div>Название</div>
           <div>Статус</div>
-          <div>Вложенность</div>
           <div className="text-right">Действия</div>
         </div>
 
@@ -263,13 +271,16 @@ export function ClassifierView() {
           ) : (
             categories.map((cat) => {
               const isExpanded = expandedCats.has(cat.id);
-              // Вычисляем отступ в зависимости от наличия parentId (в реальности лучше заранее построить дерево или считать глубину)
               const depth = cat.parentId ? 1 : 0; 
+              
+              const typesCount = typesMap[cat.id]?.length || 0;
+              // Склоняем слово "тип"
+              const typesLabel = getDeclension(typesCount, ['тип', 'типа', 'типов']);
 
               return (
                 <div key={cat.id} className="flex flex-col">
                   {/* Строка категории */}
-                  <div className="grid grid-cols-[1fr_200px_100px_100px] gap-4 p-4 items-center hover:bg-muted/30 transition-colors">
+                  <div className="grid grid-cols-[1fr_200px_100px] gap-4 p-4 items-center hover:bg-muted/30 transition-colors">
                     <div 
                       className="flex items-center gap-2 cursor-pointer" 
                       style={{ paddingLeft: `${depth * 24}px` }}
@@ -279,17 +290,15 @@ export function ClassifierView() {
                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </Button>
                       <Layers className="h-4 w-4 text-primary shrink-0" />
-                      <span className="font-medium text-sm">{cat.name}</span>
+                      <span className="font-medium text-sm">
+                        {cat.name} <span className="text-muted-foreground font-normal ml-1">({typesCount} {typesLabel})</span>
+                      </span>
                     </div>
                     
                     <div>
-                      <Badge variant={cat.isActive !== false ? "default" : "secondary"} className="text-xs">
+                      <Badge variant="outline" className={getBadgeColor(cat.isActive !== false ? "active" : "inactive")}>
                         {cat.isActive !== false ? "Активна" : "Неактивна"}
                       </Badge>
-                    </div>
-                    
-                    <div className="text-sm text-muted-foreground">
-                      {typesMap[cat.id]?.length || 0} типов
                     </div>
 
                     <div className="flex items-center justify-end gap-1">
@@ -333,15 +342,19 @@ export function ClassifierView() {
                          <div className="p-4 text-center text-xs text-muted-foreground pl-14">Нет типов событий</div>
                       ) : (
                         typesMap[cat.id].map(type => (
-                          <div key={type.id} className="grid grid-cols-[1fr_200px_100px_100px] gap-4 p-3 items-center hover:bg-muted/30">
+                          <div key={type.id} className={`grid grid-cols-[1fr_200px_100px] gap-4 p-3 items-center hover:bg-muted/30 ${type.isActive === false ? 'opacity-70' : ''}`}>
                             <div className="flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 24 + 24}px` }}>
                               <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
-                              <span className="text-sm text-muted-foreground">{type.name}</span>
+                              <span className={`text-sm ${type.isActive === false ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{type.name}</span>
                             </div>
-                            <div>
+                            <div className="flex items-center gap-2">
+                              {type.isActive === false && (
+                                <Badge variant="outline" className={getBadgeColor("inactive")}>
+                                  Неактивен
+                                </Badge>
+                              )}
                               <Badge variant="outline" className="text-[10px]">{type.patientCanReport ? 'Для пациентов' : 'Внутреннее'}</Badge>
                             </div>
-                            <div />
                             <div className="flex items-center justify-end gap-1">
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openTypeModal(cat.id, type)} title="Изменить">
                                 <Pencil className="h-3.5 w-3.5" />
