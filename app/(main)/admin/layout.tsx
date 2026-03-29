@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, Building, Users, UserCheck } from "lucide-react";
+import { Shield, Building, Users, UserCheck, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout({
@@ -14,6 +14,7 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   const adminTabs = [
+    { href: "/admin/organizations", label: "Организации", icon: Network },
     { href: "/admin/classifier", label: "Классификатор", icon: Shield },
     { href: "/admin/department", label: "Подразделение", icon: UserCheck },
     { href: "/admin/structure", label: "Структура", icon: Building },

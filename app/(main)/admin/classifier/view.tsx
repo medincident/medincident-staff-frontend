@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
-  Plus, Pencil, Trash2, Search, FolderPlus, MoreVertical, Layers, Loader2
+  Plus, Pencil, Trash2, Search, FolderPlus, MoreVertical, Layers, Loader2, ChevronRight, ChevronDown, Power, PowerOff
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,95 +17,195 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-
-// --- НОВЫЕ ИМПОРТЫ ---
-import { Category, EventType } from "@/lib/types"; 
-import { ClassifierService } from "@/lib/api";
+import { Switch } from "@/components/ui/switch";
+import { 
+  EventsService, 
+  CategoryBrief, 
+  EventType, 
+  CreateCategoryRequest, 
+  CreateEventTypeRequest 
+} from "@/lib/api";
 
 export function ClassifierView() {
-  const [data, setData] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<CategoryBrief[]>([]);
+  const [typesMap, setTypesMap] = useState<Record<string, EventType[]>>({}); // Кэш типов: categoryId -> EventType[]
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set()); // Раскрытые узлы
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
+  
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<{ id: string, name: string } | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
+  const [newItemDescription, setNewItemDescription] = useState("");
+  const [newItemPatientCanReport, setNewItemPatientCanReport] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadCategories();
+  }, [search]); // Перезагружаем при поиске, так как API поддерживает параметр q
 
-  const loadData = async () => {
+  // Загрузка категорий через новый API
+  const loadCategories = async () => {
     try {
       setIsLoading(true);
-      // --- НОВЫЙ ВЫЗОВ СЕРВИСА OpenAPI ---
-      const result = await ClassifierService.getClassifier();
-      setData(result);
+      // includeDeactivated=true, чтобы видеть все
+      const result = await EventsService.listEventCategories(true, search || undefined);
+      setCategories(result.items);
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка", { description: "Не удалось загрузить данные" });
+      toast.error("Ошибка", { description: "Не удалось загрузить категории" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 2. СОХРАНЕНИЕ
-  const syncWithServer = async (newData: Category[]) => {
-    const prevData = data;
-    setData(newData); // Оптимистичное обновление
-    setIsSaving(true);
+  // Раскрытие категории и ленивая подгрузка типов
+  const toggleCategory = async (categoryId: string) => {
+    const newExpanded = new Set(expandedCats);
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+      // Если типы для этой категории еще не загружены, грузим их
+      if (!typesMap[categoryId]) {
+        try {
+          const typesResult = await EventsService.listEventCategoryTypes(categoryId);
+          setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
+        } catch (error) {
+          toast.error("Ошибка", { description: "Не удалось загрузить типы событий" });
+        }
+      }
+    }
+    setExpandedCats(newExpanded);
+  };
 
+  // --- CRUD Категорий ---
+  const saveCategory = async () => {
+    if (!newItemName.trim()) return;
+    setIsSaving(true);
     try {
-      // --- НОВЫЙ ВЫЗОВ СЕРВИСА OpenAPI (генератор назвал метод по HTTP-глаголу POST) ---
-      await ClassifierService.postClassifier(newData);
-      toast.success("Сохранено", { description: "Изменения успешно применены" });
+      if (editingItem) {
+        await EventsService.updateEventCategory(editingItem.id, { 
+          name: newItemName,
+          description: newItemDescription || null
+        });
+      } else {
+        const payload: CreateCategoryRequest = { 
+          name: newItemName, 
+          code: `cat_${Date.now()}`,
+          parentId: targetCategoryId,
+          description: newItemDescription || null
+        };
+        await EventsService.createEventCategory(payload);
+      }
+      toast.success("Сохранено");
+      setIsCategoryDialogOpen(false);
+      loadCategories();
     } catch (e) {
-      console.error(e);
-      toast.error("Ошибка", { description: "Не удалось сохранить изменения" });
-      setData(prevData); // Откат
+      toast.error("Ошибка при сохранении категории");
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   };
 
-  // --- ЛОГИКА UI ---
+  const toggleCategoryStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      if (currentStatus) {
+        await EventsService.deactivateEventCategory(id);
+        toast.success("Категория деактивирована");
+      } else {
+        await EventsService.reactivateEventCategory(id);
+        toast.success("Категория активирована");
+      }
+      loadCategories();
+    } catch (e) {
+      toast.error("Ошибка при изменении статуса");
+    }
+  };
 
-  const filteredData = useMemo(() => {
-    if (!search) return data;
-    const lowerSearch = search.toLowerCase();
-    return data.map(cat => {
-      if (cat.name.toLowerCase().includes(lowerSearch)) return cat;
-      const matchingTypes = cat.types.filter(t => t.name.toLowerCase().includes(lowerSearch));
-      if (matchingTypes.length > 0) return { ...cat, types: matchingTypes };
-      return null;
-    }).filter(Boolean) as Category[];
-  }, [data, search]);
+  const deleteCategory = async (id: string) => {
+    if (confirm("Удалить категорию и все ее подкатегории/типы?")) {
+      try {
+        await EventsService.deleteEventCategory(id);
+        toast.success("Категория удалена");
+        loadCategories();
+      } catch (e) {
+        toast.error("Ошибка при удалении");
+      }
+    }
+  };
 
-  const openCategoryModal = (cat?: Category) => {
+  const openCategoryModal = (cat?: CategoryBrief & { description?: string }, parentId?: string) => {
     setEditingItem(cat ? { id: cat.id, name: cat.name } : null);
     setNewItemName(cat ? cat.name : "");
+    setNewItemDescription(cat?.description || ""); // Загружаем описание
+    setTargetCategoryId(parentId || null);
     setIsCategoryDialogOpen(true);
   };
 
-  const saveCategory = () => {
-    if (!newItemName.trim()) return;
-    let newData;
-    if (editingItem) {
-      newData = data.map(c => c.id === editingItem.id ? { ...c, name: newItemName } : c);
-    } else {
-      const newCat: Category = { id: `cat_${Date.now()}`, name: newItemName, types: [] };
-      newData = [...data, newCat];
+  // --- CRUD Типов событий ---
+  const saveType = async () => {
+    if (!newItemName.trim() || !targetCategoryId) return;
+    setIsSaving(true);
+    try {
+      if (editingItem) {
+        await EventsService.updateEventType(editingItem.id, { 
+          name: newItemName,
+          description: newItemDescription || null,
+          patientCanReport: newItemPatientCanReport
+        });
+      } else {
+        const payload: CreateEventTypeRequest = {
+          name: newItemName,
+          code: `type_${Date.now()}`,
+          description: newItemDescription || null,
+          patientCanReport: newItemPatientCanReport
+        };
+        await EventsService.createEventType(targetCategoryId, payload);
+      }
+      
+      const typesResult = await EventsService.listEventCategoryTypes(targetCategoryId);
+      setTypesMap(prev => ({ ...prev, [targetCategoryId]: typesResult.items }));
+      
+      toast.success("Сохранено");
+      setIsTypeDialogOpen(false);
+    } catch (e) {
+      toast.error("Ошибка при сохранении типа");
+    } finally {
+      setIsSaving(false);
     }
-    syncWithServer(newData);
-    setIsCategoryDialogOpen(false);
   };
 
-  const deleteCategory = (id: string) => {
-    if (confirm("Удалить категорию и все вложенные типы?")) {
-      const newData = data.filter(c => c.id !== id);
-      syncWithServer(newData);
+  const toggleTypeStatus = async (typeId: string, categoryId: string, currentStatus: boolean) => {
+    try {
+      if (currentStatus) {
+        await EventsService.deactivateEventType(typeId);
+        toast.success("Тип события деактивирован");
+      } else {
+        await EventsService.reactivateEventType(typeId);
+        toast.success("Тип события активирован");
+      }
+      const typesResult = await EventsService.listEventCategoryTypes(categoryId);
+      setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
+    } catch (e) {
+      toast.error("Ошибка при изменении статуса");
+    }
+  };
+
+  const deleteType = async (typeId: string, categoryId: string) => {
+    if (confirm("Удалить этот тип события?")) {
+      try {
+        await EventsService.deleteEventType(typeId);
+        // Обновляем список типов
+        const typesResult = await EventsService.listEventCategoryTypes(categoryId);
+        setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
+        toast.success("Тип удален");
+      } catch (e) {
+        toast.error("Ошибка при удалении");
+      }
     }
   };
 
@@ -114,42 +213,9 @@ export function ClassifierView() {
     setTargetCategoryId(categoryId);
     setEditingItem(type ? { id: type.id, name: type.name } : null);
     setNewItemName(type ? type.name : "");
+    setNewItemDescription(type?.description || "");
+    setNewItemPatientCanReport(type ? type.patientCanReport : false);
     setIsTypeDialogOpen(true);
-  };
-
-  const saveType = () => {
-    if (!newItemName.trim() || !targetCategoryId) return;
-    let newData;
-    if (editingItem) {
-      newData = data.map(cat => {
-        if (cat.id === targetCategoryId) {
-          return { ...cat, types: cat.types.map(t => t.id === editingItem.id ? { ...t, name: newItemName } : t) };
-        }
-        return cat;
-      });
-    } else {
-      const newType: EventType = { id: `type_${Date.now()}`, name: newItemName };
-      newData = data.map(cat => {
-        if (cat.id === targetCategoryId) {
-          return { ...cat, types: [...cat.types, newType] };
-        }
-        return cat;
-      });
-    }
-    syncWithServer(newData);
-    setIsTypeDialogOpen(false);
-  };
-
-  const deleteType = (typeId: string, categoryId: string) => {
-    if (confirm("Удалить этот тип события?")) {
-      const newData = data.map(cat => {
-        if (cat.id === categoryId) {
-          return { ...cat, types: cat.types.filter(t => t.id !== typeId) };
-        }
-        return cat;
-      });
-      syncWithServer(newData);
-    }
   };
 
   return (
@@ -180,101 +246,125 @@ export function ClassifierView() {
         </div>
       </div>
 
-      {/* GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-        {isLoading ? (
-          /* CARD SKELETONS */
-          Array.from({ length: 6 }).map((_, i) => (
-            <Card key={`skel-${i}`} className="flex flex-col overflow-hidden gap-0 p-0 border">
-              <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-2 w-full">
-                  <Skeleton className="h-4 w-4 rounded-sm shrink-0" />
-                  <Skeleton className="h-4 w-32 rounded-sm" />
-                  <Skeleton className="h-5 w-8 rounded-full" />
-                </div>
-                <Skeleton className="h-8 w-8 rounded-md shrink-0" />
-              </CardHeader>
-              <CardContent className="p-0 flex-1">
-                <div className="divide-y divide-border/50">
-                  {Array.from({ length: 3 }).map((_, j) => (
-                    <div key={j} className="p-3 flex items-center justify-between">
-                      <Skeleton className="h-4 w-3/4" />
-                      <div className="flex items-center gap-1">
-                        <Skeleton className="h-7 w-7 rounded-md" />
-                        <Skeleton className="h-7 w-7 rounded-md" />
-                      </div>
+      {/* TABLE VIEW */}
+      <div className="border rounded-md bg-card">
+        <div className="grid grid-cols-[1fr_200px_100px_100px] gap-4 p-4 border-b bg-muted/50 text-sm font-medium text-muted-foreground">
+          <div>Название</div>
+          <div>Статус</div>
+          <div>Вложенность</div>
+          <div className="text-right">Действия</div>
+        </div>
+
+        <div className="divide-y">
+          {isLoading && categories.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+          ) : categories.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">Ничего не найдено</div>
+          ) : (
+            categories.map((cat) => {
+              const isExpanded = expandedCats.has(cat.id);
+              // Вычисляем отступ в зависимости от наличия parentId (в реальности лучше заранее построить дерево или считать глубину)
+              const depth = cat.parentId ? 1 : 0; 
+
+              return (
+                <div key={cat.id} className="flex flex-col">
+                  {/* Строка категории */}
+                  <div className="grid grid-cols-[1fr_200px_100px_100px] gap-4 p-4 items-center hover:bg-muted/30 transition-colors">
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer" 
+                      style={{ paddingLeft: `${depth * 24}px` }}
+                      onClick={() => toggleCategory(cat.id)}
+                    >
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 p-0">
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </Button>
+                      <Layers className="h-4 w-4 text-primary shrink-0" />
+                      <span className="font-medium text-sm">{cat.name}</span>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-              <div className="p-3 bg-muted/30 border-t">
-                <Skeleton className="h-8 w-full rounded-md" />
-              </div>
-            </Card>
-          ))
-        ) : (
-          filteredData.map((category) => (
-            <Card key={category.id} className="flex flex-col overflow-hidden gap-0 p-0 border">
-              <CardHeader className="bg-muted/50 border-b pb-3! px-4 py-3 flex flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <Layers className="h-4 w-4 text-primary shrink-0" />
-                  <CardTitle className="text-sm font-bold truncate" title={category.name}>{category.name}</CardTitle>
-                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border ">{category.types.length}</Badge>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openCategoryModal(category)}>
-                      <Pencil className="mr-2 h-4 w-4" /> Переименовать
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => deleteCategory(category.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Удалить
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent className="p-0 flex-1">
-                <div className="divide-y divide-border/50">
-                  {category.types.length > 0 ? (
-                    category.types.map((type) => (
-                      <div key={type.id} className="group flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-sm">
-                        <span className="text-foreground truncate pr-2">{type.name}</span>
-                        <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openTypeModal(category.id, type)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteType(type.id, category.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-8 text-center text-xs text-muted-foreground italic">Нет типов событий</div>
+                    
+                    <div>
+                      <Badge variant={cat.isActive !== false ? "default" : "secondary"} className="text-xs">
+                        {cat.isActive !== false ? "Активна" : "Неактивна"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-sm text-muted-foreground">
+                      {typesMap[cat.id]?.length || 0} типов
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(undefined, cat.id); }}>
+                            <Plus className="mr-2 h-4 w-4" /> Добавить подкатегорию
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openTypeModal(cat.id); }}>
+                            <FolderPlus className="mr-2 h-4 w-4" /> Добавить тип события
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(cat); }}>
+                            <Pencil className="mr-2 h-4 w-4" /> Изменить
+                          </DropdownMenuItem>
+                          {cat.isActive !== false ? (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, true); }}>
+                              <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, false); }}>
+                              <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Удалить (полностью)
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  {/* Развернутые типы событий */}
+                  {isExpanded && (
+                    <div className="bg-muted/10 border-t border-b border-dashed divide-y divide-dashed">
+                      {!typesMap[cat.id] ? (
+                         <div className="p-4 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>
+                      ) : typesMap[cat.id].length === 0 ? (
+                         <div className="p-4 text-center text-xs text-muted-foreground pl-14">Нет типов событий</div>
+                      ) : (
+                        typesMap[cat.id].map(type => (
+                          <div key={type.id} className="grid grid-cols-[1fr_200px_100px_100px] gap-4 p-3 items-center hover:bg-muted/30">
+                            <div className="flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 24 + 24}px` }}>
+                              <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
+                              <span className="text-sm text-muted-foreground">{type.name}</span>
+                            </div>
+                            <div>
+                              <Badge variant="outline" className="text-[10px]">{type.patientCanReport ? 'Для пациентов' : 'Внутреннее'}</Badge>
+                            </div>
+                            <div />
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openTypeModal(cat.id, type)} title="Изменить">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleTypeStatus(type.id, cat.id, type.isActive !== false)} title={type.isActive !== false ? "Деактивировать" : "Активировать"}>
+                                {type.isActive !== false ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5 text-emerald-500" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteType(type.id, cat.id)} title="Удалить навсегда">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   )}
                 </div>
-              </CardContent>
-              <div className="p-3 bg-muted/30 border-t">
-                <Button variant="outline" size="sm" className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent" onClick={() => openTypeModal(category.id)}>
-                  <Plus className="mr-2 h-3.5 w-3.5" /> Добавить тип
-                </Button>
-              </div>
-            </Card>
-          ))
-        )}
-        
-        {!isLoading && filteredData.length === 0 && (
-          <div className="col-span-full py-12 text-center text-muted-foreground">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4"><Search className="h-6 w-6 text-muted-foreground" /></div>
-            <p>Ничего не найдено</p>
-          </div>
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
-
+      
       {/* DIALOGS */}
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
         <DialogContent>
@@ -285,6 +375,10 @@ export function ClassifierView() {
             <div className="grid gap-2">
               <Label>Название</Label>
               <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Например: Безопасность" autoFocus />
+            </div>
+            <div className="grid gap-2">
+              <Label>Описание (опционально)</Label>
+              <Input value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} placeholder="Подробности о категории..." />
             </div>
           </div>
           <DialogFooter>
@@ -302,6 +396,17 @@ export function ClassifierView() {
             <div className="grid gap-2">
               <Label>Название типа</Label>
               <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Например: Падение пациента" autoFocus />
+            </div>
+            <div className="grid gap-2">
+              <Label>Описание (опционально)</Label>
+              <Input value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} placeholder="Инструкция или детали..." />
+            </div>
+            <div className="flex items-center justify-between p-3 border rounded-md">
+              <div className="space-y-0.5">
+                <Label>Доступно для пациентов</Label>
+                <div className="text-[12px] text-muted-foreground">Могут ли пациенты сами регистрировать этот тип события</div>
+              </div>
+              <Switch checked={newItemPatientCanReport} onCheckedChange={setNewItemPatientCanReport} />
             </div>
           </div>
           <DialogFooter>

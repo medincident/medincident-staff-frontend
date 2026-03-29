@@ -5,7 +5,10 @@ import {
   Save, 
   ShieldAlert, 
   Loader2, 
-  UserCheck 
+  UserCheck,
+  Settings,
+  Power,
+  PowerOff
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,12 +20,9 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-
 import { User } from "@/lib/types";
-import { ROLE_NAMES } from "@/lib/constants";
-
-// Импортируем наши сервисы
-import { getDepartmentData, saveDepartmentSettings } from "@/lib/services/admin/department";
+import { Input } from "@/components/ui/input";
+import { DepartmentsService } from "@/lib/api";
 
 export function DepartmentView() {
   // --- STATE ---
@@ -31,64 +31,123 @@ export function DepartmentView() {
   const [actingId, setActingId] = useState("");
   const [departmentName, setDepartmentName] = useState("");
   const [staff, setStaff] = useState<User[]>([]);
+  const [description, setDescription] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
   // Состояния загрузки
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const departmentId = "YOUR_DEPARTMENT_ID";
 
   // 1. ЗАГРУЗКА ДАННЫХ (Client-side)
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const data = await getDepartmentData();
         
-        // Инициализация формы
-        setHeadId(data.settings.headId || "");
-        setIsActingEnabled(data.settings.isActingEnabled || false);
-        setActingId(data.settings.actingId || "");
-        setDepartmentName(data.settings.departmentName || "Настройки отделения");
-        setStaff(data.staff || []);
+        const [deptData, staffData, responsiblesData] = await Promise.all([
+          DepartmentsService.getDepartmentById(departmentId),
+          DepartmentsService.listDepartmentEmployees(departmentId, undefined, undefined, 100),
+          DepartmentsService.listDepartmentResponsibles(departmentId)
+        ]);
+        
+        setDepartmentName(deptData.name || "Настройки отделения");
+        setDescription(deptData.description || ""); // НОВОЕ
+        setIsActive(deptData.isActive ?? true);     // НОВОЕ
+        
+        const mappedStaff = staffData.items.map(emp => ({
+          ...emp.user,
+          position: emp.position
+        }));
+        setStaff(mappedStaff as any);
+
+        const directResponsibles = responsiblesData.items
+          .filter(r => r.isDirectlyAssigned)
+          .map(r => r.user.id);
+
+        setHeadId(directResponsibles[0] || "");
+        if (directResponsibles.length > 1) {
+          setIsActingEnabled(true);
+          setActingId(directResponsibles[1]);
+        } else {
+          setIsActingEnabled(false);
+          setActingId("");
+        }
       } catch (error) {
-        console.error("Failed to load department data:", error);
         toast.error("Ошибка", { description: "Не удалось загрузить данные отделения" });
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadData();
-  }, []);
+    if (departmentId) loadData();
+  }, [departmentId]);
 
   // 2. СОХРАНЕНИЕ ДАННЫХ
   const handleSave = async () => {
     try {
       setIsSaving(true);
       
-      const payload = {
-        headId,
-        isActingEnabled,
-        actingId: isActingEnabled ? actingId : "", // Если выключено, очищаем ID
-        departmentName
-      };
+      // Обновляем основные данные отделения
+      await DepartmentsService.updateDepartment(departmentId, {
+        name: departmentName,
+        description: description || null
+      });
+      
+      const newResponsibleIds = [headId];
+      if (isActingEnabled && actingId) newResponsibleIds.push(actingId);
+      const validNewIds = newResponsibleIds.filter(Boolean);
 
-      await saveDepartmentSettings(payload);
+      const currentResponsibles = await DepartmentsService.listDepartmentResponsibles(departmentId);
+      const currentDirectIds = currentResponsibles.items
+        .filter(r => r.isDirectlyAssigned)
+        .map(r => r.user.id);
 
-      toast.success("Изменения сохранены", { description: "Структура управления обновлена." });
+      const toRemove = currentDirectIds.filter(id => !validNewIds.includes(id));
+      const toAdd = validNewIds.filter(id => !currentDirectIds.includes(id));
+
+      for (const id of toRemove) {
+        await DepartmentsService.removeDepartmentResponsible(departmentId, id);
+      }
+      for (const id of toAdd) {
+        await DepartmentsService.addDepartmentResponsible(departmentId, { userId: id });
+      }
+
+      toast.success("Изменения сохранены", { description: "Отделение и структура управления обновлены." });
     } catch (error) {
-      console.error("Save failed:", error);
       toast.error("Ошибка сохранения", { description: "Проверьте соединение с сервером" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const renderSelectItem = (u: User) => (
+  // 3. ПЕРЕКЛЮЧЕНИЕ СТАТУСА (Деактивация/Активация)
+  const toggleStatus = async () => {
+    try {
+      setIsTogglingStatus(true);
+      if (isActive) {
+        await DepartmentsService.deactivateDepartment(departmentId);
+        toast.success("Отделение деактивировано");
+      } else {
+        await DepartmentsService.reactivateDepartment(departmentId);
+        toast.success("Отделение активировано");
+      }
+      setIsActive(!isActive);
+    } catch (error) {
+      toast.error("Ошибка", { description: "Не удалось изменить статус отделения" });
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
+
+  const renderSelectItem = (u: any) => (
     <SelectItem key={u.id} value={u.id} className="cursor-pointer">
        <div className="flex flex-col sm:flex-row sm:items-center w-full max-w-60 sm:max-w-md overflow-hidden text-left">
          <span className="truncate text-sm font-normal text-foreground">{u.name}</span>
          <span className="truncate text-muted-foreground text-xs sm:ml-2">
-           ({u.position || ROLE_NAMES[u.role] || u.role})
+           ({u.position || "Сотрудник"})
          </span>
        </div>
     </SelectItem>
@@ -100,54 +159,76 @@ export function DepartmentView() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="w-full sm:w-auto">
-            <h1 className="text-2xl font-bold text-foreground">
-                {isLoading ? <Skeleton className="h-8 w-64 rounded-md" /> : departmentName}
-            </h1>
-            <p className="text-sm text-muted-foreground">Управление заведующими и доступом</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-foreground">
+                  {isLoading ? <Skeleton className="h-8 w-64 rounded-md" /> : departmentName}
+              </h1>
+              {!isLoading && (
+                <Badge variant={isActive ? "default" : "destructive"}>
+                  {isActive ? "Активно" : "Деактивировано"}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">Управление настройками и доступом отделения</p>
         </div>
         
-        <Button onClick={handleSave} disabled={isSaving || isLoading} className="w-full sm:w-auto">
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Сохранить
-        </Button>
+        <div className="flex w-full sm:w-auto items-center gap-2">
+          {!isLoading && (
+            <Button 
+              variant={isActive ? "outline" : "secondary"} 
+              onClick={toggleStatus} 
+              disabled={isTogglingStatus || isSaving}
+              className="w-full sm:w-auto"
+            >
+              {isTogglingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 
+               isActive ? <PowerOff className="mr-2 h-4 w-4 text-destructive" /> : <Power className="mr-2 h-4 w-4 text-emerald-500" />}
+              {isActive ? "Деактивировать" : "Активировать"}
+            </Button>
+          )}
+          <Button onClick={handleSave} disabled={isSaving || isLoading} className="w-full sm:w-auto">
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Сохранить
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
-        /* --- SKELETON STATE --- */
         <div className="max-w-4xl space-y-6">
-           <div className="border rounded-xl bg-card p-6 space-y-6">
-             {/* Заголовок карточки */}
-             <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                   <Skeleton className="h-5 w-5 rounded-full" />
-                   <Skeleton className="h-6 w-32" />
-                </div>
-                <Skeleton className="h-4 w-48 opacity-60" />
-             </div>
-
-             {/* Поле выбора заведующего */}
-             <div className="space-y-3 pt-2">
-                <Skeleton className="h-5 w-40" /> 
-                <Skeleton className="h-4 w-full sm:w-96 opacity-60" /> 
-                <Skeleton className="h-10 w-full sm:w-[400px] rounded-md" />
-             </div>
-
-             <Separator />
-
-             {/* Блок переключателя */}
-             <div className="p-4 border rounded-xl flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
-                <div className="space-y-2 w-full">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-4 w-full sm:w-80 opacity-60" />
-                  <Skeleton className="h-4 w-full sm:w-80 opacity-60" />
-                </div>
-                <Skeleton className="h-6 w-10 rounded-full shrink-0 mt-2 sm:mt-0" />
-              </div>
-           </div>
+           <Skeleton className="h-[200px] w-full rounded-xl" />
+           <Skeleton className="h-[400px] w-full rounded-xl" />
         </div>
       ) : (
-        /* --- REAL CONTENT --- */
         <div className="max-w-4xl space-y-6">
+          
+          {/* General Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-primary" />
+                Общие настройки
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3">
+                <Label>Название отделения</Label>
+                <Input 
+                  value={departmentName} 
+                  onChange={(e) => setDepartmentName(e.target.value)} 
+                  placeholder="Например: Кардиология" 
+                />
+              </div>
+              <div className="grid gap-3">
+                <Label>Описание отделения</Label>
+                <Input 
+                  value={description} 
+                  onChange={(e) => setDescription(e.target.value)} 
+                  placeholder="Дополнительная информация (необязательно)" 
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Leadership Settings (старая карточка) */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -158,7 +239,6 @@ export function DepartmentView() {
             </CardHeader>
             <CardContent className="space-y-6">
               
-              {/* Head Selection */}
               <div className="grid gap-3">
                 <Label className="text-base font-medium">Заведующий отделением</Label>
                 <p className="text-sm text-muted-foreground">Имеет полный доступ к управлению заявками и графиком.</p>
@@ -177,7 +257,6 @@ export function DepartmentView() {
 
               <Separator />
 
-              {/* Acting Mode */}
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border rounded-xl bg-card transition-colors hover:bg-accent/5">
                   <div className="space-y-1">
