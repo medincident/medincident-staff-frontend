@@ -25,8 +25,8 @@ import { EVENT_STATUS_MAP } from "@/lib/constants";
 import { IncidentEvent, EventStatus, Category } from "@/lib/types";
 import { getBadgeColor } from "@/lib/status-helper";
 
-import { getEventById, saveEvent } from "@/lib/services/events";
-import { getClassifier } from "@/lib/services/classifier";
+// Импортируем локальные моки
+import { eventsDb, CLASSIFIER_DB } from "@/lib/mock-db";
 
 interface EventDetailsViewProps {
   eventId: string;
@@ -43,22 +43,23 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
+  // 1. ЗАГРУЗКА ДАННЫХ ИЗ МОКОВ
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [eventData, classifierData] = await Promise.all([
-          getEventById(eventId),
-          getClassifier()
-        ]);
+        // Имитируем загрузку сети
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        if (!eventData) {
+        // Ищем событие в нашем локальном массиве
+        const foundEvent = eventsDb.find((e) => e.id === eventId);
+
+        if (!foundEvent) {
           setNotFound(true);
         } else {
-          setEvent(eventData);
-          setClassifier(classifierData);
-          setStatus(eventData.status as EventStatus);
+          setEvent(foundEvent);
+          setClassifier(CLASSIFIER_DB);
+          setStatus(foundEvent.status as EventStatus);
         }
       } catch (error) {
         console.error("Failed to load event:", error);
@@ -79,8 +80,17 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
     setStatus(newStatus);
     
     try {
+      // Имитируем сетевую задержку при сохранении
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      
       const updatedEvent = { ...event, status: newStatus };
-      await saveEvent(updatedEvent);
+      
+      // Обновляем событие в глобальном моке (чтобы оно обновилось и в таблицах)
+      const eventIndex = eventsDb.findIndex(e => e.id === eventId);
+      if (eventIndex > -1) {
+        eventsDb[eventIndex] = updatedEvent;
+      }
+
       setEvent(updatedEvent);
 
       toast.success("Статус обновлен", { 
@@ -108,6 +118,59 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
     
     return { displayTypeName: typeName, displayCategoryName: categoryName };
   }, [event, classifier]);
+
+  // --- СЕКЦИЯ ДЕТАЛЕЙ ДЛЯ ПЕРЕИСПОЛЬЗОВАНИЯ ---
+  const DetailsSection = () => (
+    <div className="space-y-6">
+      <Card className="gap-3 bg-card border">
+        <CardHeader>
+          <div className="text-xs text-primary font-semibold uppercase tracking-wider mb-1">
+            {displayCategoryName}
+          </div>
+          <CardTitle className="text-lg text-foreground">{displayTypeName}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {event?.description && (
+            <div>
+              <h4 className="text-sm font-semibold mb-2 text-foreground">Описание ситуации</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-md">
+                {event.description}
+              </p>
+            </div>
+          )}
+          <Separator className="bg-border" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <User className="h-3 w-3" />
+            Автор: <span className="text-foreground">{event?.author}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/20 bg-primary/5 gap-1">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
+            <CheckCircle2 className="h-4 w-4" />
+            Управление событием
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
+            <Select value={status} onValueChange={(v) => handleStatusChange(v as EventStatus)}>
+              <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border">
+                {Object.entries(EVENT_STATUS_MAP).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   // --- RENDER STATES ---
 
@@ -201,60 +264,6 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
       </div>
     );
   }
-
-  // --- MAIN CONTENT ---
-
-  const DetailsSection = () => (
-    <div className="space-y-6">
-      <Card className="gap-3 bg-card border">
-        <CardHeader>
-          <div className="text-xs text-primary font-semibold uppercase tracking-wider mb-1">
-            {displayCategoryName}
-          </div>
-          <CardTitle className="text-lg text-foreground">{displayTypeName}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {event.description && (
-            <div>
-              <h4 className="text-sm font-semibold mb-2 text-foreground">Описание ситуации</h4>
-              <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 p-3 rounded-md">
-                {event.description}
-              </p>
-            </div>
-          )}
-          <Separator className="bg-border" />
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <User className="h-3 w-3" />
-            Автор: <span className="text-foreground">{event.author}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-primary/20 bg-primary/5 gap-1">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
-            <CheckCircle2 className="h-4 w-4" />
-            Управление событием
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
-            <Select value={status} onValueChange={(v) => handleStatusChange(v as EventStatus)}>
-              <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="border">
-                {Object.entries(EVENT_STATUS_MAP).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
 
   return (
     <div className="flex flex-col gap-4 h-[calc(100vh-6rem)] xl:h-auto pb-4 xl:pb-20">

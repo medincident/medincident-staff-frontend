@@ -33,11 +33,12 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { getEvents } from "@/lib/services/events";
-import { getClassifier } from "@/lib/services/classifier";
 import { EVENT_STATUS_MAP } from "@/lib/constants";
 import { getBadgeColor, getCardBorderColor } from "@/lib/status-helper";
 import { EventStatus, IncidentEvent, Category } from "@/lib/types";
+
+// Импортируем моки напрямую вместо старых сервисов
+import { eventsDb, CLASSIFIER_DB } from "@/lib/mock-db";
 
 export function EventsListView() {
   // --- STATE ---
@@ -54,12 +55,13 @@ export function EventsListView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [eventsData, classifierData] = await Promise.all([
-          getEvents(),
-          getClassifier()
-        ]);
-        setEvents(eventsData);
-        setClassifier(classifierData);
+        
+        // Имитируем небольшую сетевую задержку для реалистичности UI
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Берем данные из наших моков
+        setEvents(eventsDb);
+        setClassifier(CLASSIFIER_DB);
       } catch (error) {
         console.error("Failed to load events:", error);
       } finally {

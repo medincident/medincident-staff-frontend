@@ -22,10 +22,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
 
+// Импортируем моки и константы
+import { requestsDb, eventsDb } from "@/lib/mock-db";
+import { ServiceRequest } from "@/lib/types";
+import { SERVICE_TYPE_CONFIG } from "@/lib/constants";
+
 const formSchema = z.object({
   type: z.string().min(1, { message: "Выберите тип работ" }),
   location: z.string().min(1, { message: "Укажите кабинет или место" }),
-  priority: z.enum(["normal", "urgent", "critical"], {
+  priority: z.enum(["normal", "high", "critical"], {
     message: "Выберите приоритет",
   }),
   description: z.string().min(5, { message: "Опишите проблему (минимум 5 символов)" }),
@@ -34,17 +39,11 @@ const formSchema = z.object({
 
 type RequestFormValues = z.infer<typeof formSchema>;
 
-interface ServiceType {
-    id: string;
-    label: string;
-}
-
 interface RequestFormProps {
-  initialData?: RequestFormValues & { id?: string };
-  serviceTypes?: ServiceType[];
+  initialData?: RequestFormValues & { id?: string; number?: number };
 }
 
-function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps) {
+function RequestFormContent({ initialData }: RequestFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const linkedEventIdParam = searchParams.get("linkedEventId");
@@ -59,7 +58,7 @@ function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps
     defaultValues: {
       type: initialData?.type || "",
       location: initialData?.location || "",
-      priority: (initialData?.priority as "normal" | "urgent" | "critical") || "normal",
+      priority: (initialData?.priority as "normal" | "high" | "critical") || "normal",
       description: initialData?.description || "",
       linkedEventId: initialData?.linkedEventId || linkedEventIdParam || "",
     },
@@ -70,7 +69,7 @@ function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps
       form.reset({
         type: initialData.type,
         location: initialData.location,
-        priority: initialData.priority as "normal" | "urgent" | "critical",
+        priority: initialData.priority as "normal" | "high" | "critical",
         description: initialData.description,
         linkedEventId: initialData.linkedEventId,
       });
@@ -79,16 +78,15 @@ function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps
 
   const currentLinkedEventId = form.watch("linkedEventId");
 
+  // ПОЛУЧЕНИЕ ИНФОРМАЦИИ О СВЯЗАННОМ СОБЫТИИ (ИЗ МОКОВ)
   useEffect(() => {
     const fetchLinkedEventInfo = async () => {
       if (!currentLinkedEventId) return;
+      
       try {
-        const res = await fetch(`/api/events/${currentLinkedEventId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.code) {
-            setLinkedEventCode(data.code);
-          }
+        const linkedEvent = eventsDb.find(e => e.id === currentLinkedEventId);
+        if (linkedEvent?.code) {
+            setLinkedEventCode(linkedEvent.code);
         }
       } catch (e) {
         console.error("Failed to load linked event info", e);
@@ -98,29 +96,48 @@ function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps
     fetchLinkedEventInfo();
   }, [currentLinkedEventId]);
 
+  // СОХРАНЕНИЕ В МОКИ
   async function onSubmit(values: RequestFormValues) {
     setIsSubmitting(true);
     try {
-      const url = isEditMode && initialData?.id
-        ? `/api/requests/${initialData.id}`
-        : "/api/requests";
-      
-      const method = isEditMode && initialData?.id ? "PATCH" : "POST";
+      await new Promise(resolve => setTimeout(resolve, 600));
 
-      const response = await fetch(url, {
-        method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+      const dept = SERVICE_TYPE_CONFIG[values.type]?.dept || "Не определен";
 
-      if (!response.ok) throw new Error("Failed to save request");
-
-      const data = await response.json();
-
-      if (isEditMode) {
-        toast.success("Заявка обновлена", {description: `Заявка #${initialData?.id} успешно сохранена.`});
+      if (isEditMode && initialData?.id) {
+        // ОБНОВЛЕНИЕ
+        const reqIndex = requestsDb.findIndex(r => r.id === initialData.id);
+        if (reqIndex > -1) {
+            requestsDb[reqIndex] = {
+                ...requestsDb[reqIndex],
+                type: values.type,
+                location: values.location,
+                priority: values.priority,
+                description: values.description,
+                linkedEventId: values.linkedEventId,
+                responsibleDept: dept
+            };
+        }
+        toast.success("Заявка обновлена", {description: `Заявка #${initialData.number || "сохранена"} успешно обновлена.`});
       } else {
-        toast.success("Заявка создана", {description: `Номер заявки #${data.number}. Исполнители уведомлены.`});
+        // СОЗДАНИЕ
+        const newReqNumber = Math.floor(1000 + Math.random() * 9000);
+        const newRequest: ServiceRequest = {
+            id: `req_${Date.now()}`,
+            number: newReqNumber,
+            type: values.type,
+            priority: values.priority,
+            status: "created",
+            description: values.description,
+            location: values.location,
+            createdAt: new Date().toISOString(),
+            authorName: "Текущий пользователь",
+            linkedEventId: values.linkedEventId,
+            responsibleDept: dept
+        };
+        
+        requestsDb.unshift(newRequest);
+        toast.success("Заявка создана", {description: `Номер заявки #${newReqNumber}. Исполнители уведомлены.`});
       }
 
       router.push("/requests"); 
@@ -183,7 +200,10 @@ function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps
                     <FormLabel>Тип работ</FormLabel>
                     <FormControl>
                         <SearchableSelect
-                            options={serviceTypes.map(t => ({ value: t.id, label: t.label }))}
+                            options={Object.entries(SERVICE_TYPE_CONFIG).map(([key, config]) => ({ 
+                                value: key, 
+                                label: config.label 
+                            }))}
                             value={field.value}
                             onChange={field.onChange}
                             placeholder="Выберите службу"
@@ -245,7 +265,7 @@ function RequestFormContent({ initialData, serviceTypes = [] }: RequestFormProps
 
                       <FormItem className="space-y-0">
                           <FormControl>
-                          <RadioGroupItem value="urgent" className="peer sr-only" />
+                          <RadioGroupItem value="high" className="peer sr-only" />
                         </FormControl>
                         <FormLabel className="
                           flex flex-col md:flex-row items-center md:items-start gap-3 p-4 rounded-xl border-2 bg-card cursor-pointer transition-all

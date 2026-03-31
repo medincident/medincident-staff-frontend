@@ -112,10 +112,13 @@ export function SearchableSelect({
             "w-full justify-between bg-background font-normal border-input transition-colors",
             "hover:bg-background hover:text-foreground hover:border-primary",
             "focus:ring-0 focus:ring-offset-0 focus:border-primary",
-            !stringValue && "text-muted-foreground"
+            !stringValue && "text-muted-foreground",
+            "overflow-hidden" 
           )}
         >
-          {stringValue ? selectedLabel : placeholder}
+          <span className="truncate flex-1 text-left min-w-0 pr-2">
+            {stringValue ? selectedLabel : placeholder}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>

@@ -259,12 +259,12 @@ export const MOCK_STATS: DashboardStats = {
       { name: "ИСМП", value: 10 },
     ],
     yearlyTrend: [
-      { name: "Янв", requests: 120 },
-      { name: "Фев", requests: 135 },
-      { name: "Мар", requests: 110 },
-      { name: "Апр", requests: 150 },
-      { name: "Май", requests: 180 },
-      { name: "Июн", requests: 160 },
+      { name: "Янв", requests: 120, events: 15 },
+      { name: "Фев", requests: 135, events: 22 },
+      { name: "Мар", requests: 110, events: 18 },
+      { name: "Апр", requests: 150, events: 30 },
+      { name: "Май", requests: 180, events: 25 },
+      { name: "Июн", requests: 160, events: 20 },
     ],
   },
   performance: {

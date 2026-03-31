@@ -22,8 +22,8 @@ import { DynamicChart } from "@/components/charts/dynamic-chart";
 import { DashboardStats } from "@/lib/types";
 import { enrichChartData } from "@/lib/status-helper";
 
-// Импорт сервиса
-import { getStats } from "@/lib/services/reports";
+// Импортируем моки напрямую вместо старого сервиса
+import { MOCK_STATS } from "@/lib/mock-db";
 
 export function ReportsView() {
   // --- STATE ---
@@ -35,8 +35,12 @@ export function ReportsView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const data = await getStats();
-        setStats(data);
+        
+        // Имитируем сетевую задержку для красивого рендера скелетонов
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // Берем данные из нашего мока
+        setStats(MOCK_STATS);
       } catch (error) {
         console.error("Failed to load reports:", error);
       } finally {
@@ -51,9 +55,19 @@ export function ReportsView() {
     if (!stats) return null;
     return {
       ...stats.charts,
+      // Обогащаем цветами все нужные нам графики
       requestsByStatus: enrichChartData(stats.charts.requestsByStatus),
-      eventsBySeverity: enrichChartData(stats.charts.eventsBySeverity),
       requestsByCategory: enrichChartData(stats.charts.requestsByCategory),
+      requestsByPriority: enrichChartData(stats.charts.requestsByPriority),
+      eventsBySeverity: enrichChartData(stats.charts.eventsBySeverity),
+      eventsByCategory: enrichChartData(stats.charts.eventsByCategory),
+      
+      // Трансформируем годовой тренд, переводя ключи на русский для тултипов
+      yearlyTrend: stats.charts.yearlyTrend.map(item => ({
+        name: item.name,
+        "Заявки": item.requests,
+        "Инциденты": item.events || 0 // берем events из мока или 0
+      }))
     };
   }, [stats]);
 
@@ -123,12 +137,19 @@ export function ReportsView() {
 
       {/* Analytics Tabs */}
       <Tabs defaultValue="safety" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-auto min-h-12 p-1 bg-muted rounded-lg md:w-[400px] border">
+        <TabsList className="grid w-full grid-cols-3 h-auto min-h-12 p-1 bg-muted rounded-lg md:w-[500px] border">
           <TabsTrigger
             value="safety"
             className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight"
           >
-            Нежелательные события
+            Инциденты
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="requests"
+            className="text-xs sm:text-sm h-full py-2 whitespace-normal leading-tight"
+          >
+            Заявки
           </TabsTrigger>
 
           <TabsTrigger
@@ -139,10 +160,11 @@ export function ReportsView() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Вкладка 1: ИНЦИДЕНТЫ */}
         <TabsContent value="safety" className="space-y-6 mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* PIE CHART CARD */}
+            {/* PIE CHART CARD: ИНЦИДЕНТЫ ПО ТЯЖЕСТИ */}
             <Card>
               <CardHeader>
                 {isLoading ? (
@@ -159,10 +181,8 @@ export function ReportsView() {
               </CardHeader>
               <CardContent className="h-[300px] flex items-center justify-center">
                 {isLoading ? (
-                   /* Pie Chart Skeleton */
                    <div className="relative flex items-center justify-center">
                       <Skeleton className="h-[200px] w-[200px] rounded-full" />
-                      {/* Legend skeleton */}
                       <div className="absolute -bottom-10 flex gap-4">
                          <Skeleton className="h-3 w-16" />
                          <Skeleton className="h-3 w-16" />
@@ -176,7 +196,7 @@ export function ReportsView() {
               </CardContent>
             </Card>
 
-            {/* BAR CHART CARD */}
+            {/* BAR CHART CARD: ИНЦИДЕНТЫ ПО ТИПАМ */}
             <Card>
               <CardHeader>
                 {isLoading ? (
@@ -193,7 +213,6 @@ export function ReportsView() {
               </CardHeader>
               <CardContent className="h-[300px]">
                 {isLoading ? (
-                   /* Bar Chart Skeleton */
                    <div className="h-full flex items-end justify-around pb-4 px-2 gap-4">
                       <Skeleton className="h-[40%] w-full rounded-t-md" />
                       <Skeleton className="h-[70%] w-full rounded-t-md" />
@@ -216,6 +235,85 @@ export function ReportsView() {
           </div>
         </TabsContent>
 
+        {/* Вкладка 2: ЗАЯВКИ */}
+        <TabsContent value="requests" className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* ВЕРТИКАЛЬНЫЙ BAR CHART: ЗАЯВКИ ПО СТАТУСАМ */}
+            <Card>
+              <CardHeader>
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                ) : (
+                  <>
+                    <CardTitle>Статусы заявок</CardTitle>
+                    <CardDescription>Распределение заявок по этапам выполнения</CardDescription>
+                  </>
+                )}
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                {isLoading ? (
+                   <div className="h-full flex items-end justify-around pb-4 px-2 gap-4">
+                      <Skeleton className="h-[30%] w-full rounded-t-md" />
+                      <Skeleton className="h-[60%] w-full rounded-t-md" />
+                      <Skeleton className="h-[20%] w-full rounded-t-md" />
+                      <Skeleton className="h-[90%] w-full rounded-t-md" />
+                   </div>
+                ) : enrichedCharts ? (
+                   <div className="h-[300px] w-full min-h-[300px]">
+                     <DynamicChart 
+                       type="bar-vertical" 
+                       data={enrichedCharts.requestsByStatus} 
+                       height={300} 
+                       color="hsl(var(--primary))"
+                     />
+                   </div>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            {/* ГОРИЗОНТАЛЬНЫЙ BAR CHART: ЗАЯВКИ ПО КАТЕГОРИЯМ */}
+            <Card>
+              <CardHeader>
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                ) : (
+                  <>
+                    <CardTitle>Нагрузка на службы</CardTitle>
+                    <CardDescription>Количество заявок по отделам (АХО, ИТ и др.)</CardDescription>
+                  </>
+                )}
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                {isLoading ? (
+                   <div className="h-full flex flex-col justify-around py-4 px-2 gap-4">
+                      <Skeleton className="h-full w-[80%] rounded-r-md" />
+                      <Skeleton className="h-full w-[40%] rounded-r-md" />
+                      <Skeleton className="h-full w-[60%] rounded-r-md" />
+                      <Skeleton className="h-full w-[30%] rounded-r-md" />
+                   </div>
+                ) : stats ? (
+                   <div className="h-[300px] w-full min-h-[300px]">
+                     <DynamicChart
+                       type="bar-horizontal"
+                       data={stats.charts.requestsByCategory}
+                       height={300}
+                       color="hsl(var(--info))"
+                     />
+                   </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Вкладка 3: СВОДКА */}
         <TabsContent value="summary" className="mt-4">
           <Card>
             <CardHeader>
@@ -223,7 +321,7 @@ export function ReportsView() {
                 <Activity className="h-5 w-5 text-primary" />
                 Динамика активности за год
               </CardTitle>
-              <CardDescription>Количество созданных заявок и инцидентов по месяцам</CardDescription>
+              <CardDescription>Сравнение количества созданных заявок и инцидентов по месяцам</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
               <div className="h-[300px] w-full min-h-[300px]">
@@ -246,13 +344,13 @@ export function ReportsView() {
                          <Skeleton className="h-3 w-8" />
                       </div>
                    </div>
-                ) : stats ? (
+                ) : enrichedCharts ? (
                    <DynamicChart
                      type="area"
-                     data={stats.charts.yearlyTrend}
-                     dataKey="requests"
+                     data={enrichedCharts.yearlyTrend}
+                     dataKey={["Заявки", "Инциденты"]} // Передаем два ключа
+                     color={["hsl(var(--info))", "hsl(var(--warning))"]} // Передаем два цвета
                      categoryKey="name"
-                     color="hsl(var(--primary))"
                      height={300}
                    />
                 ) : null}

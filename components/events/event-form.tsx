@@ -22,9 +22,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
 import { Category, IncidentEvent } from "@/lib/types";
 
-// Импортируем сервисы
-import { getClassifier } from "@/lib/services/classifier";
-import { getEventById, saveEvent } from "@/lib/services/events";
+import { CLASSIFIER_DB, eventsDb } from "@/lib/mock-db";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, { message: "Пожалуйста, выберите категорию" }),
@@ -60,24 +58,22 @@ export function EventForm({ eventId }: EventFormProps) {
     },
   });
 
-  // 1. ЗАГРУЗКА ДАННЫХ
+  // 1. ЗАГРУЗКА ДАННЫХ ИЗ МОКОВ
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
         
-        // Запускаем загрузку классификатора
-        const classifierPromise = getClassifier();
+        // Имитируем сетевую задержку для загрузки
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Если редактирование, запускаем и загрузку события
-        const eventPromise = (isEditMode && eventId) ? getEventById(eventId) : Promise.resolve(null);
-
-        const [classifierData, eventData] = await Promise.all([classifierPromise, eventPromise]);
-
-        setClassifier(classifierData);
+        // Загружаем классификатор
+        setClassifier(CLASSIFIER_DB);
 
         // Логика для режима редактирования
-        if (isEditMode) {
+        if (isEditMode && eventId) {
+            const eventData = eventsDb.find(e => e.id === eventId);
+            
             if (!eventData) {
                 setNotFound(true);
             } else {
@@ -115,26 +111,45 @@ export function EventForm({ eventId }: EventFormProps) {
   async function onSubmit(values: EventFormValues) {
     setIsSubmitting(true);
     try {
-      const eventPayload: IncidentEvent = {
-        id: existingEvent?.id || "", 
-        code: existingEvent?.code || "",
-        createdAt: existingEvent?.createdAt || "",
-        status: existingEvent?.status || "created",
-        author: existingEvent?.author || "Текущий пользователь",
-        
-        categoryId: values.categoryId,
-        typeId: values.typeId,
-        description: values.description,
-        
-        categoryName: classifier.find(c => c.id === values.categoryId)?.name,
-        typeName: availableTypes.find(t => t.id === values.typeId)?.name
-      };
+      // Имитируем сетевую задержку сохранения
+      await new Promise(resolve => setTimeout(resolve, 600));
 
-      await saveEvent(eventPayload);
+      const selectedCategory = classifier.find(c => String(c.id) === values.categoryId);
+      const selectedType = availableTypes.find(t => String(t.id) === values.typeId);
 
-      if (isEditMode) {
+      if (isEditMode && existingEvent) {
+        // ОБНОВЛЕНИЕ СУЩЕСТВУЮЩЕГО
+        const eventIndex = eventsDb.findIndex(e => e.id === existingEvent.id);
+        if (eventIndex > -1) {
+            eventsDb[eventIndex] = {
+                ...existingEvent,
+                categoryId: values.categoryId,
+                typeId: values.typeId,
+                description: values.description,
+                categoryName: selectedCategory?.name,
+                typeName: selectedType?.name
+            };
+        }
         toast.success("Изменения сохранены");
       } else {
+        // СОЗДАНИЕ НОВОГО
+        const newEvent: IncidentEvent = {
+            id: `evt_${Date.now()}`,
+            code: `INC-${Math.floor(1000 + Math.random() * 9000)}`, // Генерируем случайный код (например, INC-4921)
+            createdAt: new Date().toISOString(),
+            status: "created",
+            author: "Текущий пользователь", // В реальном приложении брали бы из сессии
+            
+            categoryId: values.categoryId,
+            typeId: values.typeId,
+            description: values.description,
+            
+            categoryName: selectedCategory?.name,
+            typeName: selectedType?.name
+        };
+        
+        // Добавляем в начало массива
+        eventsDb.unshift(newEvent);
         toast.success("Событие зарегистрировано");
       }
 

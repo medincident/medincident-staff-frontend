@@ -27,11 +27,11 @@ export function BottomNav() {
       label: "События",
       icon: AlertTriangle,
     },
-    // {
-    //   href: "/requests", 
-    //   label: "Заявки",
-    //   icon: Wrench,
-    // },
+    {
+      href: "/requests", 
+      label: "Заявки",
+      icon: Wrench,
+    },
     {
       href: "/reports",
       label: "Отчеты",
