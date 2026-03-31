@@ -13,7 +13,8 @@ import {
   ShieldAlert,
   ChevronRight,
   ArrowRight,
-  Clock
+  Clock,
+  FileText
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,16 +24,14 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-import { ServiceRequest, Announcement, IncidentEvent, Category, User } from "@/lib/types";
-import { ROLE_NAMES } from "@/lib/constants";
+import { ServiceRequest, Announcement, IncidentEvent, Category } from "@/lib/types";
+// ДОБАВИЛИ PRIORITY_MAP
+import { ROLE_NAMES, PRIORITY_MAP } from "@/lib/constants"; 
+import { UsersService } from "@/lib/api";
+import { eventsDb, requestsDb, MOCK_ANNOUNCEMENTS, CLASSIFIER_DB } from "@/lib/mock-db";
+// ДОБАВИЛИ ИМПОРТ ЦВЕТОВ
+import { getBadgeColor } from "@/lib/status-helper";
 
-// Импортируем сервисы
-import { getEvents } from "@/lib/services/events";
-import { getClassifier } from "@/lib/services/classifier";
-import { getRequests, getAnnouncements } from "@/lib/services/dashboard";
-import { getCurrentUser } from "@/lib/services/users";
-
-// Хелпер даты
 const safeDate = (dateString?: string) => {
   if (!dateString) return "—";
   const date = new Date(dateString);
@@ -41,8 +40,7 @@ const safeDate = (dateString?: string) => {
 };
 
 export function DashboardView() {
-  // --- STATE ---
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [events, setEvents] = useState<IncidentEvent[]>([]);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -55,20 +53,20 @@ export function DashboardView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        // Загружаем всё параллельно
-        const [userData, eventsData, requestsData, announcementsData, classifierData] = await Promise.all([
-          getCurrentUser(),
-          getEvents(),
-          getRequests(),
-          getAnnouncements(),
-          getClassifier()
-        ]);
-
+        
+        // Получаем профиль текущего пользователя через API
+        const userData = await UsersService.getMe();
         setUser(userData);
-        setEvents(eventsData);
-        setRequests(requestsData);
-        setAnnouncements(announcementsData);
-        setClassifier(classifierData);
+
+        // Имитируем сетевую задержку для загрузки моковых данных
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Устанавливаем данные из моков
+        setEvents(eventsDb);
+        setRequests(requestsDb);
+        setAnnouncements(MOCK_ANNOUNCEMENTS);
+        setClassifier(CLASSIFIER_DB);
+
       } catch (error) {
         console.error("Dashboard data load failed:", error);
       } finally {
@@ -114,7 +112,7 @@ export function DashboardView() {
           <div className="flex flex-wrap items-center gap-3 text-muted-foreground mt-1 text-sm">
             <span className="flex items-center gap-1 whitespace-nowrap">
               <Briefcase className="h-3.5 w-3.5" />
-              {isLoading ? <Skeleton className="h-4 w-24" /> : (user ? (ROLE_NAMES[user.role] || user.role) : "Гость")}
+              {isLoading ? <Skeleton className="h-4 w-24" /> : (user ? (user.role && user.role in ROLE_NAMES ? ROLE_NAMES[user.role as keyof typeof ROLE_NAMES] : (user.isAdmin ? "Администратор" : "Сотрудник")) : "Гость")}
             </span>
             <span className="text-border">|</span>
             <span className="flex items-center gap-1 whitespace-nowrap">
@@ -125,7 +123,7 @@ export function DashboardView() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          {/* <Link href="/requests/new" className="w-full sm:w-auto flex-1">
+          <Link href="/requests/new" className="w-full sm:w-auto flex-1">
             <Button
               variant="outline"
               className="w-full h-12 px-6 text-base font-medium border border-primary text-primary hover:text-primary hover:bg-primary/5 transition-all"
@@ -134,7 +132,6 @@ export function DashboardView() {
               Тех. заявка
             </Button>
           </Link> 
-          */}
 
           <Link href="/events/new" className="w-full sm:w-auto flex-1">
             <Button className="w-full h-12 px-6 text-base font-bold transition-all">
@@ -146,20 +143,32 @@ export function DashboardView() {
       </div>
 
       {/* STATS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* 1. ИНЦИДЕНТЫ */}
         <StatsCard
           title="В расследовании (НС)"
           value={isLoading ? <Skeleton className="h-8 w-12" /> : activeEvents.length}
-          desc="Безопасность"
+          desc="Требуют внимания"
           icon={ShieldAlert}
           iconColor="text-primary"
           iconBg="bg-primary/10"
         />
         
+        {/* 2. ВСЕ АКТИВНЫЕ ЗАЯВКИ (Новая карточка) */}
+        <StatsCard
+          title="Активные заявки"
+          value={isLoading ? <Skeleton className="h-8 w-12" /> : activeRequests.length}
+          desc="Всего в системе"
+          icon={FileText}
+          iconColor="text-info"
+          iconBg="bg-info/10"
+        />
+
+        {/* 3. ТЕКУЩИЕ РАБОТЫ */}
         <StatsCard
           title="Всего в работе"
-          value={isLoading ? <Skeleton className="h-8 w-12" /> : myActiveRequests.length}
-          desc="Технические работы"
+          value={isLoading ? <Skeleton className="h-8 w-12" /> : requests.filter(r => r.status === 'in_work').length}
+          desc="Выполняются сейчас"
           icon={Wrench}
           iconColor="text-muted-foreground"
           iconBg="bg-muted"
@@ -177,11 +186,11 @@ export function DashboardView() {
                  <h2 className="text-lg font-semibold text-foreground">Журнал событий</h2>
               </div>
               
-              {/* <TabsList className="flex w-full p-1 bg-muted rounded-lg mb-4">
+              <TabsList className="flex w-full p-1 bg-muted rounded-lg mb-4">
                 <TabsTrigger value="ns" className="flex-1 truncate">События (НС)</TabsTrigger>
                 <TabsTrigger value="requests" className="flex-1 truncate">Заявки</TabsTrigger>
               </TabsList> 
-              */}
+             
             </div>
 
             {/* TAB: EVENTS */}
@@ -223,8 +232,7 @@ export function DashboardView() {
               )}
             </TabsContent>
 
-            {/* TAB: REQUESTS (HIDDEN/COMMENTED) */}
-            {/*
+            {/* TAB: REQUESTS */}
             <TabsContent value="requests" className="space-y-3 mt-0">
               {isLoading ? (
                  Array.from({ length: 3 }).map((_, i) => (
@@ -232,6 +240,7 @@ export function DashboardView() {
                        <Skeleton className="h-10 w-10 rounded-md" />
                        <div className="space-y-2 flex-1">
                           <Skeleton className="h-4 w-1/3" />
+                          <Skeleton className="h-3 w-full" />
                           <Skeleton className="h-3 w-1/2" />
                        </div>
                     </div>
@@ -248,14 +257,25 @@ export function DashboardView() {
                         <div className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-colors">
                           <Wrench className="h-5 w-5" />
                         </div>
-                        <div className="space-y-1 min-w-0 flex-1">
+                        <div className="space-y-1.5 min-w-0 flex-1">
                           <h4 className="font-bold text-sm text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-                            {req.title}
+                            Заявка #{req.number}
                           </h4>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                            <Clock className="h-3 w-3" />
-                            <span>{safeDate(req.createdAt)}</span>
-                            {req.priority === 'critical' && <Badge variant="destructive" className="h-4 px-1 text-[9px]">Срочно</Badge>}
+                          
+                          {/* ВЫВОДИМ ОПИСАНИЕ С ОБРЕЗКОЙ В 1 СТРОКУ */}
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {req.description}
+                          </p>
+
+                          <div className="text-xs text-muted-foreground flex items-center gap-2 pt-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3 w-3" />
+                              <span>{safeDate(req.createdAt)}</span>
+                            </div>
+                            {/* ТЕПЕРЬ ТУТ КРАСИВЫЙ БЕЙДЖ ПРИОРИТЕТА */}
+                            <Badge variant="outline" className={`font-medium text-[9px] h-4 px-1.5 ${getBadgeColor(req.priority)}`}>
+                              {PRIORITY_MAP[req.priority]}
+                            </Badge>
                           </div>
                         </div>
                       </div>
@@ -273,7 +293,7 @@ export function DashboardView() {
                 <EmptyState text="Активных заявок нет" icon={Wrench} />
               )}
             </TabsContent>
-            */}
+           
           </Tabs>
         </div>
 
@@ -327,7 +347,6 @@ export function DashboardView() {
   );
 }
 
-// ... Оставь функции EventItem, StatsCard, EmptyState без изменений ...
 function EventItem({ evt, typeMap, catMap }: { evt: IncidentEvent, typeMap: Record<string, string>, catMap: Record<string, string> }) {
   const typeName = typeMap[evt.typeId || ""] || evt.typeName || evt.typeId;
   const categoryName = catMap[evt.categoryId] || evt.categoryName || evt.categoryId;

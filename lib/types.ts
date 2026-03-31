@@ -173,7 +173,11 @@ export interface DashboardStats {
     requestsByPriority: { name: string; value: number }[];
     eventsBySeverity: { name: string; value: number }[];
     eventsByCategory: { name: string; value: number }[];
-    yearlyTrend: { name: string; requests: number }[];
+    yearlyTrend: {
+      name: string;
+      requests: number;
+      events: number;
+    }[];
   };
   performance: {
     closedOnTime: string;

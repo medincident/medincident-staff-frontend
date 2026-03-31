@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import { Notification } from "@/lib/types";
 import { getIntentColors } from "@/lib/status-helper";
 
-// Импорт сервисов
-import { getNotifications, markAllAsRead } from "@/lib/services/notifications";
+// Импортируем моки напрямую вместо старых сервисов
+import { MOCK_NOTIFICATIONS } from "@/lib/mock-db";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   info: Info,
@@ -38,8 +38,12 @@ export function NotificationsView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const data = await getNotifications();
-        setNotifications(data);
+        
+        // Имитируем небольшую сетевую задержку для плавности UI
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // Загружаем уведомления из моков
+        setNotifications(MOCK_NOTIFICATIONS);
       } catch (error) {
         console.error("Failed to load notifications:", error);
       } finally {
@@ -51,15 +55,8 @@ export function NotificationsView() {
 
   // --- HANDLERS ---
   const handleMarkAllRead = async () => {
-    const prevNotifications = notifications;
+    // Так как у нас моки, просто обновляем локальный стейт
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    
-    try {
-      await markAllAsRead();
-    } catch (error) {
-      console.error("Failed to mark read on server");
-      setNotifications(prevNotifications);
-    }
   };
 
   const grouped = notifications.reduce((acc, note) => {

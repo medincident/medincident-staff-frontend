@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ChatSection, ChatMessage } from "@/components/ui/chat-section";
-import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
 
 interface ChatContainerProps {
@@ -22,16 +21,35 @@ export function ChatContainer({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Формируем базовый путь в зависимости от типа сущности
-  const apiPath = `/api/${entityType}/${entityId}/messages`;
-
   useEffect(() => {
     const fetchMessages = async () => {
       try {
         setIsLoading(true);
-        // Используем apiClient вместо нативного fetch
-        const res = await apiClient.get<ChatMessage[]>(apiPath);
-        setMessages(res.data);
+        
+        // Имитируем сетевую задержку загрузки истории чата
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        
+        // Генерируем моковые сообщения в зависимости от типа
+        const initialMessages: ChatMessage[] = [
+          {
+            id: 1,
+            sender: "Система",
+            text: entityType === "events" 
+              ? "Событие успешно зарегистрировано в системе. Ожидайте назначения ответственного."
+              : "Заявка принята в работу. Инженер скоро свяжется с вами.",
+            time: "10:00",
+            isMe: false
+          },
+          {
+            id: 2,
+            sender: "Иванов И.И.",
+            text: "Взял в работу. Буду на месте через 15 минут.",
+            time: "10:15",
+            isMe: false
+          }
+        ];
+
+        setMessages(initialMessages);
       } catch (error) {
         console.error("Ошибка загрузки чата:", error);
         toast.error("Ошибка", { description: "Не удалось загрузить сообщения" });
@@ -41,11 +59,13 @@ export function ChatContainer({
     };
 
     fetchMessages();
-  }, [apiPath]);
+  }, [entityId, entityType]);
 
   const handleSendMessage = async (text: string) => {
     const tempId = Date.now();
-    const optimisticMsg: ChatMessage = {
+    
+    // Формируем наше сообщение
+    const newMsg: ChatMessage = {
       id: tempId,
       sender: "Вы",
       text: text,
@@ -53,26 +73,26 @@ export function ChatContainer({
       isMe: true
     };
 
-    setMessages((prev) => [...prev, optimisticMsg]);
+    // Оптимистично добавляем в UI
+    setMessages((prev) => [...prev, newMsg]);
 
     try {
-      const res = await apiClient.post<ChatMessage>(apiPath, { text });
-      const serverMsg = res.data;
-
-      // Заменяем временное сообщение серверным
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? serverMsg : m))
-      );
+      // Имитируем отправку на сервер
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      
+      // В реальном приложении мы бы заменили tempId на id от сервера.
+      // В моковом варианте просто оставляем всё как есть.
+      
     } catch (error) {
       toast.error("Ошибка", { description: "Не удалось отправить сообщение" });
-      // Удаляем оптимистичное сообщение при ошибке
+      // Удаляем сообщение из UI, если "сервер" вернул ошибку
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center bg-card border rounded-xl">
+      <div className="flex h-full items-center justify-center bg-card border rounded-xl min-h-[300px]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );

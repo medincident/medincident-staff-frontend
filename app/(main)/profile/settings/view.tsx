@@ -20,9 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { UserSettings } from "@/lib/types";
-
-// Импорт сервисов
-import { getSettings, saveSettings } from "@/lib/services/settings";
+import { SETTINGS_DB } from "@/lib/mock-db";
 
 const WEEKDAYS = [
   { id: 0, label: "Пн" },
@@ -47,8 +45,10 @@ export function SettingsView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const data = await getSettings();
-        setSettings(data);
+        
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        setSettings(JSON.parse(JSON.stringify(SETTINGS_DB)));
       } catch (error) {
         console.error("Failed to load settings:", error);
         toast.error("Не удалось загрузить настройки");
@@ -65,7 +65,10 @@ export function SettingsView() {
     
     setIsSaving(true);
     try {
-      await saveSettings(settings);
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      Object.assign(SETTINGS_DB, settings);
+      
       toast.success("Успешно", { description: "Настройки сохранены!" });
       router.refresh(); 
     } catch (error) {

@@ -1,11 +1,13 @@
 import { Metadata } from "next";
 import { EventForm } from "@/components/events/event-form";
-import { getEventById } from "@/lib/services/events";
+import { eventsDb } from "@/lib/mock-db";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const event = await getEventById(id);
-  return { title: event ? `Редактирование ${event.code}` : "Не найдено" };
+  
+  const event = eventsDb.find((e) => e.id === id);
+  
+  return { title: event ? `Редактирование ${event.code}` : "Событие не найдено" };
 }
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {

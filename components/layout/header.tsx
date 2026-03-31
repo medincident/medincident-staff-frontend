@@ -17,11 +17,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, Notification } from "@/lib/types";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
 import { UsersService } from "@/lib/api";
+import { MOCK_NOTIFICATIONS } from "@/lib/mock-db";
+import { Notification } from "@/lib/types";
 
 const NOTIFICATION_ICONS: Record<string, any> = {
   info: Info,
@@ -34,7 +35,7 @@ const NOTIFICATION_ICONS: Record<string, any> = {
 export function Header() {
   const router = useRouter();
 
-  const [user, setUser] = useState<any | null>(null); // Используем any или тип из нового API
+  const [user, setUser] = useState<any | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -54,11 +55,11 @@ export function Header() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [userData, notifData] = await Promise.all([
-          UsersService.getMe(), // Получаем профиль через новый API
-        ]);
-
+        setIsLoading(true);
+        const userData = await UsersService.getMe();
         setUser(userData);
+        
+        setNotifications(MOCK_NOTIFICATIONS as Notification[]);
       } catch (error) {
         console.error("Header data load failed", error);
       } finally {
@@ -68,11 +69,15 @@ export function Header() {
     loadData();
   }, []);
 
+  const handleMarkAllRead = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
   const handleLogout = () => {
     router.push("/login");
   };
 
-  // Формируем имя для отображения
   const displayName = user?.name || `${user?.givenName || ""} ${user?.familyName || ""}`.trim() || "Пользователь";
 
   return (
@@ -111,6 +116,7 @@ export function Header() {
                   variant="ghost"
                   size="sm"
                   className="h-auto py-1 px-2 text-[10px] text-primary hover:bg-primary/10"
+                  onClick={handleMarkAllRead}
                 >
                   <CheckCheck className="w-3 h-3 mr-1" />
                   Пометить все

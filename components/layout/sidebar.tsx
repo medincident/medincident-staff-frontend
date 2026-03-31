@@ -10,7 +10,8 @@ import {
   Users,
   Building,
   UserCheck,
-  Network
+  Network,
+  Wrench
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/constants";
@@ -23,7 +24,7 @@ export function Sidebar() {
   const mainLinks = [
     { href: "/dashboard", label: "Главная", icon: LayoutDashboard },
     { href: "/events", label: "События", icon: AlertTriangle },
-    // { href: "/requests", label: "Заявки", icon: Wrench },
+    { href: "/requests", label: "Заявки", icon: Wrench },
     { href: "/reports", label: "Отчеты", icon: BarChart3 },
   ];
 

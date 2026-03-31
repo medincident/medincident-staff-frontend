@@ -19,9 +19,7 @@ import {
 } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FaqItem } from "@/lib/types";
-
-// Импорт сервиса
-import { getFaqItems } from "@/lib/services/help";
+import { FAQ_DB } from "@/lib/mock-db";
 
 export function HelpView() {
   const router = useRouter();
@@ -35,8 +33,11 @@ export function HelpView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const data = await getFaqItems();
-        setFaqItems(data);
+        
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // Берем данные из моков
+        setFaqItems(FAQ_DB);
       } catch (error) {
         console.error("Failed to load FAQ:", error);
       } finally {
