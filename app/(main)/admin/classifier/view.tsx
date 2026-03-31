@@ -35,8 +35,8 @@ const getDeclension = (number: number, words: string[]) => {
 
 export function ClassifierView() {
   const [categories, setCategories] = useState<CategoryBrief[]>([]);
-  const [typesMap, setTypesMap] = useState<Record<string, EventType[]>>({}); // Кэш типов: categoryId -> EventType[]
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set()); // Раскрытые узлы
+  const [typesMap, setTypesMap] = useState<Record<string, EventType[]>>({});
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,9 +52,8 @@ export function ClassifierView() {
 
   useEffect(() => {
     loadCategories();
-  }, [search]); // Перезагружаем при поиске
+  }, [search]);
 
-  // Загрузка категорий и всех типов сразу
   const loadCategories = async () => {
     try {
       setIsLoading(true);
@@ -228,7 +227,7 @@ export function ClassifierView() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 overflow-x-hidden">
       {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
@@ -237,145 +236,157 @@ export function ClassifierView() {
             <p className="text-sm text-muted-foreground">Управление справочником событий</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-full lg:w-auto">
+        
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
           {isLoading ? (
-             <Skeleton className="h-10 flex-1 lg:w-64 rounded-md" />
+             <Skeleton className="h-10 w-full sm:w-64 rounded-md shrink-0" />
           ) : (
-             <div className="relative flex-1 lg:w-64">
+             <div className="relative w-full sm:w-64 shrink-0">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Поиск..." className="pl-9 bg-background" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <Input placeholder="Поиск..." className="pl-9 bg-background w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
              </div>
           )}
           
-          <Button onClick={() => openCategoryModal()} className="shrink-0" disabled={isLoading || isSaving}>
+          <Button onClick={() => openCategoryModal()} className="w-full sm:w-auto shrink-0" disabled={isLoading || isSaving}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderPlus className="mr-2 h-4 w-4" />}
             Категория
           </Button>
         </div>
       </div>
 
-      {/* TABLE VIEW */}
-      <div className="border rounded-md bg-card">
-        {/* Обновили сетку на 3 колонки вместо 4 */}
-        <div className="grid grid-cols-[1fr_200px_100px] gap-4 p-4 border-b bg-muted/50 text-sm font-medium text-muted-foreground">
-          <div>Название</div>
-          <div>Статус</div>
-          <div className="text-right">Действия</div>
-        </div>
+      {/* LIST VIEW (Без таблицы) */}
+      <div className="border rounded-md bg-card divide-y">
+        {isLoading && categories.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+        ) : categories.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">Ничего не найдено</div>
+        ) : (
+          categories.map((cat) => {
+            const isExpanded = expandedCats.has(cat.id);
+            const depth = cat.parentId ? 1 : 0; 
+            
+            const typesCount = typesMap[cat.id]?.length || 0;
+            const typesLabel = getDeclension(typesCount, ['тип', 'типа', 'типов']);
 
-        <div className="divide-y">
-          {isLoading && categories.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
-          ) : categories.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">Ничего не найдено</div>
-          ) : (
-            categories.map((cat) => {
-              const isExpanded = expandedCats.has(cat.id);
-              const depth = cat.parentId ? 1 : 0; 
-              
-              const typesCount = typesMap[cat.id]?.length || 0;
-              // Склоняем слово "тип"
-              const typesLabel = getDeclension(typesCount, ['тип', 'типа', 'типов']);
-
-              return (
-                <div key={cat.id} className="flex flex-col">
-                  {/* Строка категории */}
-                  <div className="grid grid-cols-[1fr_200px_100px] gap-4 p-4 items-center hover:bg-muted/30 transition-colors">
-                    <div 
-                      className="flex items-center gap-2 cursor-pointer" 
-                      style={{ paddingLeft: `${depth * 24}px` }}
+            return (
+              <div key={cat.id} className="flex flex-col">
+                {/* Строка категории */}
+                <div className="flex items-start justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-start gap-2 flex-1 min-w-0" style={{ paddingLeft: `${depth * 16}px` }}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 shrink-0 p-0 mt-[-2px] sm:mt-0" 
                       onClick={() => toggleCategory(cat.id)}
                     >
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 p-0">
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </Button>
-                      <Layers className="h-4 w-4 text-primary shrink-0" />
-                      <span className="font-medium text-sm">
-                        {cat.name} <span className="text-muted-foreground font-normal ml-1">({typesCount} {typesLabel})</span>
-                      </span>
-                    </div>
+                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
                     
-                    <div>
-                      <Badge variant="outline" className={getBadgeColor(cat.isActive !== false ? "active" : "inactive")}>
-                        {cat.isActive !== false ? "Активна" : "Неактивна"}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-1">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(undefined, cat.id); }}>
-                            <Plus className="mr-2 h-4 w-4" /> Добавить подкатегорию
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openTypeModal(cat.id); }}>
-                            <FolderPlus className="mr-2 h-4 w-4" /> Добавить тип события
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(cat); }}>
-                            <Pencil className="mr-2 h-4 w-4" /> Изменить
-                          </DropdownMenuItem>
-                          {cat.isActive !== false ? (
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, true); }}>
-                              <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, false); }}>
-                              <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Удалить (полностью)
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
+                      <div 
+                        className="flex items-start sm:items-center gap-2 cursor-pointer flex-1 min-w-0" 
+                        onClick={() => toggleCategory(cat.id)}
+                      >
+                        <Layers className="h-4 w-4 text-primary shrink-0 mt-0.5 sm:mt-0" />
+                        <span className="font-medium text-sm leading-tight break-words">
+                          {cat.name} <span className="text-muted-foreground font-normal ml-1 whitespace-nowrap">({typesCount} {typesLabel})</span>
+                        </span>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-2 ml-6 sm:ml-0">
+                        <Badge variant="outline" className={getBadgeColor(cat.isActive !== false ? "active" : "inactive")}>
+                          {cat.isActive !== false ? "Активна" : "Неактивна"}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Развернутые типы событий */}
-                  {isExpanded && (
-                    <div className="bg-muted/10 border-t border-b border-dashed divide-y divide-dashed">
-                      {!typesMap[cat.id] ? (
-                         <div className="p-4 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>
-                      ) : typesMap[cat.id].length === 0 ? (
-                         <div className="p-4 text-center text-xs text-muted-foreground pl-14">Нет типов событий</div>
-                      ) : (
-                        typesMap[cat.id].map(type => (
-                          <div key={type.id} className={`grid grid-cols-[1fr_200px_100px] gap-4 p-3 items-center hover:bg-muted/30 ${type.isActive === false ? 'opacity-70' : ''}`}>
-                            <div className="flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 24 + 24}px` }}>
-                              <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
-                              <span className={`text-sm ${type.isActive === false ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{type.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {type.isActive === false && (
-                                <Badge variant="outline" className={getBadgeColor("inactive")}>
-                                  Неактивен
-                                </Badge>
-                              )}
-                              <Badge variant="outline" className="text-[10px]">{type.patientCanReport ? 'Для пациентов' : 'Внутреннее'}</Badge>
-                            </div>
-                            <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openTypeModal(cat.id, type)} title="Изменить">
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleTypeStatus(type.id, cat.id, type.isActive !== false)} title={type.isActive !== false ? "Деактивировать" : "Активировать"}>
-                                {type.isActive !== false ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5 text-emerald-500" />}
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteType(type.id, cat.id)} title="Удалить навсегда">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                  {/* Кнопки действий (Справа) */}
+                  <div className="shrink-0 ml-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(undefined, cat.id); }}>
+                          <Plus className="mr-2 h-4 w-4" /> Добавить подкатегорию
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openTypeModal(cat.id); }}>
+                          <FolderPlus className="mr-2 h-4 w-4" /> Добавить тип события
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(cat); }}>
+                          <Pencil className="mr-2 h-4 w-4" /> Изменить
+                        </DropdownMenuItem>
+                        {cat.isActive !== false ? (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, true); }}>
+                            <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, false); }}>
+                            <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Удалить (полностью)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* Развернутые типы событий */}
+                {isExpanded && (
+                  <div className="bg-muted/5 border-t border-dashed divide-y divide-dashed">
+                    {!typesMap[cat.id] ? (
+                       <div className="p-4 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>
+                    ) : typesMap[cat.id].length === 0 ? (
+                       <div className="p-4 text-xs text-muted-foreground flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}>
+                         <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                         Нет типов событий
+                       </div>
+                    ) : (
+                      typesMap[cat.id].map(type => (
+                        <div key={type.id} className={`flex items-start justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors ${type.isActive === false ? 'opacity-70' : ''}`}>
+                          
+                          <div className="flex items-start gap-2 flex-1 min-w-0" style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}>
+                            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0 mt-1.5 sm:mt-2" />
+                            
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
+                              <span className={`text-sm leading-tight break-words flex-1 min-w-0 ${type.isActive === false ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                                {type.name}
+                              </span>
+                              
+                              <div className="flex flex-wrap items-center gap-2">
+                                {type.isActive === false && (
+                                  <Badge variant="outline" className={getBadgeColor("inactive")}>
+                                    Неактивен
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-[10px]">{type.patientCanReport ? 'Для пациентов' : 'Внутреннее'}</Badge>
+                              </div>
                             </div>
                           </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+
+                          <div className="flex items-center -mr-2 sm:mr-0 shrink-0 ml-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openTypeModal(cat.id, type)} title="Изменить">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleTypeStatus(type.id, cat.id, type.isActive !== false)} title={type.isActive !== false ? "Деактивировать" : "Активировать"}>
+                              {type.isActive !== false ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4 text-emerald-500" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => deleteType(type.id, cat.id)} title="Удалить навсегда">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
       
       {/* DIALOGS */}

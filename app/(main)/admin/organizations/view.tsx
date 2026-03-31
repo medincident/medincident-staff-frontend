@@ -216,7 +216,7 @@ export function OrganizationsView() {
             <p className="text-sm text-muted-foreground mt-1">Глобальное управление медицинскими сетями</p>
         </div>
         
-        <div className="flex w-full sm:w-auto items-center gap-2">
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto items-center gap-2">
           {isLoading ? (
              <Skeleton className="h-10 w-full sm:w-64 rounded-md" />
           ) : (
