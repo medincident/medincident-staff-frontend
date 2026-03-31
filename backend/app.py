@@ -4,8 +4,11 @@ import uuid
 import time
 
 app = Flask(__name__)
-# Разрешаем CORS для всех доменов, чтобы React мог делать запросы
-CORS(app)
+CORS(
+    app,
+    supports_credentials=True,
+    origins=["https://patient-medincident.ulbwa.bombomeow.ru"],
+)
 
 # --- МОКОВЫЕ ДАННЫЕ ---
 
