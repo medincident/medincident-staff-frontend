@@ -1,12 +1,19 @@
 "use server";
 
-import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/services/users";
 import webpush from "web-push";
 
-// 1. Определяем интерфейс вручную, чтобы TypeScript не ругался на сервере
+// --- ИМИТАЦИЯ АВТОРИЗАЦИИ ---
+// Временно возвращаем фейкового юзера, чтобы код работал без БД и сервисов
+async function getCurrentUser() {
+  return { id: "mock-user-123", name: "Тестовый Пользователь" };
+}
+
+// 1. Имитация базы данных подписок в памяти сервера
+let MOCK_SUBSCRIPTIONS: any[] = [];
+
+// Определяем интерфейс вручную
 interface PushSubscriptionData {
-  id: any;
+  id?: string;
   endpoint: string;
   expirationTime?: number | null;
   keys: {
@@ -15,14 +22,28 @@ interface PushSubscriptionData {
   };
 }
 
-// Настройка web-push
-webpush.setVapidDetails(
-  "mailto:support@medincident.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
+// Настройка web-push (с защитой от отсутствующих ключей в .env)
+const hasVapidKeys = !!(
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY
 );
 
-// 2. Сохранить подписку (принимаем наш типизированный интерфейс)
+if (hasVapidKeys) {
+  try {
+    webpush.setVapidDetails(
+      "mailto:support@medincident.com",
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+      process.env.VAPID_PRIVATE_KEY!,
+    );
+  } catch (error) {
+    console.warn("⚠️ Ошибка настройки web-push:", error);
+  }
+} else {
+  console.warn(
+    "⚠️ VAPID ключи не найдены. Push-уведомления будут только имитироваться в консоли.",
+  );
+}
+
+// 2. Сохранить подписку (в локальный массив)
 export async function subscribeUser(sub: PushSubscriptionData) {
   const user = await getCurrentUser();
 
@@ -36,33 +57,44 @@ export async function subscribeUser(sub: PushSubscriptionData) {
   }
 
   try {
-    // Используем create, но можно было бы и upsert, если логика требует обновления
-    await db.pushSubscription.create({
-      data: {
+    // Имитируем сетевую задержку базы данных
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Проверяем, нет ли уже такой подписки (как Unique constraint)
+    const existing = MOCK_SUBSCRIPTIONS.find(
+      (s) => s.endpoint === sub.endpoint,
+    );
+
+    if (!existing) {
+      // Сохраняем в мок-массив
+      MOCK_SUBSCRIPTIONS.push({
+        id: `push_${Date.now()}`,
         userId: user.id,
         endpoint: sub.endpoint,
         p256dh: sub.keys.p256dh,
         auth: sub.keys.auth,
-      },
-    });
+      });
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Subscription error:", error);
-
-    // Если ошибка P2002 (Unique constraint failed), значит подписка уже есть.
-    // Это нормальная ситуация, возвращаем успех.
     return { success: true };
   }
 }
 
-// 3. Удалить подписку (Log out)
+// 3. Удалить подписку (из локального массива)
 export async function unsubscribeUser(endpoint: string) {
-  // endpoint — это уникальный идентификатор браузера, удаляем по нему
   if (!endpoint) return { error: "No endpoint provided" };
 
-  await db.pushSubscription.deleteMany({
-    where: { endpoint },
-  });
+  // Имитируем задержку
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  // Фильтруем массив, удаляя нужный endpoint
+  MOCK_SUBSCRIPTIONS = MOCK_SUBSCRIPTIONS.filter(
+    (s) => s.endpoint !== endpoint,
+  );
+
   return { success: true };
 }
 
@@ -73,29 +105,32 @@ export async function sendNotificationToUser(
   body: string,
   url: string = "/",
 ) {
-  const subscriptions = await db.pushSubscription.findMany({
-    where: { userId },
-  });
-
+  // Ищем все подписки пользователя в моках
+  const subscriptions = MOCK_SUBSCRIPTIONS.filter((s) => s.userId === userId);
   const payload = JSON.stringify({ title, body, url });
 
-  const promises = subscriptions.map(async (sub: PushSubscriptionData) => {
+  const promises = subscriptions.map(async (sub) => {
     try {
-      await webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.keys.p256dh,
-            auth: sub.keys.auth,
+      if (hasVapidKeys) {
+        // Если ключи есть — шлем реальный пуш
+        await webpush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: sub.p256dh,
+              auth: sub.auth,
+            },
           },
-        },
-        payload,
-      );
+          payload,
+        );
+      } else {
+        // Если ключей нет — просто пишем в консоль сервера
+        console.log(`[MOCK PUSH] -> Юзеру ${userId}: "${title}" - ${body}`);
+      }
     } catch (err: any) {
-      // 3. Используем try/catch вместо .catch() для чистоты кода
       if (err.statusCode === 410 || err.statusCode === 404) {
         console.log(`Удаление устаревшей подписки: ${sub.id}`);
-        await db.pushSubscription.delete({ where: { id: sub.id } });
+        MOCK_SUBSCRIPTIONS = MOCK_SUBSCRIPTIONS.filter((s) => s.id !== sub.id);
       } else {
         console.error("Push error:", err);
       }
