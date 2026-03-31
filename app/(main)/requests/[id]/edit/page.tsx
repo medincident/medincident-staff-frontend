@@ -103,6 +103,6 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
 
   // Передаем справочник и данные в чистую форму
   return (
-    <RequestForm initialData={initialData} serviceTypes={SERVICE_TYPES} />
+    <RequestForm initialData={initialData} />
   );
 }
