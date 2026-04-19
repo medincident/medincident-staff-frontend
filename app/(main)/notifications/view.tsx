@@ -70,20 +70,20 @@ export function NotificationsView() {
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
 
       {/* HEADER */}
-      <div className="flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-md py-4 z-10 border-b md:static md:border-none md:bg-transparent md:py-0 px-4 md:px-0">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
+      <div className="flex items-center justify-between gap-2 sticky top-0 bg-background/80 backdrop-blur-md py-4 z-10 border-b md:static md:border-none md:bg-transparent md:py-0 px-4 md:px-0 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted shrink-0">
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Уведомления</h1>
-            <p className="text-sm text-muted-foreground">История системных сообщений</p>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground line-clamp-2 break-words">Уведомления</h1>
+            <p className="text-sm text-muted-foreground truncate">История системных сообщений</p>
           </div>
         </div>
         
         {/* Кнопка скрывается при загрузке, чтобы не мелькать */}
         {!isLoading && notifications.some(n => !n.read) && (
-          <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-primary hover:bg-primary/10">
+          <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-primary hover:bg-primary/10 shrink-0">
             <CheckCheck className="mr-2 h-4 w-4" />
             <span className="hidden sm:inline">Пометить все</span>
           </Button>
@@ -217,7 +217,7 @@ export function NotificationsView() {
                              </div>
                              <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start gap-1">
-                                   <h4 className={cn("text-sm font-semibold truncate leading-tight", note.type === 'error' ? colors.text : 'text-foreground')}>
+                                   <h4 className={cn("text-sm font-semibold line-clamp-2 break-words leading-tight min-w-0", note.type === 'error' ? colors.text : 'text-foreground')}>
                                      {note.title}
                                      {!note.read && <span className="inline-block w-1.5 h-1.5 bg-primary rounded-full ml-1 align-top" />}
                                    </h4>

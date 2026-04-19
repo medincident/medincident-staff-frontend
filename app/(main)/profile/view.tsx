@@ -33,12 +33,9 @@ export function ProfileView() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  
-  // --- STATE ---
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -56,7 +53,6 @@ export function ProfileView() {
     setMounted(true);
   }, []);
 
-  // --- HANDLERS ---
   const handleLogout = () => {
     router.push("/login");
   };
@@ -72,11 +68,9 @@ export function ProfileView() {
       .slice(0, 2);
   };
 
-  // --- RENDER SKELETON STATE ---
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto space-y-8 pb-20">
-        {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Профиль</h1>
@@ -92,7 +86,6 @@ export function ProfileView() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* LEFT COLUMN SKELETON */}
           <div className="lg:col-span-5 space-y-3">
             <div className="rounded-xl border bg-card text-card-foreground overflow-hidden gap-6 py-0">
               <Skeleton className="h-32 w-full rounded-none" />
@@ -118,45 +111,44 @@ export function ProfileView() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN SKELETON */}
           <div className="lg:col-span-7 space-y-6">
             <div>
-               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
-                  Параметры
-               </h3>
-               <div className="rounded-xl border bg-card p-2 space-y-1">
-                  <div className="p-4 space-y-3">
-                      <div className="flex items-center gap-4">
-                         <Skeleton className="h-10 w-10 rounded-lg" />
-                         <div className="space-y-2">
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-3 w-32" />
-                         </div>
-                      </div>
-                      <Skeleton className="h-12.25 w-full rounded-lg" />
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
+                Параметры
+              </h3>
+              <div className="rounded-xl border bg-card p-2 space-y-1">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
                   </div>
-                  <Separator className="my-1 opacity-50" />
-                  {[1, 2].map((i) => (
-                      <div key={i} className="flex items-center p-4 gap-4">
-                         <Skeleton className="h-10.5 w-10 rounded-lg shrink-0" />
-                         <div className="space-y-2 flex-1">
-                            <Skeleton className="h-4 w-32" />
-                            <Skeleton className="h-3 w-48" />
-                         </div>
-                         <Skeleton className="h-5 w-5 rounded-full" />
-                      </div>
-                  ))}
-               </div>
+                  <Skeleton className="h-12.25 w-full rounded-lg" />
+                </div>
+                <Separator className="my-1 opacity-50" />
+                {[1, 2].map((i) => (
+                  <div key={i} className="flex items-center p-4 gap-4">
+                    <Skeleton className="h-10.5 w-10 rounded-lg shrink-0" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                    <Skeleton className="h-5 w-5 rounded-full" />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="md:hidden pt-4">
-               <Button variant="destructive" size="lg" className="w-full" disabled>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Выйти из аккаунта
-               </Button>
-               <div className="flex justify-center mt-6">
-                  <Skeleton className="h-3 w-32" />
-               </div>
+              <Button variant="destructive" size="lg" className="w-full" disabled>
+                <LogOut className="mr-2 h-4 w-4" />
+                Выйти из аккаунта
+              </Button>
+              <div className="flex justify-center mt-6">
+                <Skeleton className="h-3 w-32" />
+              </div>
             </div>
           </div>
         </div>
@@ -164,10 +156,8 @@ export function ProfileView() {
     );
   }
 
-  // --- RENDER DATA STATE ---
   if (!user) return null;
 
-  // Формируем данные для отображения из новой схемы API
   const displayName = user.name || `${user.givenName || ""} ${user.familyName || ""}`.trim() || "Пользователь";
   const roleName = user.isAdmin ? "Администратор" : "Сотрудник";
   const positionName = user.employment?.position || "Сотрудник";
@@ -176,7 +166,6 @@ export function ProfileView() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
-
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Профиль</h1>
@@ -192,7 +181,6 @@ export function ProfileView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
         <div className="lg:col-span-5 space-y-3">
           <Card className="overflow-hidden py-0!">
             <div className="h-32 bg-gradient-to-b from-primary/20 via-primary/5 to-card" />
@@ -242,14 +230,12 @@ export function ProfileView() {
         </div>
 
         <div className="lg:col-span-7 space-y-6">
-
           <div>
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
               Параметры
             </h3>
             <Card className="py-0!">
               <CardContent className="p-2 space-y-1">
-
                 <div className="p-4 flex flex-col gap-3">
                   <div className="flex items-center gap-4">
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground">
@@ -324,7 +310,6 @@ export function ProfileView() {
             </Button>
             <p className="text-center text-[10px] text-muted-foreground mt-6">Версия системы {APP_CONFIG?.version || "1.0.0"}</p>
           </div>
-
         </div>
       </div>
     </div>

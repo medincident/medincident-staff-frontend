@@ -294,7 +294,7 @@ export function EventsListView() {
                           {event.code}
                         </span>
                       </div>
-                      <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-1">
+                      <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-2 break-words">
                         {typeNamesMap[event.typeId || ""] || event.typeName || event.typeId}
                       </h3>
                     </div>

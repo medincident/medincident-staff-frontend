@@ -49,9 +49,6 @@ import {
 import { getAnalyticsSeed } from "@/lib/mock-db";
 import type { EventStatus, Priority, RequestStatus } from "@/lib/types";
 
-// ============================================================
-// Периоды
-// ============================================================
 const PERIODS = [
   { value: "7d", label: "Последние 7 дней", days: 7 },
   { value: "30d", label: "Последние 30 дней", days: 30 },
@@ -82,9 +79,6 @@ const DAY_MS = 86_400_000;
 // стоит того, чтобы на него посмотреть человек.
 const ANOMALY_Z_THRESHOLD = 2;
 
-// ============================================================
-// Утилиты
-// ============================================================
 function pctChange(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? null : 0;
   return ((current - previous) / previous) * 100;
@@ -120,14 +114,10 @@ function stdDev(arr: number[]): number {
   return Math.sqrt(mean(sq));
 }
 
-// ============================================================
-// Главный компонент
-// ============================================================
 export function ReportsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodValue>("30d");
 
-  // Для кастомного диапазона — по умолчанию последние 14 дней.
   const defaultCustomRange: DateRange = useMemo(() => {
     const now = new Date();
     const from = new Date(now);
@@ -149,13 +139,11 @@ export function ReportsView() {
     return () => clearTimeout(t);
   }, []);
 
-  // --- Эффективные границы периода (startMs, endMs) и период для сравнения ---
   const { startMs, endMs, prevStartMs, prevEndMs, effectiveDays } = useMemo(() => {
     const now = Date.now();
 
     if (period === "custom") {
       const from = customRange?.from?.getTime() ?? now - 14 * DAY_MS;
-      // Включаем весь последний день диапазона
       const rawTo = customRange?.to?.getTime() ?? customRange?.from?.getTime() ?? now;
       const to = rawTo + DAY_MS - 1;
 
@@ -199,7 +187,6 @@ export function ReportsView() {
     };
   }, [period, customRange, seedData]);
 
-  // --- Фильтр текущего и предыдущего периодов ---
   const filtered = useMemo(() => {
     const within = <T extends { createdAt: string }>(
       items: T[],
@@ -219,7 +206,6 @@ export function ReportsView() {
     };
   }, [seedData, startMs, endMs, prevStartMs, prevEndMs]);
 
-  // --- KPI ---
   const kpi = useMemo(() => {
     const { events, requests, prevEvents, prevRequests } = filtered;
 
@@ -256,7 +242,6 @@ export function ReportsView() {
     };
   }, [filtered]);
 
-  // --- Частота регистрации по корзинам ---
   const frequencyData = useMemo(() => {
     const useWeekly = effectiveDays > 60;
     const bucketSizeDays = useWeekly ? 7 : 1;
@@ -357,7 +342,6 @@ export function ReportsView() {
       }
     });
 
-    // Самые сильные отклонения показываем первыми.
     rows.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
 
     return {
@@ -370,7 +354,6 @@ export function ReportsView() {
     };
   }, [frequencyData]);
 
-  // --- Распределения ---
   const distributions = useMemo(() => {
     const byReqStatus = Object.entries(
       filtered.requests.reduce<Record<string, number>>((acc, r) => {
@@ -436,15 +419,11 @@ export function ReportsView() {
   const hasAnyData =
     filtered.events.length > 0 || filtered.requests.length > 0;
 
-  // --- RENDER ---
   return (
     <div className="space-y-6 pb-20 overflow-x-hidden">
-      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="min-w-0">
-          {/* Бейдж аномалий — на одной строке с тайтлом, flex-wrap позволяет
-              перенестись на вторую строку если мало места. */}
-          <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5">
             <h1 className="text-2xl font-bold">Отчёты и аналитика</h1>
             {anomalies.rows.length > 0 && (
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium whitespace-nowrap">
@@ -489,7 +468,6 @@ export function ReportsView() {
         </div>
       </div>
 
-      {/* Кастомный диапазон дат */}
       {period === "custom" && (
         <div className="bg-muted/30 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex-1 max-w-md">
@@ -514,7 +492,6 @@ export function ReportsView() {
         </div>
       )}
 
-      {/* KPI (3 карточки) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
@@ -559,7 +536,6 @@ export function ReportsView() {
 
       <Separator />
 
-      {/* Табы */}
       <Tabs defaultValue="frequency" className="w-full">
         <TabsList className="grid w-full grid-cols-4 h-auto min-h-12 p-1 bg-muted rounded-lg md:w-[640px] border">
           <TabsTrigger
@@ -588,7 +564,6 @@ export function ReportsView() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ЧАСТОТА */}
         <TabsContent value="frequency" className="space-y-6 mt-4">
           <Card>
             <CardHeader>
@@ -654,7 +629,6 @@ export function ReportsView() {
             </CardContent>
           </Card>
 
-          {/* АНОМАЛИИ */}
           <Card className={cn(anomalies.rows.length > 0 && "border-destructive/30")}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -738,7 +712,6 @@ export function ReportsView() {
           </Card>
         </TabsContent>
 
-        {/* ЗАЯВКИ */}
         <TabsContent value="requests" className="space-y-6 mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -811,7 +784,6 @@ export function ReportsView() {
           </div>
         </TabsContent>
 
-        {/* ИНЦИДЕНТЫ */}
         <TabsContent value="safety" className="space-y-6 mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -859,7 +831,6 @@ export function ReportsView() {
           </div>
         </TabsContent>
 
-        {/* СВОДКА */}
         <TabsContent value="summary" className="mt-4">
           <Card>
             <CardHeader>
@@ -923,9 +894,6 @@ export function ReportsView() {
   );
 }
 
-// ============================================================
-// Подкомпоненты
-// ============================================================
 function KPICard({
   title,
   value,
@@ -1041,7 +1009,6 @@ function AnomalyRow({
     ? "bg-destructive/10 border-destructive/20 text-destructive"
     : "bg-info/10 border-info/20 text-info";
   const Icon = isUp ? ArrowUpRight : ArrowDownRight;
-  // Коротко описываем смысл в привычных словах
   const directionLabel = isUp
     ? row.metric === "Заявки"
       ? "всплеск заявок"

@@ -34,20 +34,15 @@ const WEEKDAYS = [
 
 export function SettingsView() {
   const router = useRouter();
-  
-  // --- STATE ---
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        
         await new Promise(resolve => setTimeout(resolve, 600));
-        
         setSettings(JSON.parse(JSON.stringify(SETTINGS_DB)));
       } catch (error) {
         console.error("Failed to load settings:", error);
@@ -59,18 +54,15 @@ export function SettingsView() {
     loadData();
   }, []);
 
-  // --- HANDLERS ---
   const handleSave = async () => {
     if (!settings) return;
-    
+
     setIsSaving(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 600));
-      
       Object.assign(SETTINGS_DB, settings);
-      
       notify.mutationSuccess("Успешно", "Настройки сохранены.");
-      router.refresh(); 
+      router.refresh();
     } catch (error) {
       console.error(error);
       notify.mutationError("Ошибка", "Не удалось сохранить настройки.");
@@ -81,10 +73,10 @@ export function SettingsView() {
 
   const toggleDay = (dayId: number) => {
     if (!settings) return;
-    
+
     setSettings((prev) => {
       if (!prev) return null;
-      
+
       const currentDays = prev.quietMode.days;
       const newDays = currentDays.includes(dayId)
         ? currentDays.filter((id) => id !== dayId)
@@ -104,23 +96,20 @@ export function SettingsView() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
-
-      {/* HEADER: Всегда видим (без скелетонов) */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted shrink-0">
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Общие настройки</h1>
-            <p className="text-sm text-muted-foreground">Время и режим уведомлений</p>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground line-clamp-2 break-words">Общие настройки</h1>
+            <p className="text-sm text-muted-foreground truncate">Время и режим уведомлений</p>
           </div>
         </div>
-        
+
         <Button
           onClick={handleSave}
-          // Кнопка неактивна пока идет загрузка данных ИЛИ сохранение
-          disabled={isLoading || isSaving} 
+          disabled={isLoading || isSaving}
           className="shrink-0"
           size="sm"
         >
@@ -129,7 +118,6 @@ export function SettingsView() {
         </Button>
       </div>
 
-      {/* CONTENT CARD */}
       <Card className="bg-card pb-2!">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -142,150 +130,140 @@ export function SettingsView() {
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="divide-y divide-border">
-          
           {isLoading ? (
-             /* SKELETON CONTENT */
-             <>
-               {/* Email Toggle Skeleton */}
-               <div className="flex items-center justify-between py-4 pt-0">
+            <>
+              <div className="flex items-center justify-between py-4 pt-0">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-lg" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                </div>
+                <Skeleton className="h-6 w-10 rounded-full" />
+              </div>
+
+              <div className="space-y-6 py-4">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                     <Skeleton className="h-10 w-10 rounded-lg" />
-                     <div className="space-y-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-40" />
-                     </div>
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
                   </div>
                   <Skeleton className="h-6 w-10 rounded-full" />
-               </div>
+                </div>
 
-               {/* Quiet Mode Skeleton */}
-               <div className="space-y-6 py-4">
-                  <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-3">
-                        <Skeleton className="h-10 w-10 rounded-lg" />
-                        <div className="space-y-2">
-                           <Skeleton className="h-4 w-40" />
-                           <Skeleton className="h-3 w-48" />
-                        </div>
-                     </div>
-                     <Skeleton className="h-6 w-10 rounded-full" />
+                <div className="pl-14 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-9 w-full rounded-md" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-9 w-full rounded-md" />
+                    </div>
                   </div>
-                  
-                  {/* Inputs Skeleton */}
-                  <div className="pl-14 space-y-4">
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                           <Skeleton className="h-3 w-16" />
-                           <Skeleton className="h-9 w-full rounded-md" />
-                        </div>
-                        <div className="space-y-2">
-                           <Skeleton className="h-3 w-16" />
-                           <Skeleton className="h-9 w-full rounded-md" />
-                        </div>
-                     </div>
-                     <div className="space-y-2">
-                        <Skeleton className="h-3 w-24" />
-                        <div className="flex gap-2">
-                           {Array.from({ length: 7 }).map((_, i) => (
-                              <Skeleton key={i} className="h-9 w-9 rounded-full" />
-                           ))}
-                        </div>
-                     </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-24" />
+                    <div className="flex gap-2">
+                      {Array.from({ length: 7 }).map((_, i) => (
+                        <Skeleton key={i} className="h-9 w-9 rounded-full" />
+                      ))}
+                    </div>
                   </div>
-               </div>
-             </>
+                </div>
+              </div>
+            </>
           ) : settings ? (
-             /* REAL FORM CONTENT */
-             <>
-                {/* Email Notification */}
-                <div className="py-4 pt-0 flex items-center justify-between">
+            <>
+              <div className="py-4 pt-0 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
+                    <Mail className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <Label className="text-base text-foreground">Email оповещения</Label>
+                    <p className="text-xs text-muted-foreground">Получать сводку на почту</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={settings.emailNotification}
+                  onCheckedChange={(v) => setSettings({ ...settings, emailNotification: v })}
+                />
+              </div>
+
+              <div className="py-4 space-y-4">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
-                      <Mail className="h-5 w-5" />
+                      <Moon className="h-5 w-5" />
                     </div>
                     <div>
-                      <Label className="text-base text-foreground">Email оповещения</Label>
-                      <p className="text-xs text-muted-foreground">Получать сводку на почту</p>
+                      <Label className="text-base text-foreground">Режим "Не беспокоить"</Label>
+                      <p className="text-xs text-muted-foreground">Отключать уведомления ночью</p>
                     </div>
                   </div>
                   <Switch
-                    checked={settings.emailNotification}
-                    onCheckedChange={(v) => setSettings({ ...settings, emailNotification: v })}
+                    checked={settings.quietMode.enabled}
+                    onCheckedChange={(v) => setSettings({ ...settings, quietMode: { ...settings.quietMode, enabled: v } })}
                   />
                 </div>
 
-                {/* Quiet Mode */}
-                <div className="py-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-muted rounded-lg text-muted-foreground shrink-0">
-                        <Moon className="h-5 w-5" />
+                {settings.quietMode.enabled && (
+                  <div className="space-y-4 pl-14 animate-in fade-in slide-in-from-top-1">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs text-muted-foreground">С (время)</Label>
+                        <Input
+                          type="time"
+                          className="bg-background border-input"
+                          value={settings.quietMode.from}
+                          onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, from: e.target.value } })}
+                        />
                       </div>
-                      <div>
-                        <Label className="text-base text-foreground">Режим "Не беспокоить"</Label>
-                        <p className="text-xs text-muted-foreground">Отключать уведомления ночью</p>
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs text-muted-foreground">До (время)</Label>
+                        <Input
+                          type="time"
+                          className="bg-background border-input"
+                          value={settings.quietMode.to}
+                          onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, to: e.target.value } })}
+                        />
                       </div>
                     </div>
-                    <Switch
-                      checked={settings.quietMode.enabled}
-                      onCheckedChange={(v) => setSettings({ ...settings, quietMode: { ...settings.quietMode, enabled: v } })}
-                    />
+
+                    <div className="grid gap-2">
+                      <Label className="text-xs text-muted-foreground">Повторять по дням</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {WEEKDAYS.map((day) => {
+                          const isSelected = settings.quietMode.days.includes(day.id);
+                          return (
+                            <button
+                              key={day.id}
+                              onClick={() => toggleDay(day.id)}
+                              type="button"
+                              className={cn(
+                                "h-9 w-9 rounded-full text-xs font-medium transition-all border flex items-center justify-center",
+                                isSelected
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-transparent text-muted-foreground border-border hover:border-foreground/50 hover:bg-muted/50"
+                              )}
+                            >
+                              {day.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-
-                  {settings.quietMode.enabled && (
-                    <div className="space-y-4 pl-14 animate-in fade-in slide-in-from-top-1">
-                      {/* Выбор времени */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-1.5">
-                          <Label className="text-xs text-muted-foreground">С (время)</Label>
-                          <Input
-                            type="time"
-                            className="bg-background border-input"
-                            value={settings.quietMode.from}
-                            onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, from: e.target.value } })}
-                          />
-                        </div>
-                        <div className="grid gap-1.5">
-                          <Label className="text-xs text-muted-foreground">До (время)</Label>
-                          <Input
-                            type="time"
-                            className="bg-background border-input"
-                            value={settings.quietMode.to}
-                            onChange={(e) => setSettings({ ...settings, quietMode: { ...settings.quietMode, to: e.target.value } })}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Выбор дней недели */}
-                      <div className="grid gap-2">
-                        <Label className="text-xs text-muted-foreground">Повторять по дням</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {WEEKDAYS.map((day) => {
-                            const isSelected = settings.quietMode.days.includes(day.id);
-                            return (
-                              <button
-                                key={day.id}
-                                onClick={() => toggleDay(day.id)}
-                                type="button"
-                                className={cn(
-                                  "h-9 w-9 rounded-full text-xs font-medium transition-all border flex items-center justify-center",
-                                  isSelected
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "bg-transparent text-muted-foreground border-border hover:border-foreground/50 hover:bg-muted/50"
-                                )}
-                              >
-                                {day.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-             </>
+                )}
+              </div>
+            </>
           ) : null}
         </CardContent>
       </Card>

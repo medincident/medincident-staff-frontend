@@ -18,33 +18,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
-import { 
-  EventsService, 
-  CategoryBrief, 
-  EventType, 
-  CreateCategoryRequest, 
-  CreateEventTypeRequest 
+import {
+  EventsService,
+  CategoryBrief,
+  EventType,
+  CreateCategoryRequest,
+  CreateEventTypeRequest
 } from "@/lib/api";
 import { getBadgeColor } from "@/lib/status-helper";
 
-// Функция для правильного склонения слов (например: 1 тип, 2 типа, 5 типов)
-const getDeclension = (number: number, words: string[]) => {
+// Русское склонение числительных с существительным (1 тип / 2 типа / 5 типов)
+const getDeclension = (n: number, words: string[]) => {
   const cases = [2, 0, 1, 1, 1, 2];
-  return words[(number % 100 > 4 && number % 100 < 20) ? 2 : cases[(number % 10 < 5) ? number % 10 : 5]];
+  return words[(n % 100 > 4 && n % 100 < 20) ? 2 : cases[(n % 10 < 5) ? n % 10 : 5]];
 };
 
 export function ClassifierView() {
   const [categories, setCategories] = useState<CategoryBrief[]>([]);
   const [typesMap, setTypesMap] = useState<Record<string, EventType[]>>({});
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
-  
+
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<{ id: string, name: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string; name: string } | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
   const [newItemDescription, setNewItemDescription] = useState("");
@@ -61,17 +61,14 @@ export function ClassifierView() {
       const fetchedCats = result.items;
       setCategories(fetchedCats);
 
-      const typesPromises = fetchedCats.map(cat => 
-        EventsService.listEventCategoryTypes(cat.id).then(res => ({ id: cat.id, types: res.items }))
+      const typesResults = await Promise.all(
+        fetchedCats.map(cat =>
+          EventsService.listEventCategoryTypes(cat.id).then(res => ({ id: cat.id, types: res.items }))
+        )
       );
-      
-      const typesResults = await Promise.all(typesPromises);
-      
+
       const newTypesMap: Record<string, EventType[]> = {};
-      typesResults.forEach(res => {
-        newTypesMap[res.id] = res.types;
-      });
-      
+      typesResults.forEach(res => { newTypesMap[res.id] = res.types; });
       setTypesMap(newTypesMap);
     } catch (error) {
       console.error(error);
@@ -82,28 +79,29 @@ export function ClassifierView() {
   };
 
   const toggleCategory = (categoryId: string) => {
-    const newExpanded = new Set(expandedCats);
-    if (newExpanded.has(categoryId)) {
-      newExpanded.delete(categoryId);
-    } else {
-      newExpanded.add(categoryId);
-    }
-    setExpandedCats(newExpanded);
+    setExpandedCats(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
   };
 
-  // --- CRUD Категорий ---
   const saveCategory = async () => {
     if (!newItemName.trim()) return;
     setIsSaving(true);
     try {
       if (editingItem) {
-        await EventsService.updateEventCategory(editingItem.id, { 
+        await EventsService.updateEventCategory(editingItem.id, {
           name: newItemName,
           description: newItemDescription || null
         });
       } else {
-        const payload: CreateCategoryRequest = { 
-          name: newItemName, 
+        const payload: CreateCategoryRequest = {
+          name: newItemName,
           code: `cat_${Date.now()}`,
           parentId: targetCategoryId,
           description: newItemDescription || null
@@ -155,13 +153,12 @@ export function ClassifierView() {
     setIsCategoryDialogOpen(true);
   };
 
-  // --- CRUD Типов событий ---
   const saveType = async () => {
     if (!newItemName.trim() || !targetCategoryId) return;
     setIsSaving(true);
     try {
       if (editingItem) {
-        await EventsService.updateEventType(editingItem.id, { 
+        await EventsService.updateEventType(editingItem.id, {
           name: newItemName,
           description: newItemDescription || null,
           patientCanReport: newItemPatientCanReport
@@ -175,10 +172,10 @@ export function ClassifierView() {
         };
         await EventsService.createEventType(targetCategoryId, payload);
       }
-      
+
       const typesResult = await EventsService.listEventCategoryTypes(targetCategoryId);
-      setTypesMap(prev => ({ ...prev, [targetCategoryId]: typesResult.items }));
-      
+      setTypesMap(prev => ({ ...prev, [targetCategoryId!]: typesResult.items }));
+
       notify.mutationSuccess("Сохранено", "Тип события сохранён в справочнике.");
       setIsTypeDialogOpen(false);
     } catch (e) {
@@ -228,7 +225,6 @@ export function ClassifierView() {
 
   return (
     <div className="space-y-6 pb-20 overflow-x-hidden">
-      {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-foreground">Классификатор</h1>
@@ -249,7 +245,6 @@ export function ClassifierView() {
               />
             </div>
           )}
-
           <Button
             onClick={() => openCategoryModal()}
             className="w-full sm:w-auto shrink-0"
@@ -265,29 +260,22 @@ export function ClassifierView() {
         </div>
       </div>
 
-      {/* LIST VIEW (Без таблицы) */}
       <div className="border rounded-md bg-card divide-y">
         {isLoading && categories.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+          <div className="p-8 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
         ) : categories.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">Ничего не найдено</div>
         ) : (
           categories.map((cat) => {
             const isExpanded = expandedCats.has(cat.id);
-            const depth = cat.parentId ? 1 : 0; 
-            
+            const depth = cat.parentId ? 1 : 0;
             const typesCount = typesMap[cat.id]?.length || 0;
-            const typesLabel = getDeclension(typesCount, ['тип', 'типа', 'типов']);
+            const typesLabel = getDeclension(typesCount, ["тип", "типа", "типов"]);
 
             return (
               <div key={cat.id} className="flex flex-col">
-                {/* Строка категории.
-                    items-center по всей строке — иконка/чеврон/бейдж лежат на
-                    одной оптической линии с текстом. Если текст переносится,
-                    всё блок из иконки+текста вертикально центрируется относительно
-                    этого блока, а бейдж остаётся в том же flex-flow через
-                    flex-wrap (переносится на новую строку, но центрируется).
-                    Никаких ручных mt-*, -2px и прочих компенсаций. */}
                 <div className="flex items-center justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors">
                   <div
                     className="flex items-center gap-2 flex-1 min-w-0"
@@ -329,11 +317,12 @@ export function ClassifierView() {
                     </div>
                   </div>
 
-                  {/* Кнопки действий (Справа) */}
                   <div className="shrink-0 ml-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(undefined, cat.id); }}>
@@ -354,7 +343,10 @@ export function ClassifierView() {
                             <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); deleteCategory(cat.id); }}
+                        >
                           <Trash2 className="mr-2 h-4 w-4" /> Удалить (полностью)
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -362,16 +354,20 @@ export function ClassifierView() {
                   </div>
                 </div>
 
-                {/* Развернутые типы событий */}
                 {isExpanded && (
                   <div className="bg-muted/5 border-t border-dashed divide-y divide-dashed">
                     {!typesMap[cat.id] ? (
-                       <div className="p-4 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>
+                      <div className="p-4 text-center text-xs text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                      </div>
                     ) : typesMap[cat.id].length === 0 ? (
-                       <div className="p-4 text-xs text-muted-foreground flex items-center gap-2" style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}>
-                         <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-                         Нет типов событий
-                       </div>
+                      <div
+                        className="p-4 text-xs text-muted-foreground flex items-center gap-2"
+                        style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                        Нет типов событий
+                      </div>
                     ) : (
                       typesMap[cat.id].map((type) => (
                         <div
@@ -383,14 +379,12 @@ export function ClassifierView() {
                             style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
                           >
                             <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
-
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 flex-1 min-w-0">
                               <span
                                 className={`text-sm break-words min-w-0 ${type.isActive === false ? "text-muted-foreground line-through" : "text-foreground"}`}
                               >
                                 {type.name}
                               </span>
-
                               <div className="flex items-center gap-2 shrink-0">
                                 {type.isActive === false && (
                                   <Badge variant="outline" className={getBadgeColor("inactive")}>
@@ -405,13 +399,33 @@ export function ClassifierView() {
                           </div>
 
                           <div className="flex items-center -mr-2 sm:mr-0 shrink-0 ml-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openTypeModal(cat.id, type)} title="Изменить">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground"
+                              onClick={() => openTypeModal(cat.id, type)}
+                              title="Изменить"
+                            >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleTypeStatus(type.id, cat.id, type.isActive !== false)} title={type.isActive !== false ? "Деактивировать" : "Активировать"}>
-                              {type.isActive !== false ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4 text-emerald-500" />}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground"
+                              onClick={() => toggleTypeStatus(type.id, cat.id, type.isActive !== false)}
+                              title={type.isActive !== false ? "Деактивировать" : "Активировать"}
+                            >
+                              {type.isActive !== false
+                                ? <PowerOff className="h-4 w-4" />
+                                : <Power className="h-4 w-4 text-emerald-500" />}
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => deleteType(type.id, cat.id)} title="Удалить навсегда">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteType(type.id, cat.id)}
+                              title="Удалить навсегда"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -425,25 +439,35 @@ export function ClassifierView() {
           })
         )}
       </div>
-      
-      {/* DIALOGS */}
+
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Переименовать категорию' : 'Новая категория'}</DialogTitle>
+            <DialogTitle>{editingItem ? "Переименовать категорию" : "Новая категория"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label>Название</Label>
-              <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Например: Безопасность" autoFocus />
+              <Input
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder="Например: Безопасность"
+                autoFocus
+              />
             </div>
             <div className="grid gap-2">
               <Label>Описание (опционально)</Label>
-              <Input value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} placeholder="Подробности о категории..." />
+              <Input
+                value={newItemDescription}
+                onChange={(e) => setNewItemDescription(e.target.value)}
+                placeholder="Подробности о категории..."
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={saveCategory} disabled={!newItemName.trim() || isSaving}>Сохранить</Button>
+            <Button onClick={saveCategory} disabled={!newItemName.trim() || isSaving}>
+              Сохранить
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -451,27 +475,43 @@ export function ClassifierView() {
       <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Переименовать тип' : 'Новый тип события'}</DialogTitle>
+            <DialogTitle>{editingItem ? "Переименовать тип" : "Новый тип события"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label>Название типа</Label>
-              <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Например: Падение пациента" autoFocus />
+              <Input
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder="Например: Падение пациента"
+                autoFocus
+              />
             </div>
             <div className="grid gap-2">
               <Label>Описание (опционально)</Label>
-              <Input value={newItemDescription} onChange={(e) => setNewItemDescription(e.target.value)} placeholder="Инструкция или детали..." />
+              <Input
+                value={newItemDescription}
+                onChange={(e) => setNewItemDescription(e.target.value)}
+                placeholder="Инструкция или детали..."
+              />
             </div>
             <div className="flex items-center justify-between p-3 border rounded-md">
               <div className="space-y-0.5">
                 <Label>Доступно для пациентов</Label>
-                <div className="text-[12px] text-muted-foreground">Могут ли пациенты сами регистрировать этот тип события</div>
+                <div className="text-[12px] text-muted-foreground">
+                  Могут ли пациенты сами регистрировать этот тип события
+                </div>
               </div>
-              <Switch checked={newItemPatientCanReport} onCheckedChange={setNewItemPatientCanReport} />
+              <Switch
+                checked={newItemPatientCanReport}
+                onCheckedChange={setNewItemPatientCanReport}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={saveType} disabled={!newItemName.trim() || isSaving}>Сохранить</Button>
+            <Button onClick={saveType} disabled={!newItemName.trim() || isSaving}>
+              Сохранить
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

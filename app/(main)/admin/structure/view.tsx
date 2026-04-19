@@ -12,7 +12,7 @@ import {
   Trash2,
   User as UserIcon,
   Loader2,
-  Power, 
+  Power,
   PowerOff
 } from "lucide-react";
 
@@ -43,32 +43,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { notify } from "@/lib/toast";
-import { 
-  OrganizationsService, 
-  ClinicsService, 
-  DepartmentsService, 
-  UsersService 
+import {
+  OrganizationsService,
+  ClinicsService,
+  DepartmentsService,
+  UsersService
 } from "@/lib/api";
 
 export function StructureView() {
-  // --- STATE ---
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const [isOrgsLoading, setIsOrgsLoading] = useState(true);
 
   const [clinics, setClinics] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  
-  // UI State
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Dialog State
   const [isClinicDialogOpen, setIsClinicDialogOpen] = useState(false);
   const [isDeptDialogOpen, setIsDeptDialogOpen] = useState(false);
-  
-  // Form State
+
   const [editingItem, setEditingItem] = useState<{ id?: string, parentId?: string, oldHeadId?: string } | null>(null);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -76,11 +72,9 @@ export function StructureView() {
   const [newHeadId, setNewHeadId] = useState<string>("none");
   const [targetClinicId, setTargetClinicId] = useState<string | null>(null);
 
-  // 1. ЗАГРУЗКА ОРГАНИЗАЦИЙ
   useEffect(() => {
     const loadOrgs = async () => {
       try {
-        // Загружаем только активные организации (или true, если нужно видеть деактивированные)
         const res = await OrganizationsService.listOrganizations(true);
         setOrganizations(res.items);
         if (res.items.length > 0) {
@@ -95,18 +89,17 @@ export function StructureView() {
     loadOrgs();
   }, []);
 
-  // 2. ЗАГРУЗКА СТРУКТУРЫ (Зависит от выбранной организации)
   const loadData = async () => {
     if (!selectedOrgId) return;
 
     try {
       setIsLoading(true);
-      
+
       const usersRes = await UsersService.listUsers(false, undefined, undefined, 100);
       setUsers(usersRes.items);
 
       const clinicsRes = await ClinicsService.listOrganizationClinics(selectedOrgId, true, search || undefined);
-      
+
       const builtClinics = await Promise.all(clinicsRes.items.map(async (clinic) => {
         const [deptsRes, respRes] = await Promise.all([
           DepartmentsService.listClinicDepartments(clinic.id, true, search || undefined),
@@ -135,9 +128,8 @@ export function StructureView() {
 
   useEffect(() => {
     loadData();
-  }, [selectedOrgId, search]); // Перезагружаем при смене организации или поиске
+  }, [selectedOrgId, search]);
 
-  // --- HELPERS ---
   const getUserName = (userId?: string) => {
     if (!userId) return null;
     const user = users.find(u => u.id === userId);
@@ -145,20 +137,18 @@ export function StructureView() {
   };
 
   const syncResponsible = async (
-    targetId: string, 
-    oldHeadId: string | undefined, 
-    newHeadId: string, 
-    addMethod: any, 
+    targetId: string,
+    oldHeadId: string | undefined,
+    newHeadId: string,
+    addMethod: any,
     removeMethod: any
   ) => {
     const finalNewId = newHeadId === "none" ? undefined : newHeadId;
     if (oldHeadId === finalNewId) return;
-
     if (oldHeadId) await removeMethod(targetId, oldHeadId);
     if (finalNewId) await addMethod(targetId, { userId: finalNewId });
   };
 
-  // --- ACTIONS: КЛИНИКИ ---
   const openClinicModal = (clinic?: any) => {
     if (clinic) {
       setEditingItem({ id: clinic.id, oldHeadId: clinic.headId });
@@ -187,10 +177,10 @@ export function StructureView() {
           physicalAddress: { value: newAddress }
         });
         await syncResponsible(
-          editingItem.id, 
-          editingItem.oldHeadId, 
-          newHeadId, 
-          ClinicsService.addClinicResponsible, 
+          editingItem.id,
+          editingItem.oldHeadId,
+          newHeadId,
+          ClinicsService.addClinicResponsible,
           ClinicsService.removeClinicResponsible
         );
       } else {
@@ -240,7 +230,6 @@ export function StructureView() {
     }
   };
 
-  // --- ACTIONS: ОТДЕЛЕНИЯ ---
   const openDeptModal = (clinicId: string, dept?: any) => {
     setTargetClinicId(clinicId);
     if (dept) {
@@ -267,10 +256,10 @@ export function StructureView() {
           description: newDescription || null
         });
         await syncResponsible(
-          editingItem.id, 
-          editingItem.oldHeadId, 
-          newHeadId, 
-          DepartmentsService.addDepartmentResponsible, 
+          editingItem.id,
+          editingItem.oldHeadId,
+          newHeadId,
+          DepartmentsService.addDepartmentResponsible,
           DepartmentsService.removeDepartmentResponsible
         );
       } else {
@@ -321,15 +310,13 @@ export function StructureView() {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Структура</h1>
           <p className="text-sm text-muted-foreground">Управление филиалами и отделениями</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
-          {/* СЕЛЕКТ ОРГАНИЗАЦИИ */}
           {isOrgsLoading ? (
             <Skeleton className="h-10 w-full sm:w-48 rounded-md shrink-0" />
           ) : (
@@ -348,7 +335,6 @@ export function StructureView() {
             </Select>
           )}
 
-          {/* ПОИСК */}
           {isLoading && !clinics.length ? (
             <Skeleton className="h-10 flex-1 w-full sm:w-48 lg:w-64 rounded-md" />
           ) : (
@@ -363,10 +349,10 @@ export function StructureView() {
               />
             </div>
           )}
-          
-          <Button 
-            onClick={() => openClinicModal()} 
-            className="shrink-0 w-full sm:w-auto" 
+
+          <Button
+            onClick={() => openClinicModal()}
+            className="shrink-0 w-full sm:w-auto"
             disabled={isSaving || isLoading || !selectedOrgId}
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building className="mr-2 h-4 w-4" />}
@@ -375,20 +361,16 @@ export function StructureView() {
         </div>
       </div>
 
-      {/* ОТОБРАЖЕНИЕ ЕСЛИ НЕТ ОРГАНИЗАЦИЙ */}
       {!isOrgsLoading && organizations.length === 0 && (
-         <div className="py-16 text-center border rounded-xl bg-card">
-           <Building className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-           <h3 className="text-lg font-medium">Нет организаций</h3>
-           <p className="text-sm text-muted-foreground mt-1 mb-4">Сначала создайте медицинскую сеть (организацию).</p>
-         </div>
+        <div className="py-16 text-center border rounded-xl bg-card">
+          <Building className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+          <h3 className="text-lg font-medium">Нет организаций</h3>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">Сначала создайте медицинскую сеть (организацию).</p>
+        </div>
       )}
 
-      {/* LIST GRID */}
       {selectedOrgId && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-          
-          {/* SKELETON STATE */}
           {isLoading && clinics.length === 0 && Array.from({ length: 6 }).map((_, i) => (
             <Card key={`skel-${i}`} className="flex flex-col overflow-hidden gap-0 p-0 border">
               <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
@@ -409,7 +391,6 @@ export function StructureView() {
             </Card>
           ))}
 
-          {/* REAL DATA */}
           {!isLoading && clinics.map((clinic) => {
             const clinicHeadName = getUserName(clinic.headId);
 
@@ -479,7 +460,6 @@ export function StructureView() {
                     {clinic.departments.length > 0 ? (
                       clinic.departments.map((dept: any) => {
                         const deptHeadName = getUserName(dept.headId);
-
                         return (
                           <div key={dept.id} className={`group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm ${dept.isActive === false ? 'opacity-60' : ''}`}>
                             <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
@@ -542,7 +522,6 @@ export function StructureView() {
         </div>
       )}
 
-      {/* DIALOGS */}
       <Dialog open={isClinicDialogOpen} onOpenChange={setIsClinicDialogOpen}>
         <DialogContent>
           <DialogHeader>

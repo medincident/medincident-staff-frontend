@@ -22,7 +22,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
 
-// Импортируем моки и константы
 import { requestsDb, eventsDb } from "@/lib/mock-db";
 import { ServiceRequest } from "@/lib/types";
 import { SERVICE_TYPE_CONFIG } from "@/lib/constants";
@@ -78,25 +77,21 @@ function RequestFormContent({ initialData }: RequestFormProps) {
 
   const currentLinkedEventId = form.watch("linkedEventId");
 
-  // ПОЛУЧЕНИЕ ИНФОРМАЦИИ О СВЯЗАННОМ СОБЫТИИ (ИЗ МОКОВ)
   useEffect(() => {
     const fetchLinkedEventInfo = async () => {
       if (!currentLinkedEventId) return;
-      
       try {
         const linkedEvent = eventsDb.find(e => e.id === currentLinkedEventId);
         if (linkedEvent?.code) {
-            setLinkedEventCode(linkedEvent.code);
+          setLinkedEventCode(linkedEvent.code);
         }
       } catch (e) {
         console.error("Failed to load linked event info", e);
       }
     };
-
     fetchLinkedEventInfo();
   }, [currentLinkedEventId]);
 
-  // СОХРАНЕНИЕ В МОКИ
   async function onSubmit(values: RequestFormValues) {
     setIsSubmitting(true);
     try {
@@ -105,42 +100,39 @@ function RequestFormContent({ initialData }: RequestFormProps) {
       const dept = SERVICE_TYPE_CONFIG[values.type]?.dept || "Не определен";
 
       if (isEditMode && initialData?.id) {
-        // ОБНОВЛЕНИЕ
         const reqIndex = requestsDb.findIndex(r => r.id === initialData.id);
         if (reqIndex > -1) {
-            requestsDb[reqIndex] = {
-                ...requestsDb[reqIndex],
-                type: values.type,
-                location: values.location,
-                priority: values.priority,
-                description: values.description,
-                linkedEventId: values.linkedEventId,
-                responsibleDept: dept
-            };
+          requestsDb[reqIndex] = {
+            ...requestsDb[reqIndex],
+            type: values.type,
+            location: values.location,
+            priority: values.priority,
+            description: values.description,
+            linkedEventId: values.linkedEventId,
+            responsibleDept: dept
+          };
         }
         notify.mutationSuccess("Заявка обновлена", `Заявка #${initialData.number || "сохранена"} успешно обновлена.`);
       } else {
-        // СОЗДАНИЕ
         const newReqNumber = Math.floor(1000 + Math.random() * 9000);
         const newRequest: ServiceRequest = {
-            id: `req_${Date.now()}`,
-            number: newReqNumber,
-            type: values.type,
-            priority: values.priority,
-            status: "created",
-            description: values.description,
-            location: values.location,
-            createdAt: new Date().toISOString(),
-            authorName: "Текущий пользователь",
-            linkedEventId: values.linkedEventId,
-            responsibleDept: dept
+          id: `req_${Date.now()}`,
+          number: newReqNumber,
+          type: values.type,
+          priority: values.priority,
+          status: "created",
+          description: values.description,
+          location: values.location,
+          createdAt: new Date().toISOString(),
+          authorName: "Текущий пользователь",
+          linkedEventId: values.linkedEventId,
+          responsibleDept: dept
         };
-        
         requestsDb.unshift(newRequest);
         notify.mutationSuccess("Заявка создана", `Номер заявки #${newReqNumber}. Исполнители уведомлены.`);
       }
 
-      router.push("/requests"); 
+      router.push("/requests");
       router.refresh();
 
     } catch (error) {
