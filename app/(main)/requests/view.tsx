@@ -277,7 +277,7 @@ export function RequestsListView() {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-[10px] font-mono font-bold text-muted-foreground">#{req.number}</span>
                       </div>
-                      <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-1">
+                      <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-2 break-words">
                         {SERVICE_TYPE_CONFIG[req.type]?.label || req.type}
                       </h3>
                     </div>

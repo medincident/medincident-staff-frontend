@@ -50,14 +50,13 @@ export function HelpView() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
 
-      {/* HEADER */}
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted">
+      <div className="flex items-center gap-2 min-w-0">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted shrink-0">
           <ArrowLeft className="h-5 w-5 text-foreground" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Справка</h1>
-          <p className="text-sm text-muted-foreground">База знаний и инструкции</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-bold text-foreground line-clamp-2 break-words">Справка</h1>
+          <p className="text-sm text-muted-foreground truncate">База знаний и инструкции</p>
         </div>
       </div>
 
@@ -136,23 +135,23 @@ export function HelpView() {
             ) : (
                /* REAL DOCS */
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 group border-border">
+                  <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 group border-border min-w-0">
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground mr-4 shrink-0 transition-colors group-hover:text-foreground">
                       <FileText className="h-5 w-5" />
                     </div>
-                    <div className="flex flex-col items-start text-left gap-0.5">
-                      <span className="font-medium text-foreground text-sm group-hover:text-primary transition-colors">Инструкция пользователя (PDF)</span>
-                      <span className="text-[10px] text-muted-foreground font-normal">2.4 MB • Обновлено 10.11.2025</span>
+                    <div className="flex flex-col items-start text-left gap-0.5 min-w-0 flex-1">
+                      <span className="font-medium text-foreground text-sm group-hover:text-primary transition-colors break-words whitespace-normal max-w-full">Инструкция пользователя (PDF)</span>
+                      <span className="text-[10px] text-muted-foreground font-normal break-words whitespace-normal max-w-full">2.4 MB • Обновлено 10.11.2025</span>
                     </div>
                   </Button>
 
-                  <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 group border-border">
+                  <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 group border-border min-w-0">
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground mr-4 shrink-0 transition-colors group-hover:text-foreground">
                       <FileText className="h-5 w-5" />
                     </div>
-                    <div className="flex flex-col items-start text-left gap-0.5">
-                      <span className="font-medium text-foreground text-sm group-hover:text-primary transition-colors">Приказ о мониторинге</span>
-                      <span className="text-[10px] text-muted-foreground font-normal">1.1 MB • Приказ №123-П</span>
+                    <div className="flex flex-col items-start text-left gap-0.5 min-w-0 flex-1">
+                      <span className="font-medium text-foreground text-sm group-hover:text-primary transition-colors break-words whitespace-normal max-w-full">Приказ о мониторинге</span>
+                      <span className="text-[10px] text-muted-foreground font-normal break-words whitespace-normal max-w-full">1.1 MB • Приказ №123-П</span>
                     </div>
                   </Button>
                </div>

@@ -55,22 +55,21 @@ export function AccessibilityView() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
-      {/* HEADER */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.back()}
-            className="hover:bg-muted"
+            className="hover:bg-muted shrink-0"
           >
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground line-clamp-2 break-words">
               Специальные возможности
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground truncate">
               Настройки интерфейса для комфортной работы
             </p>
           </div>
@@ -144,7 +143,7 @@ export function AccessibilityView() {
         </CardHeader>
 
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 min-w-0">
             {FONT_SCALE_OPTIONS.map((opt) => {
               const isActive =
                 Math.abs(current.fontScale - opt.value) < 0.001;
@@ -155,7 +154,7 @@ export function AccessibilityView() {
                   disabled={!isReady}
                   onClick={() => update({ fontScale: opt.value })}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-2 rounded-xl border p-4 transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                    "flex flex-col items-center justify-center gap-2 rounded-xl border p-4 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-w-0",
                     isActive
                       ? "border-primary bg-primary/10 ring-2 ring-primary/30"
                       : "border-border bg-card hover:border-foreground/30 hover:bg-muted/50",
@@ -169,7 +168,7 @@ export function AccessibilityView() {
                   </span>
                   <span
                     className={cn(
-                      "text-xs font-medium",
+                      "text-xs font-medium text-center break-words max-w-full",
                       isActive ? "text-primary" : "text-muted-foreground",
                     )}
                   >

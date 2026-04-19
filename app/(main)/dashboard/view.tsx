@@ -104,20 +104,24 @@ export function DashboardView() {
     <div className="space-y-6 pb-20 overflow-x-hidden">
 
       {/* HEADER BLOCK */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-card p-6 rounded-xl border">
-        <div className="w-full md:w-auto">
-          <h1 className="text-2xl font-bold text-foreground tracking-tight truncate">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-card p-6 rounded-xl border min-w-0">
+        <div className="w-full md:w-auto min-w-0">
+          <h1 className="text-2xl font-bold text-foreground tracking-tight line-clamp-2 break-words">
             Ситуационный центр
           </h1>
-          <div className="flex flex-wrap items-center gap-3 text-muted-foreground mt-1 text-sm">
-            <span className="flex items-center gap-1 whitespace-nowrap">
-              <Briefcase className="h-3.5 w-3.5" />
-              {isLoading ? <Skeleton className="h-4 w-24" /> : (user ? (user.role && user.role in ROLE_NAMES ? ROLE_NAMES[user.role as keyof typeof ROLE_NAMES] : (user.isAdmin ? "Администратор" : "Сотрудник")) : "Гость")}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground mt-1 text-sm">
+            <span className="flex items-center gap-1 min-w-0">
+              <Briefcase className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
+                {isLoading ? <Skeleton className="h-4 w-24" /> : (user ? (user.role && user.role in ROLE_NAMES ? ROLE_NAMES[user.role as keyof typeof ROLE_NAMES] : (user.isAdmin ? "Администратор" : "Сотрудник")) : "Гость")}
+              </span>
             </span>
             <span className="text-border">|</span>
-            <span className="flex items-center gap-1 whitespace-nowrap">
-              <CalendarDays className="h-3.5 w-3.5" />
-              {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+            <span className="flex items-center gap-1 min-w-0">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
+                {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+              </span>
             </span>
           </div>
         </div>
@@ -186,9 +190,9 @@ export function DashboardView() {
                  <h2 className="text-lg font-semibold text-foreground">Журнал событий</h2>
               </div>
               
-              <TabsList className="flex w-full p-1 bg-muted rounded-lg mb-4">
-                <TabsTrigger value="ns" className="flex-1 truncate">События (НС)</TabsTrigger>
-                <TabsTrigger value="requests" className="flex-1 truncate">Заявки</TabsTrigger>
+              <TabsList className="flex w-full p-1 bg-muted rounded-lg mb-4 min-w-0">
+                <TabsTrigger value="ns" className="flex-1 min-w-0 truncate">События (НС)</TabsTrigger>
+                <TabsTrigger value="requests" className="flex-1 min-w-0 truncate">Заявки</TabsTrigger>
               </TabsList> 
              
             </div>

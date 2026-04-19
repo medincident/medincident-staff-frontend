@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  Loader2, 
+import {
+  Loader2,
   Power,
   PowerOff,
   Building,
@@ -38,44 +38,36 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { notify } from "@/lib/toast";
 import { getBadgeColor } from "@/lib/status-helper";
-
-// Импорт нового сервиса
 import { OrganizationsService } from "@/lib/api";
 
 export function OrganizationsView() {
-  // --- STATE ---
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Модалка создания/редактирования
   const [isOrgDialogOpen, setIsOrgDialogOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<any | null>(null);
   const [orgName, setOrgName] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
   const [orgAddress, setOrgAddress] = useState("");
 
-  // Модалка назначения руководителей
   const [isRespDialogOpen, setIsRespDialogOpen] = useState(false);
   const [targetOrgId, setTargetOrgId] = useState<string | null>(null);
   const [responsibles, setResponsibles] = useState<any[]>([]);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   const loadOrganizations = async () => {
     try {
       setIsLoading(true);
-      // Загружаем все организации, включая деактивированные
       const res = await OrganizationsService.listOrganizations(true, search || undefined);
-      
-      // Подгружаем ответственных для каждой организации, чтобы выводить их в карточке
+
       const orgsWithResponsibles = await Promise.all(res.items.map(async (org) => {
         const resp = await OrganizationsService.listOrganizationResponsibles(org.id);
         return { ...org, responsibles: resp.items };
       }));
-      
+
       setOrganizations(orgsWithResponsibles);
     } catch (error) {
       notify.error("Ошибка", "Не удалось загрузить список организаций.");
@@ -88,7 +80,6 @@ export function OrganizationsView() {
     loadOrganizations();
   }, [search]);
 
-  // --- HANDLERS: ОРГАНИЗАЦИИ ---
   const openOrgDialog = (org?: any) => {
     if (org) {
       setEditingOrg(org);
@@ -157,7 +148,6 @@ export function OrganizationsView() {
     }
   };
 
-  // --- HANDLERS: ОТВЕТСТВЕННЫЕ ---
   const openResponsiblesDialog = async (orgId: string) => {
     setTargetOrgId(orgId);
     setIsRespDialogOpen(true);
@@ -168,7 +158,7 @@ export function OrganizationsView() {
     try {
       const [respRes, candRes] = await Promise.all([
         OrganizationsService.listOrganizationResponsibles(orgId),
-        // includeIneligible=true позволяет показать неактивных/неподходящих кандидатов с объяснением причины
+        // includeIneligible=true — показываем неподходящих кандидатов с объяснением причины
         OrganizationsService.listOrganizationResponsibleCandidates(orgId, undefined, true)
       ]);
       setResponsibles(respRes.items);
@@ -186,7 +176,7 @@ export function OrganizationsView() {
       notify.mutationSuccess("Руководитель назначен", "Пользователь добавлен как ответственный по организации.");
       setSelectedCandidateId("");
       loadResponsiblesAndCandidates(targetOrgId);
-      loadOrganizations(); // Обновляем список, чтобы руководитель появился в карточке
+      loadOrganizations();
     } catch (e) {
       notify.mutationError("Ошибка назначения", "Не удалось добавить ответственного.");
     } finally {
@@ -208,63 +198,65 @@ export function OrganizationsView() {
 
   return (
     <div className="space-y-6 pb-20">
-      
-      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-            <h1 className="text-2xl font-bold text-foreground">Организации</h1>
-            <p className="text-sm text-muted-foreground mt-1">Глобальное управление медицинскими сетями</p>
+          <h1 className="text-2xl font-bold text-foreground">Организации</h1>
+          <p className="text-sm text-muted-foreground mt-1">Глобальное управление медицинскими сетями</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row w-full sm:w-auto items-center gap-2">
           {isLoading ? (
-             <Skeleton className="h-10 w-full sm:w-64 rounded-md" />
+            <Skeleton className="h-10 w-full sm:w-64 rounded-md" />
           ) : (
-             <Input 
-                placeholder="Поиск организации..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full sm:w-64"
-             />
+            <Input
+              placeholder="Поиск организации..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-64"
+            />
           )}
           <Button onClick={() => openOrgDialog()} disabled={isLoading} className="w-full sm:w-auto shrink-0">
-              <Plus className="mr-2 h-4 w-4" /> Добавить
+            <Plus className="mr-2 h-4 w-4" /> Добавить
           </Button>
         </div>
       </div>
 
-      {/* GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {isLoading && organizations.length === 0 ? (
-           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-xl" />)
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-xl" />)
         ) : organizations.length === 0 ? (
-           <div className="col-span-full py-12 text-center text-muted-foreground">Организации не найдены</div>
+          <div className="col-span-full py-12 text-center text-muted-foreground">Организации не найдены</div>
         ) : (
           organizations.map((org) => {
             const head = org.responsibles?.find((r: any) => r.isDirectlyAssigned)?.user;
 
             return (
-              <Card key={org.id} className={`gap-2 transition-all ${org.isActive === false ? 'opacity-70 grayscale-[30%]' : ''}`}>
+              <Card key={org.id} className={`gap-2 transition-all ${org.isActive === false ? "opacity-70 grayscale-[30%]" : ""}`}>
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                   <div className="space-y-1 overflow-hidden pr-4">
                     <div className="flex items-center gap-2">
                       <Building className="h-5 w-5 text-primary shrink-0" />
                       <CardTitle className="truncate text-lg">{org.name}</CardTitle>
-                      {org.isActive === false && <Badge 
-                        variant="outline" 
-                        className={getBadgeColor(org.isActive ? "active" : "inactive")}
-                      >
-                        {org.isActive ? "Активна" : "Неактивна"}
-                      </Badge>}
+                      {org.isActive === false && (
+                        <Badge
+                          variant="outline"
+                          className={getBadgeColor(org.isActive ? "active" : "inactive")}
+                        >
+                          {org.isActive ? "Активна" : "Неактивна"}
+                        </Badge>
+                      )}
                     </div>
                     <CardDescription className="flex items-center gap-1 truncate text-xs">
-                      <MapPin className="h-3 w-3 shrink-0" /> {org.legalAddress?.value || "Юридический адрес не указан"}
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      {org.legalAddress?.value || "Юридический адрес не указан"}
                     </CardDescription>
                   </div>
-                  
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="-mt-2 -mr-2"><MoreVertical className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="-mt-2 -mr-2">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => openOrgDialog(org)}>
@@ -282,24 +274,31 @@ export function OrganizationsView() {
                           <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => deleteOrg(org.id)}>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => deleteOrg(org.id)}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" /> Удалить навсегда
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </CardHeader>
-                
+
                 <CardContent className="space-y-4 pt-2">
                   {org.description && (
                     <p className="text-sm text-muted-foreground line-clamp-2">{org.description}</p>
                   )}
-                  
+
                   <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Главный Руководитель</p>
-                      <p className="text-sm font-medium">{head ? `${head.name || head.givenName}` : <span className="italic text-muted-foreground">Не назначен</span>}</p>
+                      <p className="text-sm font-medium">
+                        {head
+                          ? `${head.name || head.givenName}`
+                          : <span className="italic text-muted-foreground">Не назначен</span>}
+                      </p>
                     </div>
-                      <Button
+                    <Button
                       variant="outline"
                       size="sm"
                       className="border-dashed text-muted-foreground hover:text-primary hover:border-primary hover:bg-transparent transition-all"
@@ -315,11 +314,10 @@ export function OrganizationsView() {
         )}
       </div>
 
-      {/* DIALOG: ОРГАНИЗАЦИЯ */}
       <Dialog open={isOrgDialogOpen} onOpenChange={setIsOrgDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingOrg ? 'Настройки организации' : 'Новая организация'}</DialogTitle>
+            <DialogTitle>{editingOrg ? "Настройки организации" : "Новая организация"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -344,7 +342,6 @@ export function OrganizationsView() {
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG: РУКОВОДИТЕЛИ (С использованием умных кандидатов) */}
       <Dialog open={isRespDialogOpen} onOpenChange={setIsRespDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -353,9 +350,8 @@ export function OrganizationsView() {
               Они получат доступ к управлению всеми клиниками и отделениями этой сети.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4 space-y-6">
-            {/* Список текущих руководителей */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">Назначенные руководители</Label>
               {responsibles.length === 0 ? (
@@ -368,7 +364,12 @@ export function OrganizationsView() {
                     <div key={r.user.id} className="flex items-center justify-between p-3 bg-card">
                       <span className="text-sm font-medium">{r.user.name || r.user.givenName}</span>
                       {r.isDirectlyAssigned && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => removeResponsible(r.user.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeResponsible(r.user.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
@@ -378,7 +379,6 @@ export function OrganizationsView() {
               )}
             </div>
 
-            {/* Добавление нового руководителя */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">Назначить нового</Label>
               <div className="flex items-center gap-2">
@@ -388,15 +388,14 @@ export function OrganizationsView() {
                   </SelectTrigger>
                   <SelectContent>
                     {candidates.map((cand: any) => (
-                      <SelectItem 
-                        key={cand.user.id} 
-                        value={cand.user.id} 
-                        disabled={!cand.eligible} // Блокируем неподходящих
+                      <SelectItem
+                        key={cand.user.id}
+                        value={cand.user.id}
+                        disabled={!cand.eligible}
                       >
                         <div className="flex flex-col text-left">
                           <span>{cand.user.name || cand.user.givenName}</span>
                           {!cand.eligible && (
-                             // Показываем причину, почему нельзя назначить (определяется сервером)
                             <span className="text-[10px] text-destructive flex items-center mt-0.5">
                               <ShieldAlert className="h-3 w-3 mr-1" />
                               {cand.ineligibilityReasons?.[0]?.message || "Нельзя назначить"}

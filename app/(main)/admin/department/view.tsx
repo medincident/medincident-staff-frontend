@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  Save, 
-  ShieldAlert, 
-  Loader2, 
+import {
+  Save,
+  ShieldAlert,
+  Loader2,
   UserCheck,
-  Settings,
-  Power,
-  PowerOff
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,41 +19,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { notify } from "@/lib/toast";
 import { User } from "@/lib/types";
 import { DepartmentsService } from "@/lib/api";
-import { getBadgeColor } from "@/lib/status-helper";
 
 export function DepartmentView() {
-  // --- STATE ---
   const [headId, setHeadId] = useState("");
   const [isActingEnabled, setIsActingEnabled] = useState(false);
   const [actingId, setActingId] = useState("");
   const [departmentName, setDepartmentName] = useState("");
   const [staff, setStaff] = useState<User[]>([]);
   const [description, setDescription] = useState("");
-  const [isActive, setIsActive] = useState(true);
-  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
-  // Состояния загрузки
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const departmentId = "YOUR_DEPARTMENT_ID";
 
-  // 1. ЗАГРУЗКА ДАННЫХ (Client-side)
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        
+
         const [deptData, staffData, responsiblesData] = await Promise.all([
           DepartmentsService.getDepartmentById(departmentId),
           DepartmentsService.listDepartmentEmployees(departmentId, undefined, undefined, 100),
           DepartmentsService.listDepartmentResponsibles(departmentId)
         ]);
-        
+
         setDepartmentName(deptData.name || "Настройки отделения");
-        setDescription(deptData.description || ""); // НОВОЕ
-        setIsActive(deptData.isActive ?? true);     // НОВОЕ
-        
+        setDescription(deptData.description || "");
+
         const mappedStaff = staffData.items.map(emp => ({
           ...emp.user,
           position: emp.position
@@ -85,17 +75,15 @@ export function DepartmentView() {
     if (departmentId) loadData();
   }, [departmentId]);
 
-  // 2. СОХРАНЕНИЕ ДАННЫХ
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      
-      // Обновляем основные данные отделения
+
       await DepartmentsService.updateDepartment(departmentId, {
         name: departmentName,
         description: description || null
       });
-      
+
       const newResponsibleIds = [headId];
       if (isActingEnabled && actingId) newResponsibleIds.push(actingId);
       const validNewIds = newResponsibleIds.filter(Boolean);
@@ -123,67 +111,44 @@ export function DepartmentView() {
     }
   };
 
-  // 3. ПЕРЕКЛЮЧЕНИЕ СТАТУСА (Деактивация/Активация)
-  const toggleStatus = async () => {
-    try {
-      setIsTogglingStatus(true);
-      if (isActive) {
-        await DepartmentsService.deactivateDepartment(departmentId);
-        notify.mutationSuccess("Отделение деактивировано", "Отделение скрыто из активной структуры.");
-      } else {
-        await DepartmentsService.reactivateDepartment(departmentId);
-        notify.mutationSuccess("Отделение активировано", "Отделение снова доступно для работы.");
-      }
-      setIsActive(!isActive);
-    } catch (error) {
-      notify.mutationError("Ошибка", "Не удалось изменить статус отделения.");
-    } finally {
-      setIsTogglingStatus(false);
-    }
-  };
-
   const renderSelectItem = (u: any) => (
     <SelectItem key={u.id} value={u.id} className="cursor-pointer">
-       <div className="flex flex-col sm:flex-row sm:items-center w-full max-w-60 sm:max-w-md overflow-hidden text-left">
-         <span className="truncate text-sm font-normal text-foreground">{u.name}</span>
-         <span className="truncate text-muted-foreground text-xs sm:ml-2">
-           ({u.position || "Сотрудник"})
-         </span>
-       </div>
+      <div className="flex flex-col sm:flex-row sm:items-center w-full max-w-60 sm:max-w-md overflow-hidden text-left">
+        <span className="truncate text-sm font-normal text-foreground">{u.name}</span>
+        <span className="truncate text-muted-foreground text-xs sm:ml-2">
+          ({u.position || "Сотрудник"})
+        </span>
+      </div>
     </SelectItem>
   );
 
   return (
     <div className="space-y-6 pb-20">
-      
-      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="w-full sm:w-auto">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground">
-                  {isLoading ? <Skeleton className="h-8 w-64 rounded-md" /> : departmentName}
-              </h1>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">Управление настройками и доступом отделения</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-foreground">
+              {isLoading ? <Skeleton className="h-8 w-64 rounded-md" /> : departmentName}
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">Управление настройками и доступом отделения</p>
         </div>
-        
+
         <div className="flex w-full sm:w-auto items-center gap-2">
           <Button onClick={handleSave} disabled={isSaving || isLoading} className="w-full sm:w-auto">
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Сохранить
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Сохранить
           </Button>
         </div>
       </div>
 
       {isLoading ? (
         <div className="max-w-4xl space-y-6">
-           <Skeleton className="h-[200px] w-full rounded-xl" />
-           <Skeleton className="h-[400px] w-full rounded-xl" />
+          <Skeleton className="h-[200px] w-full rounded-xl" />
+          <Skeleton className="h-[400px] w-full rounded-xl" />
         </div>
       ) : (
         <div className="max-w-4xl space-y-6">
-
-          {/* Leadership Settings */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -193,15 +158,14 @@ export function DepartmentView() {
               <CardDescription>Назначение ответственных лиц</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              
               <div className="grid gap-3">
                 <Label className="text-base font-medium">Заведующий отделением</Label>
                 <p className="text-sm text-muted-foreground">Имеет полный доступ к управлению заявками и графиком.</p>
-                
+
                 <Select value={headId} onValueChange={setHeadId}>
                   <SelectTrigger className="w-full sm:w-100 h-auto min-h-12 sm:min-h-10 py-3 sm:py-2 px-4 bg-background text-left">
                     <div className="truncate w-full pr-2">
-                        <SelectValue placeholder="Выберите сотрудника" />
+                      <SelectValue placeholder="Выберите сотрудника" />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="max-w-[90vw] sm:max-w-none max-h-[40vh]">
@@ -220,10 +184,7 @@ export function DepartmentView() {
                       Включите на время отпуска или болезни, чтобы временно передать права другому сотруднику.
                     </p>
                   </div>
-                  <Switch
-                    checked={isActingEnabled}
-                    onCheckedChange={setIsActingEnabled}
-                  />
+                  <Switch checked={isActingEnabled} onCheckedChange={setIsActingEnabled} />
                 </div>
 
                 {isActingEnabled && (
@@ -239,7 +200,7 @@ export function DepartmentView() {
                       <Select value={actingId} onValueChange={setActingId}>
                         <SelectTrigger className="w-full sm:w-100 h-auto min-h-12 sm:min-h-10 py-3 sm:py-2 px-4 bg-background text-left">
                           <div className="truncate w-full pr-2">
-                             <SelectValue placeholder="Выберите заместителя" />
+                            <SelectValue placeholder="Выберите заместителя" />
                           </div>
                         </SelectTrigger>
                         <SelectContent className="max-w-[90vw] sm:max-w-none max-h-[40vh]">
@@ -250,7 +211,7 @@ export function DepartmentView() {
                       <div className="flex gap-3 items-start text-xs text-muted-foreground bg-background/50 p-3 rounded-md">
                         <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-warning" />
                         <p>
-                          Сотрудник получит права заведующего. История действий будет сохранена под его аккаунтом. 
+                          Сотрудник получит права заведующего. История действий будет сохранена под его аккаунтом.
                           Не забудьте отключить режим после возвращения основного руководителя.
                         </p>
                       </div>
@@ -258,7 +219,6 @@ export function DepartmentView() {
                   </div>
                 )}
               </div>
-
             </CardContent>
           </Card>
         </div>
