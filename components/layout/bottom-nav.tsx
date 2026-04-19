@@ -10,11 +10,15 @@ import {
   Wrench 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMiniApp } from "@/lib/miniapp";
 
 export function BottomNav() {
   const pathname = usePathname();
-  
-  const isAdmin = true; 
+  const miniApp = useMiniApp();
+
+  const isAdmin = true;
+
+  if (miniApp) return null;
 
   const links = [
     {

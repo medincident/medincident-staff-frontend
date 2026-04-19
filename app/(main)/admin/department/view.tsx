@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { User } from "@/lib/types";
 import { DepartmentsService } from "@/lib/api";
 import { getBadgeColor } from "@/lib/status-helper";
@@ -76,7 +76,7 @@ export function DepartmentView() {
           setActingId("");
         }
       } catch (error) {
-        toast.error("Ошибка", { description: "Не удалось загрузить данные отделения" });
+        notify.error("Ошибка", "Не удалось загрузить данные отделения.");
       } finally {
         setIsLoading(false);
       }
@@ -115,9 +115,9 @@ export function DepartmentView() {
         await DepartmentsService.addDepartmentResponsible(departmentId, { userId: id });
       }
 
-      toast.success("Изменения сохранены", { description: "Отделение и структура управления обновлены." });
+      notify.mutationSuccess("Изменения сохранены", "Отделение и структура управления обновлены.");
     } catch (error) {
-      toast.error("Ошибка сохранения", { description: "Проверьте соединение с сервером" });
+      notify.mutationError("Ошибка сохранения", "Проверьте соединение с сервером и попробуйте ещё раз.");
     } finally {
       setIsSaving(false);
     }
@@ -129,14 +129,14 @@ export function DepartmentView() {
       setIsTogglingStatus(true);
       if (isActive) {
         await DepartmentsService.deactivateDepartment(departmentId);
-        toast.success("Отделение деактивировано");
+        notify.mutationSuccess("Отделение деактивировано", "Отделение скрыто из активной структуры.");
       } else {
         await DepartmentsService.reactivateDepartment(departmentId);
-        toast.success("Отделение активировано");
+        notify.mutationSuccess("Отделение активировано", "Отделение снова доступно для работы.");
       }
       setIsActive(!isActive);
     } catch (error) {
-      toast.error("Ошибка", { description: "Не удалось изменить статус отделения" });
+      notify.mutationError("Ошибка", "Не удалось изменить статус отделения.");
     } finally {
       setIsTogglingStatus(false);
     }

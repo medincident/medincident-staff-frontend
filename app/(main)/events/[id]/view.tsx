@@ -10,7 +10,7 @@ import {
   MessageSquare,
   AlertTriangle
 } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,7 +63,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         }
       } catch (error) {
         console.error("Failed to load event:", error);
-        toast.error("Ошибка загрузки данных");
+        notify.error("Ошибка загрузки данных", "Не удалось получить информацию о событии.");
       } finally {
         setIsLoading(false);
       }
@@ -93,13 +93,14 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
 
       setEvent(updatedEvent);
 
-      toast.success("Статус обновлен", { 
-        description: `Событие переведено в статус "${EVENT_STATUS_MAP[newStatus]}"` 
-      });
+      notify.mutationSuccess(
+        "Статус обновлён",
+        `Событие переведено в статус "${EVENT_STATUS_MAP[newStatus]}".`,
+      );
     } catch (error) {
       console.error(error);
       setStatus(prevStatus);
-      toast.error("Ошибка", { description: "Не удалось обновить статус" });
+      notify.mutationError("Ошибка", "Не удалось обновить статус события.");
     }
   };
 

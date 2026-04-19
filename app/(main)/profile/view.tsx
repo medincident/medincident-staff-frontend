@@ -15,7 +15,8 @@ import {
   Mail,
   Building,
   Briefcase,
-  Palette
+  Palette,
+  Accessibility
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -292,6 +293,13 @@ export function ProfileView() {
                   icon={Settings}
                   title="Общие настройки"
                   desc="Уведомления, пароль и безопасность"
+                />
+
+                <ProfileLink
+                  href="/profile/accessibility"
+                  icon={Accessibility}
+                  title="Специальные возможности"
+                  desc="Чёрно-белый режим и размер шрифта"
                 />
 
                 <ProfileLink

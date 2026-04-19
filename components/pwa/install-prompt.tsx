@@ -1,84 +1,117 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Download, SquarePlus, SquareArrowUp } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Download, SquareArrowUp, SquarePlus, X } from "lucide-react";
 import { APP_CONFIG } from "@/lib/constants";
-import { Button } from "@/components/ui/button"; // Предполагаю, что у тебя есть этот компонент
+import { Button } from "@/components/ui/button";
+import { useMiniApp } from "@/lib/miniapp";
+
+const DISMISS_KEY = "installPromptDismissedAt";
+const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 дней
+
+function isRecentlyDismissed(): boolean {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY);
+    if (!raw) return false;
+    const ts = Number(raw);
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < DISMISS_TTL_MS;
+  } catch {
+    return false;
+  }
+}
 
 export function InstallPrompt() {
+  const miniApp = useMiniApp();
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     // 1. Проверяем, установлено ли уже приложение
-    const standalone = window.matchMedia("(display-mode: standalone)").matches;
+    //    (display-mode: standalone — современный способ, navigator.standalone — legacy iOS).
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as any).standalone === true;
     setIsStandalone(standalone);
 
-    // 2. Определяем ОС и тип устройства
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const ios = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
-    const mobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
-    
+    // 2. Определяем iOS (у него нет beforeinstallprompt — показываем инструкцию).
+    const ua =
+      navigator.userAgent || navigator.vendor || (window as any).opera || "";
+    const ios = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
     setIsIOS(ios);
-    setIsMobile(mobile);
 
-    // Проверяем, закрывал ли юзер этот попап ранее
-    const hasDismissed = localStorage.getItem("installPromptDismissed");
-
-    // Для iOS событие beforeinstallprompt не работает, поэтому показываем сразу (если это мобилка и попап не закрывали)
-    if (ios && mobile && !standalone && !hasDismissed) {
+    // 3. iOS: сразу показываем инструкцию, если ещё не установлено и недавно не закрывали.
+    if (ios && !standalone && !isRecentlyDismissed()) {
       setIsVisible(true);
     }
 
-    // 3. Ловим событие установки (для Android)
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault(); // Останавливаем стандартный показ
+    // 4. Остальные (Android Chrome, desktop Chromium): ждём beforeinstallprompt.
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Если юзер недавно закрывал нашу модалку — не блокируем дефолтный UI браузера.
+      if (isRecentlyDismissed()) return;
+
+      e.preventDefault();
       setDeferredPrompt(e);
-      
-      // Показываем нашу модалку только если это мобилка и юзер её не закрывал
-      if (mobile && !hasDismissed) {
-        setIsVisible(true);
+      setIsVisible(true);
+    };
+
+    // 5. После успешной установки — прячем и сбрасываем флаг.
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setIsVisible(false);
+      setIsStandalone(true);
+      try {
+        localStorage.removeItem(DISMISS_KEY);
+      } catch {
+        // ignore
       }
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt,
+      );
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
-  // Функция закрытия с запоминанием
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsVisible(false);
-    localStorage.setItem("installPromptDismissed", "true");
-  };
+    try {
+      localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    } catch {
+      // ignore
+    }
+  }, []);
 
-  // Функция вызова системного окна установки (Android)
-  const handleInstallClick = async () => {
+  const handleInstallClick = useCallback(async () => {
     if (!deferredPrompt) return;
-    
+
     deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-      setIsVisible(false); // Прячем после успешной установки
+    try {
+      await deferredPrompt.userChoice;
+    } catch {
+      // ignore
     }
     setDeferredPrompt(null);
-  };
+    setIsVisible(false);
+  }, [deferredPrompt]);
 
-  // Если это ПК, или уже установлено, или скрыто — ничего не рендерим
-  if (isStandalone || !isVisible || !isMobile) {
-    return null;
-  }
+  if (miniApp || isStandalone || !isVisible) return null;
+
+  // Для не-iOS показываем модалку только если есть deferredPrompt
+  // (иначе кнопка «Установить сейчас» не имеет смысла — запустить установку нечем).
+  if (!isIOS && !deferredPrompt) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
       <div className="relative w-full max-w-sm bg-background border rounded-xl shadow-2xl p-6 flex flex-col gap-4 animate-in zoom-in-95 duration-300">
-        
         <button
           onClick={handleClose}
           className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
@@ -96,7 +129,8 @@ export function InstallPrompt() {
             Установить приложение
           </h3>
           <p className="text-sm text-muted-foreground">
-            Установите <strong>{APP_CONFIG.name}</strong> на свой экран «Домой» для быстрого доступа и работы офлайн.
+            Установите <strong>{APP_CONFIG.name}</strong> на свой экран «Домой»
+            для быстрого доступа и работы офлайн.
           </p>
         </div>
 
@@ -121,9 +155,12 @@ export function InstallPrompt() {
           </div>
         )}
 
-        {/* Кнопка установки для Android */}
+        {/* Кнопка установки для Android / desktop Chromium */}
         {!isIOS && deferredPrompt && (
-          <Button onClick={handleInstallClick} className="w-full mt-2 font-bold">
+          <Button
+            onClick={handleInstallClick}
+            className="w-full mt-2 font-bold"
+          >
             Установить сейчас
           </Button>
         )}

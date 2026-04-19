@@ -16,7 +16,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import { 
   EventsService, 
@@ -75,7 +75,7 @@ export function ClassifierView() {
       setTypesMap(newTypesMap);
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка", { description: "Не удалось загрузить справочник" });
+      notify.error("Ошибка", "Не удалось загрузить справочник категорий.");
     } finally {
       setIsLoading(false);
     }
@@ -110,11 +110,11 @@ export function ClassifierView() {
         };
         await EventsService.createEventCategory(payload);
       }
-      toast.success("Сохранено");
+      notify.mutationSuccess("Сохранено", "Категория сохранена в справочнике.");
       setIsCategoryDialogOpen(false);
       loadCategories();
     } catch (e) {
-      toast.error("Ошибка при сохранении категории");
+      notify.mutationError("Ошибка", "Не удалось сохранить категорию.");
     } finally {
       setIsSaving(false);
     }
@@ -124,14 +124,14 @@ export function ClassifierView() {
     try {
       if (currentStatus) {
         await EventsService.deactivateEventCategory(id);
-        toast.success("Категория деактивирована");
+        notify.mutationSuccess("Категория деактивирована", "Категория скрыта из активного справочника.");
       } else {
         await EventsService.reactivateEventCategory(id);
-        toast.success("Категория активирована");
+        notify.mutationSuccess("Категория активирована", "Категория снова доступна для использования.");
       }
       loadCategories();
     } catch (e) {
-      toast.error("Ошибка при изменении статуса");
+      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус категории.");
     }
   };
 
@@ -139,10 +139,10 @@ export function ClassifierView() {
     if (confirm("Удалить категорию и все ее подкатегории/типы?")) {
       try {
         await EventsService.deleteEventCategory(id);
-        toast.success("Категория удалена");
+        notify.mutationSuccess("Категория удалена", "Запись категории удалена из справочника.");
         loadCategories();
       } catch (e) {
-        toast.error("Ошибка при удалении");
+        notify.mutationError("Ошибка удаления", "Не удалось удалить категорию. Проверьте, что в ней нет связанных данных.");
       }
     }
   };
@@ -179,10 +179,10 @@ export function ClassifierView() {
       const typesResult = await EventsService.listEventCategoryTypes(targetCategoryId);
       setTypesMap(prev => ({ ...prev, [targetCategoryId]: typesResult.items }));
       
-      toast.success("Сохранено");
+      notify.mutationSuccess("Сохранено", "Тип события сохранён в справочнике.");
       setIsTypeDialogOpen(false);
     } catch (e) {
-      toast.error("Ошибка при сохранении типа");
+      notify.mutationError("Ошибка", "Не удалось сохранить тип события.");
     } finally {
       setIsSaving(false);
     }
@@ -192,15 +192,15 @@ export function ClassifierView() {
     try {
       if (currentStatus) {
         await EventsService.deactivateEventType(typeId);
-        toast.success("Тип события деактивирован");
+        notify.mutationSuccess("Тип события деактивирован", "Тип скрыт из активного справочника.");
       } else {
         await EventsService.reactivateEventType(typeId);
-        toast.success("Тип события активирован");
+        notify.mutationSuccess("Тип события активирован", "Тип снова доступен для использования.");
       }
       const typesResult = await EventsService.listEventCategoryTypes(categoryId);
       setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
     } catch (e) {
-      toast.error("Ошибка при изменении статуса");
+      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус типа события.");
     }
   };
 
@@ -210,9 +210,9 @@ export function ClassifierView() {
         await EventsService.deleteEventType(typeId);
         const typesResult = await EventsService.listEventCategoryTypes(categoryId);
         setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
-        toast.success("Тип удален");
+        notify.mutationSuccess("Тип удалён", "Запись типа события удалена из справочника.");
       } catch (e) {
-        toast.error("Ошибка при удалении");
+        notify.mutationError("Ошибка удаления", "Не удалось удалить тип события.");
       }
     }
   };
@@ -230,25 +230,36 @@ export function ClassifierView() {
     <div className="space-y-6 pb-20 overflow-x-hidden">
       {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Классификатор</h1>
-            <p className="text-sm text-muted-foreground">Управление справочником событий</p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-foreground">Классификатор</h1>
+          <p className="text-sm text-muted-foreground mt-1">Управление справочником событий</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
           {isLoading ? (
-             <Skeleton className="h-10 w-full sm:w-64 rounded-md shrink-0" />
+            <Skeleton className="h-10 w-full sm:w-64 rounded-md shrink-0" />
           ) : (
-             <div className="relative w-full sm:w-64 shrink-0">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Поиск..." className="pl-9 bg-background w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
-             </div>
+            <div className="relative w-full sm:w-64 shrink-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Поиск..."
+                className="pl-9 bg-background w-full"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           )}
-          
-          <Button onClick={() => openCategoryModal()} className="w-full sm:w-auto shrink-0" disabled={isLoading || isSaving}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderPlus className="mr-2 h-4 w-4" />}
+
+          <Button
+            onClick={() => openCategoryModal()}
+            className="w-full sm:w-auto shrink-0"
+            disabled={isLoading || isSaving}
+          >
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FolderPlus className="mr-2 h-4 w-4" />
+            )}
             Категория
           </Button>
         </div>
@@ -270,34 +281,51 @@ export function ClassifierView() {
 
             return (
               <div key={cat.id} className="flex flex-col">
-                {/* Строка категории */}
-                <div className="flex items-start justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-start gap-2 flex-1 min-w-0" style={{ paddingLeft: `${depth * 16}px` }}>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 shrink-0 p-0 mt-[-2px] sm:mt-0" 
+                {/* Строка категории.
+                    items-center по всей строке — иконка/чеврон/бейдж лежат на
+                    одной оптической линии с текстом. Если текст переносится,
+                    всё блок из иконки+текста вертикально центрируется относительно
+                    этого блока, а бейдж остаётся в том же flex-flow через
+                    flex-wrap (переносится на новую строку, но центрируется).
+                    Никаких ручных mt-*, -2px и прочих компенсаций. */}
+                <div className="flex items-center justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors">
+                  <div
+                    className="flex items-center gap-2 flex-1 min-w-0"
+                    style={{ paddingLeft: `${depth * 16}px` }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0 p-0"
                       onClick={() => toggleCategory(cat.id)}
                     >
-                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
                     </Button>
-                    
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
-                      <div 
-                        className="flex items-start sm:items-center gap-2 cursor-pointer flex-1 min-w-0" 
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 flex-1 min-w-0">
+                      <div
+                        className="flex items-center gap-2 cursor-pointer min-w-0"
                         onClick={() => toggleCategory(cat.id)}
                       >
-                        <Layers className="h-4 w-4 text-primary shrink-0 mt-0.5 sm:mt-0" />
-                        <span className="font-medium text-sm leading-tight break-words">
-                          {cat.name} <span className="text-muted-foreground font-normal ml-1 whitespace-nowrap">({typesCount} {typesLabel})</span>
+                        <Layers className="h-4 w-4 text-primary shrink-0" />
+                        <span className="font-medium text-sm break-words">
+                          {cat.name}{" "}
+                          <span className="text-muted-foreground font-normal whitespace-nowrap">
+                            ({typesCount} {typesLabel})
+                          </span>
                         </span>
                       </div>
-                      
-                      <div className="flex flex-wrap items-center gap-2 ml-6 sm:ml-0">
-                        <Badge variant="outline" className={getBadgeColor(cat.isActive !== false ? "active" : "inactive")}>
-                          {cat.isActive !== false ? "Активна" : "Неактивна"}
-                        </Badge>
-                      </div>
+
+                      <Badge
+                        variant="outline"
+                        className={getBadgeColor(cat.isActive !== false ? "active" : "inactive")}
+                      >
+                        {cat.isActive !== false ? "Активна" : "Неактивна"}
+                      </Badge>
                     </div>
                   </div>
 
@@ -345,24 +373,33 @@ export function ClassifierView() {
                          Нет типов событий
                        </div>
                     ) : (
-                      typesMap[cat.id].map(type => (
-                        <div key={type.id} className={`flex items-start justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors ${type.isActive === false ? 'opacity-70' : ''}`}>
-                          
-                          <div className="flex items-start gap-2 flex-1 min-w-0" style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}>
-                            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0 mt-1.5 sm:mt-2" />
-                            
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 flex-1 min-w-0">
-                              <span className={`text-sm leading-tight break-words flex-1 min-w-0 ${type.isActive === false ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                      typesMap[cat.id].map((type) => (
+                        <div
+                          key={type.id}
+                          className={`flex items-center justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors ${type.isActive === false ? "opacity-70" : ""}`}
+                        >
+                          <div
+                            className="flex items-center gap-2 flex-1 min-w-0"
+                            style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 flex-1 min-w-0">
+                              <span
+                                className={`text-sm break-words min-w-0 ${type.isActive === false ? "text-muted-foreground line-through" : "text-foreground"}`}
+                              >
                                 {type.name}
                               </span>
-                              
-                              <div className="flex flex-wrap items-center gap-2">
+
+                              <div className="flex items-center gap-2 shrink-0">
                                 {type.isActive === false && (
                                   <Badge variant="outline" className={getBadgeColor("inactive")}>
                                     Неактивен
                                   </Badge>
                                 )}
-                                <Badge variant="outline" className="text-[10px]">{type.patientCanReport ? 'Для пациентов' : 'Внутреннее'}</Badge>
+                                <Badge variant="outline" className="text-[10px]">
+                                  {type.patientCanReport ? "Для пациентов" : "Внутреннее"}
+                                </Badge>
                               </div>
                             </div>
                           </div>

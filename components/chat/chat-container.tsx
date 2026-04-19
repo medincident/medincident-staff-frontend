@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ChatSection, ChatMessage } from "@/components/ui/chat-section";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 
 interface ChatContainerProps {
   entityId: string;
@@ -52,7 +52,7 @@ export function ChatContainer({
         setMessages(initialMessages);
       } catch (error) {
         console.error("Ошибка загрузки чата:", error);
-        toast.error("Ошибка", { description: "Не удалось загрузить сообщения" });
+        notify.error("Ошибка", "Не удалось загрузить сообщения.");
       } finally {
         setIsLoading(false);
       }
@@ -84,7 +84,7 @@ export function ChatContainer({
       // В моковом варианте просто оставляем всё как есть.
       
     } catch (error) {
-      toast.error("Ошибка", { description: "Не удалось отправить сообщение" });
+      notify.mutationError("Ошибка", "Не удалось отправить сообщение.");
       // Удаляем сообщение из UI, если "сервер" вернул ошибку
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }

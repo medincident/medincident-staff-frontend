@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { 
   OrganizationsService, 
   ClinicsService, 
@@ -87,7 +87,7 @@ export function StructureView() {
           setSelectedOrgId(res.items[0].id);
         }
       } catch (error) {
-        toast.error("Ошибка", { description: "Не удалось загрузить список организаций" });
+        notify.error("Ошибка", "Не удалось загрузить список организаций.");
       } finally {
         setIsOrgsLoading(false);
       }
@@ -127,7 +127,7 @@ export function StructureView() {
       setClinics(builtClinics);
     } catch (error) {
       console.error("Failed to load structure:", error);
-      toast.error("Ошибка", { description: "Не удалось загрузить структуру клиник" });
+      notify.error("Ошибка", "Не удалось загрузить структуру клиник.");
     } finally {
       setIsLoading(false);
     }
@@ -203,11 +203,11 @@ export function StructureView() {
           await ClinicsService.addClinicResponsible(newClinic.id, { userId: newHeadId });
         }
       }
-      toast.success("Успешно", { description: "Клиника сохранена" });
+      notify.mutationSuccess("Успешно", "Клиника сохранена.");
       setIsClinicDialogOpen(false);
       loadData();
     } catch (e) {
-      toast.error("Ошибка при сохранении клиники");
+      notify.mutationError("Ошибка", "Не удалось сохранить клинику.");
     } finally {
       setIsSaving(false);
     }
@@ -217,14 +217,14 @@ export function StructureView() {
     try {
       if (isActive) {
         await ClinicsService.deactivateClinic(id);
-        toast.success("Клиника деактивирована");
+        notify.mutationSuccess("Клиника деактивирована", "Клиника скрыта из активной структуры.");
       } else {
         await ClinicsService.reactivateClinic(id);
-        toast.success("Клиника активирована");
+        notify.mutationSuccess("Клиника активирована", "Клиника снова доступна для работы.");
       }
       loadData();
     } catch (e) {
-      toast.error("Ошибка изменения статуса");
+      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус клиники.");
     }
   };
 
@@ -232,10 +232,10 @@ export function StructureView() {
     if (confirm("Вы уверены? Удалить клинику можно только если в ней нет отделений и сотрудников.")) {
       try {
         await ClinicsService.deleteClinic(id);
-        toast.success("Клиника удалена");
+        notify.mutationSuccess("Клиника удалена", "Запись клиники удалена из системы.");
         loadData();
       } catch (e) {
-        toast.error("Ошибка удаления", { description: "Убедитесь, что клиника пуста." });
+        notify.mutationError("Ошибка удаления", "Убедитесь, что клиника пуста.");
       }
     }
   };
@@ -282,11 +282,11 @@ export function StructureView() {
           await DepartmentsService.addDepartmentResponsible(newDept.id, { userId: newHeadId });
         }
       }
-      toast.success("Успешно", { description: "Отделение сохранено" });
+      notify.mutationSuccess("Успешно", "Отделение сохранено.");
       setIsDeptDialogOpen(false);
       loadData();
     } catch (e) {
-      toast.error("Ошибка при сохранении отделения");
+      notify.mutationError("Ошибка", "Не удалось сохранить отделение.");
     } finally {
       setIsSaving(false);
     }
@@ -296,14 +296,14 @@ export function StructureView() {
     try {
       if (isActive) {
         await DepartmentsService.deactivateDepartment(id);
-        toast.success("Отделение деактивировано");
+        notify.mutationSuccess("Отделение деактивировано", "Отделение скрыто из активной структуры.");
       } else {
         await DepartmentsService.reactivateDepartment(id);
-        toast.success("Отделение активировано");
+        notify.mutationSuccess("Отделение активировано", "Отделение снова доступно для работы.");
       }
       loadData();
     } catch (e) {
-      toast.error("Ошибка изменения статуса");
+      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус отделения.");
     }
   };
 
@@ -311,10 +311,10 @@ export function StructureView() {
     if (confirm("Удалить отделение? Это действие нельзя отменить.")) {
       try {
         await DepartmentsService.deleteDepartment(deptId);
-        toast.success("Отделение удалено");
+        notify.mutationSuccess("Отделение удалено", "Запись отделения удалена из системы.");
         loadData();
       } catch (e) {
-        toast.error("Ошибка удаления", { description: "Убедитесь, что в отделении нет сотрудников." });
+        notify.mutationError("Ошибка удаления", "Убедитесь, что в отделении нет сотрудников.");
       }
     }
   };

@@ -30,7 +30,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { 
   UsersService, 
   ClinicsService, 
@@ -91,7 +91,7 @@ export function UsersView() {
       }
     } catch (error) {
       console.error("Failed to load users data:", error);
-      toast.error("Ошибка", {description: "Не удалось загрузить данные пользователей"});
+      notify.error("Ошибка", "Не удалось загрузить данные пользователей.");
     } finally {
       setIsLoading(false);
     }
@@ -148,12 +148,12 @@ export function UsersView() {
         });
       }
 
-      toast.success("Успешно", {description: "Данные пользователя обновлены"});
+      notify.mutationSuccess("Успешно", "Данные пользователя обновлены.");
       setIsDialogOpen(false); 
       loadData(); // Перезагружаем список
     } catch (e) {
       console.error(e);
-      toast.error("Ошибка", {description: "Не удалось сохранить изменения"});
+      notify.mutationError("Ошибка", "Не удалось сохранить изменения.");
     } finally {
       setIsSaving(false);
     }
@@ -163,14 +163,14 @@ export function UsersView() {
     try {
       if (isActive) {
         await UsersService.deactivateUser(id);
-        toast.success("Пользователь деактивирован");
+        notify.mutationSuccess("Пользователь деактивирован", "Учётная запись заблокирована для входа.");
       } else {
         await UsersService.reactivateUser(id);
-        toast.success("Пользователь активирован");
+        notify.mutationSuccess("Пользователь активирован", "Учётная запись снова доступна.");
       }
       loadData();
     } catch (e) {
-      toast.error("Ошибка", {description: "Не удалось изменить статус"});
+      notify.mutationError("Ошибка", "Не удалось изменить статус пользователя.");
     }
   };
 
@@ -178,10 +178,10 @@ export function UsersView() {
     if(confirm("Удалить пользователя навсегда? Это действие нельзя отменить.")) {
         try {
             await UsersService.deleteUser(id);
-            toast.success("Успешно", {description: "Пользователь удален"});
+            notify.mutationSuccess("Успешно", "Пользователь удалён.");
             loadData();
         } catch (e) {
-            toast.error("Ошибка удаления", {description: "Возможно, пользователь связан с историческими данными."});
+            notify.mutationError("Ошибка удаления", "Возможно, пользователь связан с историческими данными.");
         }
     }
   };

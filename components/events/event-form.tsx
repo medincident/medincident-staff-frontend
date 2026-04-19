@@ -19,7 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { Category, IncidentEvent } from "@/lib/types";
 
 import { CLASSIFIER_DB, eventsDb } from "@/lib/mock-db";
@@ -87,7 +87,7 @@ export function EventForm({ eventId }: EventFormProps) {
         }
       } catch (error) {
         console.error("Failed to load form data:", error);
-        toast.error("Ошибка загрузки данных");
+        notify.error("Ошибка загрузки данных", "Не удалось получить справочник и событие. Обновите страницу.");
       } finally {
         setIsLoading(false);
       }
@@ -130,7 +130,7 @@ export function EventForm({ eventId }: EventFormProps) {
                 typeName: selectedType?.name
             };
         }
-        toast.success("Изменения сохранены");
+        notify.mutationSuccess("Изменения сохранены", "Данные события обновлены.");
       } else {
         // СОЗДАНИЕ НОВОГО
         const newEvent: IncidentEvent = {
@@ -150,7 +150,7 @@ export function EventForm({ eventId }: EventFormProps) {
         
         // Добавляем в начало массива
         eventsDb.unshift(newEvent);
-        toast.success("Событие зарегистрировано");
+        notify.mutationSuccess("Событие зарегистрировано", `Код ${newEvent.code}. Ответственные будут уведомлены.`);
       }
 
       router.push("/events");
@@ -158,7 +158,7 @@ export function EventForm({ eventId }: EventFormProps) {
 
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка", { description: "Не удалось сохранить данные" });
+      notify.mutationError("Ошибка", "Не удалось сохранить данные.");
     } finally {
       setIsSubmitting(false);
     }
@@ -219,54 +219,71 @@ export function EventForm({ eventId }: EventFormProps) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
-            {/* CATEGORY */}
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Категория</FormLabel>
-                  <FormControl>
-                    <SearchableSelect
-                      // Если классификатор еще грузится (isLoading=true), список будет пустым, но поле отобразится
-                      options={classifier.map(c => ({ value: String(c.id), label: c.name }))}
-                      value={field.value}
-                      onChange={(val) => {
-                        field.onChange(val);
-                        if (val !== String(existingEvent?.categoryId)) {
-                           form.setValue("typeId", "");
+            {/* CATEGORY + TYPE — в grid, как в request-form: на десктопе в 2
+                колонки, на мобильной стек. Grid заодно жёстко ограничивает
+                ширину каждого FormItem → длинные лейблы в SearchableSelect
+                не могут распирать горизонт. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Категория</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        // Если классификатор ещё грузится (isLoading=true),
+                        // список будет пустым, но поле отобразится.
+                        options={classifier.map((c) => ({
+                          value: String(c.id),
+                          label: c.name,
+                        }))}
+                        value={field.value}
+                        onChange={(val) => {
+                          field.onChange(val);
+                          if (val !== String(existingEvent?.categoryId)) {
+                            form.setValue("typeId", "");
+                          }
+                        }}
+                        placeholder={
+                          isLoading ? "Загрузка..." : "Выберите категорию..."
                         }
-                      }}
-                      placeholder={isLoading ? "Загрузка..." : "Выберите категорию..."}
-                      disabled={isLoading} // Блокируем селект пока грузятся справочники
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* TYPE */}
-            <FormField
-              control={form.control}
-              name="typeId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Тип события</FormLabel>
-                  <FormControl>
-                    <SearchableSelect
-                      options={availableTypes.map(t => ({ value: String(t.id), label: t.name }))}
-                      value={field.value}
-                      onChange={field.onChange}
-                      disabled={!selectedCategoryId || isLoading}
-                      placeholder={selectedCategoryId ? "Выберите тип..." : "Сначала выберите категорию"}
-                      emptyMessage="Нет типов в этой категории"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="typeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Тип события</FormLabel>
+                    <FormControl>
+                      <SearchableSelect
+                        options={availableTypes.map((t) => ({
+                          value: String(t.id),
+                          label: t.name,
+                        }))}
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={!selectedCategoryId || isLoading}
+                        placeholder={
+                          selectedCategoryId
+                            ? "Выберите тип..."
+                            : "Сначала выберите категорию"
+                        }
+                        emptyMessage="Нет типов в этой категории"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* DESCRIPTION */}
             <FormField

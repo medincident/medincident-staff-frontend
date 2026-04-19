@@ -22,7 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 
 import { RequestStatus, ServiceRequest } from "@/lib/types";
 import { STATUS_MAP, PRIORITY_MAP, SERVICE_TYPE_CONFIG } from "@/lib/constants";
@@ -59,7 +59,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                 }
             } catch (error) {
                 console.error("Failed to load request:", error);
-                toast.error("Ошибка загрузки данных");
+                notify.error("Ошибка загрузки данных", "Не удалось получить информацию о заявке.");
             } finally {
                 setIsLoading(false);
             }
@@ -87,11 +87,14 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
             }
             
             setRequest(updatedRequest);
-            toast.success("Статус обновлен", { description: `Заявка переведена в статус "${STATUS_MAP[newStatus]}"` });
+            notify.mutationSuccess(
+                "Статус обновлён",
+                `Заявка переведена в статус "${STATUS_MAP[newStatus]}".`,
+            );
         } catch (error) {
             console.error(error);
             setStatus(prevStatus);
-            toast.error("Ошибка", { description: "Не удалось обновить статус" });
+            notify.mutationError("Ошибка", "Не удалось обновить статус заявки.");
         }
     };
 
