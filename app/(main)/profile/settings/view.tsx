@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { UserSettings } from "@/lib/types";
 import { SETTINGS_DB } from "@/lib/mock-db";
@@ -51,7 +51,7 @@ export function SettingsView() {
         setSettings(JSON.parse(JSON.stringify(SETTINGS_DB)));
       } catch (error) {
         console.error("Failed to load settings:", error);
-        toast.error("Не удалось загрузить настройки");
+        notify.error("Не удалось загрузить настройки", "Проверьте соединение и обновите страницу.");
       } finally {
         setIsLoading(false);
       }
@@ -69,11 +69,11 @@ export function SettingsView() {
       
       Object.assign(SETTINGS_DB, settings);
       
-      toast.success("Успешно", { description: "Настройки сохранены!" });
+      notify.mutationSuccess("Успешно", "Настройки сохранены.");
       router.refresh(); 
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка", { description: "Не удалось сохранить настройки" });
+      notify.mutationError("Ошибка", "Не удалось сохранить настройки.");
     } finally {
       setIsSaving(false);
     }

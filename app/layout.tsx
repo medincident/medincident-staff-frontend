@@ -6,6 +6,8 @@ import { APP_CONFIG } from "@/lib/constants";
 import { Metadata, Viewport } from "next";
 import { THEME_COLORS } from "@/lib/constants";
 import { ThemeColorManager } from "@/components/providers/theme-color-manager";
+import { AccessibilityInit } from "@/components/providers/accessibility-init";
+import { MiniAppInit } from "@/components/providers/miniapp-init";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { NextAuthSessionProvider } from "@/components/providers/session-provider";
@@ -52,9 +54,11 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
+          <MiniAppInit />
           <ServiceWorkerRegister />
           <InstallPrompt />
           <ThemeColorManager />
+          <AccessibilityInit />
           <NextAuthSessionProvider>
             <ApiProvider>
             {children}

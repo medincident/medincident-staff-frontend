@@ -113,21 +113,27 @@ export function DynamicChart({
           
           {/* === 1. ГОРИЗОНТАЛЬНЫЕ СТОЛБЦЫ (BAR / BAR-HORIZONTAL) === */}
           {type === "bar" || type === "bar-horizontal" ? (
-            <BarChart 
-              data={data} 
-              layout="vertical" 
+            <BarChart
+              data={data}
+              layout="vertical"
               margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#e2e8f0" opacity={0.2} />
               <XAxis type="number" hide />
-              <YAxis 
-                dataKey={categoryKey} 
-                type="category" 
-                width={120} 
+              <YAxis
+                dataKey={categoryKey}
+                type="category"
+                width={180}
                 tick={{ fill: AXIS_COLOR, fontSize: 11 }}
-                axisLine={false} 
-                tickLine={false} 
+                axisLine={false}
+                tickLine={false}
                 interval={0}
+                tickFormatter={(value: unknown) => {
+                  // Длинные подписи отделов обрезаем — иначе они перекрывают соседние.
+                  // Полное имя по-прежнему доступно в тултипе.
+                  const str = String(value ?? "");
+                  return str.length > 26 ? str.slice(0, 24) + "…" : str;
+                }}
               />
               <Tooltip cursor={{ fill: 'currentColor', opacity: 0.1 }} content={<CustomTooltip />} />
               {isMulti && <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />}

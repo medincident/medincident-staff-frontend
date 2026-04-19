@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { subscribeUser } from "@/app/actions/push";
 
 // Вспомогательная функция для конвертации ключа
@@ -56,11 +56,11 @@ export function PushNotificationManager() {
       const result = await subscribeUser(serializedSub);
 
       if (result.success) {
-        toast.success("Уведомления включены!");
+        notify.mutationSuccess("Уведомления включены!", "Вы будете получать оповещения о новых инцидентах.");
       }
     } catch (error) {
       console.error("Error subscribing:", error);
-      toast.error("Ошибка подписки. Проверьте разрешения браузера.");
+      notify.error("Ошибка подписки", "Проверьте разрешения уведомлений в настройках браузера.");
     }
   }
 

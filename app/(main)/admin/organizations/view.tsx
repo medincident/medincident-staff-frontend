@@ -36,7 +36,7 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { getBadgeColor } from "@/lib/status-helper";
 
 // Импорт нового сервиса
@@ -78,7 +78,7 @@ export function OrganizationsView() {
       
       setOrganizations(orgsWithResponsibles);
     } catch (error) {
-      toast.error("Ошибка", { description: "Не удалось загрузить список организаций" });
+      notify.error("Ошибка", "Не удалось загрузить список организаций.");
     } finally {
       setIsLoading(false);
     }
@@ -116,15 +116,15 @@ export function OrganizationsView() {
 
       if (editingOrg) {
         await OrganizationsService.updateOrganization(editingOrg.id, payload);
-        toast.success("Организация обновлена");
+        notify.mutationSuccess("Организация обновлена", "Данные организации успешно сохранены.");
       } else {
         await OrganizationsService.createOrganization(payload);
-        toast.success("Организация создана");
+        notify.mutationSuccess("Организация создана", "Новая организация добавлена в систему.");
       }
       setIsOrgDialogOpen(false);
       loadOrganizations();
     } catch (error) {
-      toast.error("Ошибка сохранения");
+      notify.mutationError("Ошибка сохранения", "Не удалось сохранить данные организации.");
     } finally {
       setIsSaving(false);
     }
@@ -134,14 +134,14 @@ export function OrganizationsView() {
     try {
       if (isActive) {
         await OrganizationsService.deactivateOrganization(id);
-        toast.success("Организация деактивирована");
+        notify.mutationSuccess("Организация деактивирована", "Организация скрыта из активной структуры.");
       } else {
         await OrganizationsService.reactivateOrganization(id);
-        toast.success("Организация активирована");
+        notify.mutationSuccess("Организация активирована", "Организация снова доступна для работы.");
       }
       loadOrganizations();
     } catch (error) {
-      toast.error("Ошибка изменения статуса");
+      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус организации.");
     }
   };
 
@@ -149,10 +149,10 @@ export function OrganizationsView() {
     if (confirm("Удалить организацию? Это возможно только если в ней нет клиник и сотрудников.")) {
       try {
         await OrganizationsService.deleteOrganization(id);
-        toast.success("Организация удалена");
+        notify.mutationSuccess("Организация удалена", "Запись организации удалена из системы.");
         loadOrganizations();
       } catch (error) {
-        toast.error("Ошибка удаления", { description: "Убедитесь, что организация пуста." });
+        notify.mutationError("Ошибка удаления", "Убедитесь, что организация пуста.");
       }
     }
   };
@@ -174,7 +174,7 @@ export function OrganizationsView() {
       setResponsibles(respRes.items);
       setCandidates(candRes.items);
     } catch (e) {
-      toast.error("Ошибка загрузки данных о руководителях");
+      notify.error("Ошибка", "Не удалось загрузить данные о руководителях.");
     }
   };
 
@@ -183,12 +183,12 @@ export function OrganizationsView() {
     setIsSaving(true);
     try {
       await OrganizationsService.addOrganizationResponsible(targetOrgId, { userId: selectedCandidateId });
-      toast.success("Руководитель назначен");
+      notify.mutationSuccess("Руководитель назначен", "Пользователь добавлен как ответственный по организации.");
       setSelectedCandidateId("");
       loadResponsiblesAndCandidates(targetOrgId);
       loadOrganizations(); // Обновляем список, чтобы руководитель появился в карточке
     } catch (e) {
-      toast.error("Ошибка назначения");
+      notify.mutationError("Ошибка назначения", "Не удалось добавить ответственного.");
     } finally {
       setIsSaving(false);
     }
@@ -198,11 +198,11 @@ export function OrganizationsView() {
     if (!targetOrgId) return;
     try {
       await OrganizationsService.removeOrganizationResponsible(targetOrgId, userId);
-      toast.success("Руководитель снят");
+      notify.mutationSuccess("Руководитель снят", "Пользователь больше не ответственный по организации.");
       loadResponsiblesAndCandidates(targetOrgId);
       loadOrganizations();
     } catch (e) {
-      toast.error("Ошибка при удалении");
+      notify.mutationError("Ошибка", "Не удалось снять ответственного.");
     }
   };
 

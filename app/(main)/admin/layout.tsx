@@ -2,9 +2,23 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Shield, Building, Users, UserCheck, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
+
+const adminTabs = [
+  { href: "/admin/organizations", label: "Организации", icon: Network },
+  { href: "/admin/classifier", label: "Классификатор", icon: Shield },
+  { href: "/admin/department", label: "Подразделение", icon: UserCheck },
+  { href: "/admin/structure", label: "Структура", icon: Building },
+  { href: "/admin/users", label: "Пользователи", icon: Users },
+];
 
 export default function AdminLayout({
   children,
@@ -12,42 +26,64 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
 
-  const adminTabs = [
-    { href: "/admin/organizations", label: "Организации", icon: Network },
-    { href: "/admin/classifier", label: "Классификатор", icon: Shield },
-    { href: "/admin/department", label: "Подразделение", icon: UserCheck },
-    { href: "/admin/structure", label: "Структура", icon: Building },
-    { href: "/admin/users", label: "Пользователи", icon: Users },
-  ];
+  const currentTab = adminTabs.find((t) => t.href === pathname) ?? adminTabs[0];
+  const CurrentIcon = currentTab.icon;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Мобильная навигация админки */}
+      {/* Мобильная навигация: 5 разделов не влезают в табы без обрезания,
+          поэтому используем Select. Название текущего раздела всегда видно
+          полностью, иконка слева — визуальный якорь. На десктопе этот блок
+          скрыт (md:hidden), там своя навигация. */}
       <div className="md:hidden w-full pb-4">
-        <nav className="grid w-full grid-flow-col auto-cols-fr items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground overflow-x-auto">
-          {adminTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = pathname === tab.href;
-            
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={cn(
-                  "inline-flex flex-col items-center justify-center whitespace-nowrap rounded-md py-1.5 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-                  "h-full px-1 sm:px-3 sm:text-sm", 
-                  isActive 
-                    ? "bg-background text-foreground shadow-sm" 
-                    : "hover:bg-background/50 hover:text-foreground"
-                )}
-              >
-                <Icon size={16} className="mb-1 sm:mb-0 sm:mr-2 inline-block" />
-                <span className="truncate max-w-full">{tab.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        <Select
+          value={pathname}
+          onValueChange={(href) => router.push(href)}
+        >
+          <SelectTrigger className="w-full h-11">
+            {/* Кастомное содержимое триггера — дефолтный SelectValue не
+                умеет показывать иконку перед текстом. */}
+            <span className="flex items-center gap-2.5 min-w-0">
+              <CurrentIcon className="h-4 w-4 text-primary shrink-0" />
+              <span className="truncate font-medium">{currentTab.label}</span>
+            </span>
+          </SelectTrigger>
+          <SelectContent className="w-[var(--radix-select-trigger-width)]">
+            {adminTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = pathname === tab.href;
+              return (
+                <SelectItem
+                  key={tab.href}
+                  value={tab.href}
+                  className="cursor-pointer pl-8 pr-2 [&>span:first-child]:left-2 [&>span:first-child]:right-auto [&>span:first-child]:top-1/2 [&>span:first-child]:-translate-y-1/2"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Icon
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        isActive ? "text-primary" : "text-muted-foreground",
+                      )}
+                    />
+                    <span className={isActive ? "font-medium" : ""}>
+                      {tab.label}
+                    </span>
+                  </span>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Скрытые ссылки для префетча — Next.js подтягивает чанки страниц,
+          чтобы переключение через Select было мгновенным. */}
+      <div className="hidden">
+        {adminTabs.map((tab) => (
+          <Link key={tab.href} href={tab.href} prefetch />
+        ))}
       </div>
 
       {/* Контент страницы */}

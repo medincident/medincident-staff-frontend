@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RequestForm } from "@/components/requests/request-form"; 
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 
 // Этот справочник можно вынести в отдельный файл констант или загружать с API
 const SERVICE_TYPES = [
@@ -36,11 +36,11 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
           const data = await res.json();
           setInitialData(data);
         } else {
-            toast.error("Ошибка", {description: "Не удалось загрузить данные заявки"});
+            notify.error("Ошибка", "Не удалось загрузить данные заявки.");
         }
       } catch (error) {
         console.error(error);
-        toast.error("Ошибка сети");
+        notify.error("Ошибка сети", "Не удалось связаться с сервером. Проверьте соединение.");
       } finally {
         setIsLoading(false);
       }

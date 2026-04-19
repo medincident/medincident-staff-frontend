@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 
 // Импортируем моки и константы
 import { requestsDb, eventsDb } from "@/lib/mock-db";
@@ -118,7 +118,7 @@ function RequestFormContent({ initialData }: RequestFormProps) {
                 responsibleDept: dept
             };
         }
-        toast.success("Заявка обновлена", {description: `Заявка #${initialData.number || "сохранена"} успешно обновлена.`});
+        notify.mutationSuccess("Заявка обновлена", `Заявка #${initialData.number || "сохранена"} успешно обновлена.`);
       } else {
         // СОЗДАНИЕ
         const newReqNumber = Math.floor(1000 + Math.random() * 9000);
@@ -137,7 +137,7 @@ function RequestFormContent({ initialData }: RequestFormProps) {
         };
         
         requestsDb.unshift(newRequest);
-        toast.success("Заявка создана", {description: `Номер заявки #${newReqNumber}. Исполнители уведомлены.`});
+        notify.mutationSuccess("Заявка создана", `Номер заявки #${newReqNumber}. Исполнители уведомлены.`);
       }
 
       router.push("/requests"); 
@@ -145,7 +145,7 @@ function RequestFormContent({ initialData }: RequestFormProps) {
 
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка", {description: "Не удалось сохранить заявку."});
+      notify.mutationError("Ошибка", "Не удалось сохранить заявку.");
     } finally {
       setIsSubmitting(false);
     }

@@ -16,10 +16,14 @@ import {
 import { cn } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
+import { useMiniApp } from "@/lib/miniapp";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const miniApp = useMiniApp();
   const isAdmin = true;
+
+  if (miniApp) return null;
 
   const mainLinks = [
     { href: "/dashboard", label: "Главная", icon: LayoutDashboard },

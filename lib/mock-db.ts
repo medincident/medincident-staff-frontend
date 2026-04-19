@@ -4,13 +4,17 @@ import {
   Clinic,
   DashboardStats,
   DepartmentData,
+  EventStatus,
   FaqItem,
   IncidentEvent,
   Notification,
+  Priority,
+  RequestStatus,
   ServiceRequest,
   User,
   UserSettings,
 } from "./types";
+import { SERVICE_TYPE_CONFIG } from "./constants";
 
 // --- USERS (Пользователи) ---
 export const USERS_LIST_DB: User[] = [
@@ -398,3 +402,143 @@ export const DEPARTMENT_DB: DepartmentData = {
     },
   ] as any[],
 };
+
+// ============================================================
+// Синтетические данные для аналитики (/reports).
+// Генерируются один раз за жизнь модуля и используются для
+// фильтрации по периодам, частотного графика и детекции аномалий.
+// В дашборд и другие view не попадают — там свои короткие списки
+// (eventsDb / requestsDb).
+// ============================================================
+export type AnalyticsEvent = IncidentEvent;
+export type AnalyticsRequest = ServiceRequest;
+
+const DAY_MS = 86_400_000;
+const TOTAL_DAYS = 365;
+
+const EVENT_STATUSES: EventStatus[] = [
+  "created",
+  "in_work",
+  "investigation",
+  "measures",
+  "completed",
+  "closed",
+];
+const REQUEST_STATUSES: RequestStatus[] = [
+  "created",
+  "in_work",
+  "purchase",
+  "completed",
+  "refused",
+  "cancelled",
+];
+const PRIORITIES: Priority[] = ["normal", "high", "critical"];
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Маленький трюк для реалистичности: аномальные всплески в нескольких
+// случайных днях — чтобы функция детекции аномалий в аналитике было
+// что находить.
+const SPIKE_DAYS = new Set<number>();
+for (let k = 0; k < 6; k++) {
+  SPIKE_DAYS.add(Math.floor(Math.random() * TOTAL_DAYS));
+}
+
+function generateAnalyticsSeed(): {
+  events: AnalyticsEvent[];
+  requests: AnalyticsRequest[];
+} {
+  const events: AnalyticsEvent[] = [];
+  const requests: AnalyticsRequest[] = [];
+  const now = Date.now();
+
+  const serviceTypes = Object.keys(SERVICE_TYPE_CONFIG);
+
+  for (let daysAgo = 0; daysAgo < TOTAL_DAYS; daysAgo++) {
+    const dow = new Date(now - daysAgo * DAY_MS).getDay();
+    const weekdayBoost = dow >= 1 && dow <= 5 ? 1 : 0;
+    const spike = SPIKE_DAYS.has(daysAgo) ? 5 : 0;
+
+    // --- События: 0–3 в день + спайк до +5 ---
+    const evtCount = Math.floor(Math.random() * 3) + weekdayBoost + spike;
+    for (let i = 0; i < evtCount; i++) {
+      const cat = pick(CLASSIFIER_DB);
+      const type = pick(cat.types);
+      const status =
+        daysAgo < 3
+          ? pick(["created", "in_work", "investigation"] as EventStatus[])
+          : pick(EVENT_STATUSES);
+      const createdAt = new Date(
+        now - daysAgo * DAY_MS - Math.random() * DAY_MS,
+      );
+      events.push({
+        id: `seed_evt_${daysAgo}_${i}`,
+        code: `INC-${5000 + events.length}`,
+        categoryId: cat.id,
+        categoryName: cat.name,
+        typeId: type.id,
+        typeName: type.name,
+        status,
+        author: "—",
+        createdAt: createdAt.toISOString(),
+      });
+    }
+
+    // --- Заявки: 2–9 в день + спайк до +7 ---
+    const reqCount =
+      Math.floor(Math.random() * 6) + 2 + weekdayBoost * 2 + (spike ? 7 : 0);
+    for (let i = 0; i < reqCount; i++) {
+      const type = pick(serviceTypes);
+      const cfg = SERVICE_TYPE_CONFIG[type];
+      const status =
+        daysAgo < 5
+          ? pick(["created", "in_work", "purchase"] as RequestStatus[])
+          : pick(REQUEST_STATUSES);
+      const createdAt = new Date(
+        now - daysAgo * DAY_MS - Math.random() * DAY_MS,
+      );
+
+      let completedAt: string | undefined;
+      if (status === "completed") {
+        const hoursToComplete = Math.random() * 72 + 1;
+        completedAt = new Date(
+          createdAt.getTime() + hoursToComplete * 3_600_000,
+        ).toISOString();
+      }
+
+      requests.push({
+        id: `seed_req_${daysAgo}_${i}`,
+        number: 10_000 + requests.length,
+        type,
+        responsibleDept: cfg?.dept ?? "Прочее",
+        priority: pick(PRIORITIES),
+        status,
+        description: "",
+        location: "",
+        authorName: "—",
+        createdAt: createdAt.toISOString(),
+        completedAt,
+      });
+    }
+  }
+
+  return { events, requests };
+}
+
+let _analyticsCache: {
+  events: AnalyticsEvent[];
+  requests: AnalyticsRequest[];
+} | null = null;
+
+/** Возвращает (и лениво генерирует) синтетический датасет для аналитики. */
+export function getAnalyticsSeed(): {
+  events: AnalyticsEvent[];
+  requests: AnalyticsRequest[];
+} {
+  if (!_analyticsCache) {
+    _analyticsCache = generateAnalyticsSeed();
+  }
+  return _analyticsCache;
+}

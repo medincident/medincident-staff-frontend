@@ -64,23 +64,43 @@ export function SearchableSelect({
         value={stringValue} // Используем строковое значение
         onValueChange={onChange}
       >
-        <SelectTrigger 
+        <SelectTrigger
           className={cn(
             "w-full bg-background text-foreground border-input transition-colors",
             "hover:border-primary",
             "focus:ring-0 focus:ring-offset-0 focus:border-primary",
-            !stringValue && "text-muted-foreground"
+            "overflow-hidden min-w-0",
+            // Переопределяем базовый line-clamp-1 у SelectValue на truncate —
+            // line-clamp даёт «…» только когда текст разливается на 2+ строки
+            // (он про вертикальное переполнение). Для однострочного
+            // горизонтального overflow нужен text-overflow: ellipsis, который
+            // приходит вместе с truncate.
+            "[&>span[data-slot=select-value]]:block [&>span[data-slot=select-value]]:truncate [&>span[data-slot=select-value]]:min-w-0",
+            !stringValue && "text-muted-foreground",
           )}
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent className="bg-popover text-popover-foreground border-border">
+        <SelectContent
+          className="bg-popover text-popover-foreground border-border w-[var(--radix-select-trigger-width)]"
+        >
           {options.length > 0 ? (
             options.map((option) => (
               <SelectItem
                 key={String(option.value)}
-                value={String(option.value)} // Гарантируем строку в value
-                className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+                value={String(option.value)}
+                // whitespace-normal — разрешаем перенос длинного лейбла.
+                // items-start — текст выровнен по верху при переносе.
+                //
+                // Галку-индикатор двигаем с правой стороны (дефолт shadcn)
+                // на левую — так одинаково с combobox-режимом этого же
+                // компонента. Индикатор у Radix это <span> — первый
+                // прямой потомок SelectItem с absolute-позиционированием.
+                // Меняем right-2 → left-2, плюс ставим top-1/2 + translate,
+                // чтобы при многострочном тексте он был по центру, а не
+                // «прилипал» к первой строке. Паддинги тоже переворачиваем
+                // (pl-8 pr-2 вместо pr-8 pl-2).
+                className="cursor-pointer items-start whitespace-normal focus:bg-accent focus:text-accent-foreground pl-8 pr-2 [&>span:first-child]:left-2 [&>span:first-child]:right-auto [&>span:first-child]:top-1/2 [&>span:first-child]:-translate-y-1/2"
               >
                 {option.label}
               </SelectItem>
