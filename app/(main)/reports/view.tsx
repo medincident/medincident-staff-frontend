@@ -48,6 +48,13 @@ import {
 } from "@/lib/constants";
 import { getAnalyticsSeed } from "@/lib/mock-db";
 import type { EventStatus, Priority, RequestStatus } from "@/lib/types";
+import { forecastHolt, type ForecastResult } from "@/lib/analytics/forecast";
+import {
+  detectChangePoints,
+  type ChangePoint,
+} from "@/lib/analytics/change-points";
+import { ForecastChart } from "@/components/charts/forecast-chart";
+import { Sparkles, Brain, Loader2, GitBranch } from "lucide-react";
 
 const PERIODS = [
   { value: "7d", label: "Последние 7 дней", days: 7 },
@@ -117,6 +124,13 @@ function stdDev(arr: number[]): number {
 export function ReportsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodValue>("30d");
+  const [forecastMethod, setForecastMethod] = useState<"holt" | "lstm">("holt");
+  const [lstmResult, setLstmResult] = useState<{
+    key: string;
+    requests: ForecastResult;
+    events: ForecastResult;
+  } | null>(null);
+  const [isTrainingLstm, setIsTrainingLstm] = useState(false);
 
   const defaultCustomRange: DateRange = useMemo(() => {
     const now = new Date();
@@ -277,7 +291,7 @@ export function ReportsView() {
       });
     }
 
-    return { buckets, useWeekly };
+    return { buckets, useWeekly, bucketSizeMs };
   }, [filtered, startMs, endMs, effectiveDays]);
 
   // --- АНОМАЛИИ ---
@@ -353,6 +367,145 @@ export function ReportsView() {
       bucketCount: frequencyData.buckets.length,
     };
   }, [frequencyData]);
+
+  const changePoints = useMemo(() => {
+    const labels = frequencyData.buckets.map(b => b.name);
+    const reqVals = frequencyData.buckets.map(b => b["Заявки"]);
+    const evtVals = frequencyData.buckets.map(b => b["Инциденты"]);
+
+    return {
+      requests: detectChangePoints(reqVals, labels),
+      events: detectChangePoints(evtVals, labels),
+    };
+  }, [frequencyData]);
+
+  const forecastSeriesKey = useMemo(() => {
+    // Стабильный ключ для сравнения: меняется, когда меняются исходные ряды.
+    // Нужно, чтобы LSTM не переобучалась при каждом ререндере.
+    return (
+      frequencyData.useWeekly + ":" +
+      frequencyData.buckets
+        .map(b => `${b["Заявки"]}|${b["Инциденты"]}`)
+        .join(",")
+    );
+  }, [frequencyData]);
+
+  useEffect(() => {
+    if (forecastMethod !== "lstm") return;
+    if (frequencyData.buckets.length < 7) return;
+    if (lstmResult?.key === forecastSeriesKey) return;
+
+    let cancelled = false;
+    setIsTrainingLstm(true);
+
+    (async () => {
+      const { forecastLstm } = await import("@/lib/analytics/lstm-forecast");
+      const horizon = frequencyData.useWeekly ? 4 : 7;
+      const reqSeries = frequencyData.buckets.map(b => b["Заявки"]);
+      const evtSeries = frequencyData.buckets.map(b => b["Инциденты"]);
+
+      try {
+        const [reqRes, evtRes] = await Promise.all([
+          forecastLstm(reqSeries, horizon),
+          forecastLstm(evtSeries, horizon),
+        ]);
+        if (!cancelled) {
+          setLstmResult({ key: forecastSeriesKey, requests: reqRes, events: evtRes });
+        }
+      } catch (e) {
+        console.error("LSTM training failed", e);
+      } finally {
+        if (!cancelled) setIsTrainingLstm(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [forecastMethod, forecastSeriesKey, frequencyData, lstmResult]);
+
+  const forecast = useMemo(() => {
+    const horizon = frequencyData.useWeekly ? 4 : 7;
+    const reqSeries = frequencyData.buckets.map(b => b["Заявки"]);
+    const evtSeries = frequencyData.buckets.map(b => b["Инциденты"]);
+
+    // Фоллбек-прогноз — всегда Holt. LSTM заменяет его, если обучен и выбран.
+    const holtReq = forecastHolt(reqSeries, horizon);
+    const holtEvt = forecastHolt(evtSeries, horizon);
+
+    const useLstm =
+      forecastMethod === "lstm" && lstmResult?.key === forecastSeriesKey;
+    const reqRes = useLstm ? lstmResult!.requests : holtReq;
+    const evtRes = useLstm ? lstmResult!.events : holtEvt;
+
+    const hasEnoughData = frequencyData.buckets.length >= 5;
+
+    // Комбинированный набор точек для графика: история + прогноз.
+    // В точке "сегодня" (последний bucket истории) дублируем последнее
+    // фактическое значение в колонки прогноза/ДИ, чтобы пунктирная линия
+    // начиналась из него без разрыва.
+    const chartData: Array<{
+      name: string;
+      "Заявки"?: number | null;
+      "Инциденты"?: number | null;
+      "Заявки_прогноз"?: number | null;
+      "Инциденты_прогноз"?: number | null;
+      "Заявки_ДИ"?: [number, number] | null;
+      "Инциденты_ДИ"?: [number, number] | null;
+      isForecast?: boolean;
+    }> = frequencyData.buckets.map((b, i, arr) => {
+      const isLast = i === arr.length - 1;
+      const base: any = {
+        name: b.name,
+        "Заявки": b["Заявки"],
+        "Инциденты": b["Инциденты"],
+      };
+      if (isLast && hasEnoughData) {
+        base["Заявки_прогноз"] = b["Заявки"];
+        base["Инциденты_прогноз"] = b["Инциденты"];
+        base["Заявки_ДИ"] = [b["Заявки"], b["Заявки"]];
+        base["Инциденты_ДИ"] = [b["Инциденты"], b["Инциденты"]];
+      }
+      return base;
+    });
+
+    const forecastStartName =
+      frequencyData.buckets.length > 0
+        ? frequencyData.buckets[frequencyData.buckets.length - 1].name
+        : undefined;
+
+    if (hasEnoughData) {
+      const lastMs =
+        frequencyData.buckets[frequencyData.buckets.length - 1].bucketEndMs;
+      for (let h = 0; h < horizon; h++) {
+        const endMs = lastMs + (h + 1) * frequencyData.bucketSizeMs;
+        const rp = reqRes.points[h];
+        const ep = evtRes.points[h];
+        chartData.push({
+          name: formatDateShort(new Date(endMs)),
+          "Заявки": null,
+          "Инциденты": null,
+          "Заявки_прогноз": rp.mean,
+          "Инциденты_прогноз": ep.mean,
+          "Заявки_ДИ": [rp.lower, rp.upper],
+          "Инциденты_ДИ": [ep.lower, ep.upper],
+          isForecast: true,
+        });
+      }
+    }
+
+    return {
+      requests: reqRes,
+      events: evtRes,
+      horizon,
+      unit: frequencyData.useWeekly ? "неделю" : "день",
+      unitPlural: frequencyData.useWeekly ? "недель" : "дней",
+      hasEnoughData,
+      chartData,
+      forecastStartName,
+      activeMethod: useLstm ? ("lstm" as const) : ("holt" as const),
+    };
+  }, [frequencyData, forecastMethod, forecastSeriesKey, lstmResult]);
 
   const distributions = useMemo(() => {
     const byReqStatus = Object.entries(
@@ -581,18 +734,54 @@ export function ReportsView() {
                 {isLoading ? (
                   <Skeleton className="h-full w-full rounded-lg" />
                 ) : hasAnyData ? (
-                  <DynamicChart
-                    type="area"
-                    data={frequencyData.buckets}
-                    dataKey={["Заявки", "Инциденты"]}
-                    color={["hsl(var(--info))", "hsl(var(--warning))"]}
-                    categoryKey="name"
+                  <ForecastChart
+                    data={forecast.chartData}
+                    forecastStartName={forecast.forecastStartName}
                     height={360}
+                    changePoints={[
+                      ...changePoints.requests.map(cp => ({
+                        name: cp.bucketName,
+                        color: "#f59e0b",
+                        label: `${cp.direction === "up" ? "↑" : "↓"} заявки ${
+                          cp.deltaPct !== null
+                            ? `${cp.deltaPct > 0 ? "+" : ""}${cp.deltaPct.toFixed(0)}%`
+                            : ""
+                        }`,
+                      })),
+                      ...changePoints.events.map(cp => ({
+                        name: cp.bucketName,
+                        color: "#3b82f6",
+                        label: `${cp.direction === "up" ? "↑" : "↓"} НС ${
+                          cp.deltaPct !== null
+                            ? `${cp.deltaPct > 0 ? "+" : ""}${cp.deltaPct.toFixed(0)}%`
+                            : ""
+                        }`,
+                      })),
+                    ]}
                   />
                 ) : (
                   <EmptyState />
                 )}
               </div>
+              {forecast.hasEnoughData && (
+                <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block w-4 h-0.5 bg-muted-foreground" />
+                    история
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="inline-block w-4 border-t border-dashed"
+                      style={{ borderColor: "currentColor" }}
+                    />
+                    прогноз
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block w-4 h-2 bg-muted/50 border border-muted-foreground/30 rounded-[2px]" />
+                    95% ДИ
+                  </span>
+                </p>
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
                 <FrequencyTile
@@ -629,6 +818,21 @@ export function ReportsView() {
             </CardContent>
           </Card>
 
+          <ForecastCard
+            forecast={forecast}
+            isLoading={isLoading}
+            method={forecastMethod}
+            onMethodChange={setForecastMethod}
+            isTrainingLstm={isTrainingLstm}
+            hasLstmResult={lstmResult?.key === forecastSeriesKey}
+          />
+
+          <ChangePointCard
+            requestPoints={changePoints.requests}
+            eventPoints={changePoints.events}
+            isLoading={isLoading}
+          />
+
           <Card className={cn(anomalies.rows.length > 0 && "border-destructive/30")}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -643,9 +847,9 @@ export function ReportsView() {
                 Аномалии
               </CardTitle>
               <CardDescription>
-                Дни (или недели), в которые нагрузка была заметно выше или ниже
-                обычной — статистически такие скачки случаются примерно в 1
-                случае из 20. На них стоит обратить внимание: возможно, была
+                Отдельные дни (или недели), в которые регистраций было заметно
+                больше или меньше обычного. Такие скачки выбиваются из привычной
+                картины и стоят того, чтобы в них разобраться — возможно, была
                 авария, массовое ЧП или нерабочий день.
               </CardDescription>
             </CardHeader>
@@ -1082,6 +1286,384 @@ function EmptyState() {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-xl bg-muted/10 text-sm text-muted-foreground">
       Нет данных за выбранный период
+    </div>
+  );
+}
+
+function ChangePointCard({
+  requestPoints,
+  eventPoints,
+  isLoading,
+}: {
+  requestPoints: ChangePoint[];
+  eventPoints: ChangePoint[];
+  isLoading: boolean;
+}) {
+  const all = [
+    ...requestPoints.map(p => ({ ...p, metric: "Заявки" as const })),
+    ...eventPoints.map(p => ({ ...p, metric: "Инциденты" as const })),
+  ].sort((a, b) => b.score - a.score);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <GitBranch className="h-5 w-5 text-primary" />
+          Точки смены режима
+          <span className="text-[10px] font-normal uppercase tracking-wider text-muted-foreground bg-background border rounded-full px-2 py-0.5 ml-1">
+            CUSUM
+          </span>
+        </CardTitle>
+        <CardDescription>
+          Даты, после которых нагрузка стала заметно отличаться от привычной.
+          Если в какой-то день произошёл перелом — авария, приказ, массовое
+          ЧП — система автоматически это поймает и покажет здесь. Число «|t|»
+          — насколько сильно режим изменился: чем больше, тем увереннее сдвиг
+          реальный, а не случайный скачок.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-14 w-full rounded-lg" />
+            <Skeleton className="h-14 w-full rounded-lg" />
+          </div>
+        ) : all.length === 0 ? (
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-success/10 border border-success/20 text-success">
+            <div className="shrink-0">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Режим стабилен</p>
+              <p className="text-xs opacity-80">
+                За период не обнаружено значимых сдвигов уровня регистрации.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {all.map((cp, i) => (
+              <ChangePointRow key={`${cp.metric}-${cp.index}-${i}`} cp={cp} />
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ChangePointRow({
+  cp,
+}: {
+  cp: ChangePoint & { metric: "Заявки" | "Инциденты" };
+}) {
+  const isUp = cp.direction === "up";
+  const Icon = isUp ? ArrowUpRight : ArrowDownRight;
+  const tone = isUp
+    ? "bg-warning/10 border-warning/20 text-warning"
+    : "bg-info/10 border-info/20 text-info";
+
+  return (
+    <li className={cn("flex items-center gap-3 p-3 rounded-lg border", tone)}>
+      <div className="p-2 rounded-lg bg-background/60 shrink-0">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold">
+            {cp.metric}:{" "}
+            {isUp ? "рост нагрузки" : "спад нагрузки"}
+          </span>
+          <span className="text-xs opacity-70">· с {cp.bucketName}</span>
+        </div>
+        <p className="text-xs opacity-90 mt-0.5">
+          Среднее: <b>{cp.leftMean.toFixed(1)}</b> →{" "}
+          <b>{cp.rightMean.toFixed(1)}</b>
+          {cp.deltaPct !== null && (
+            <>
+              {" "}
+              (<b>
+                {cp.deltaPct > 0 ? "+" : ""}
+                {cp.deltaPct.toFixed(0)}%
+              </b>)
+            </>
+          )}
+        </p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-base font-bold leading-none">
+          |t| {cp.score.toFixed(1)}
+        </p>
+        <p className="text-[10px] opacity-70 mt-1 uppercase tracking-wider">
+          сила сдвига
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function ForecastMethodToggle({
+  method,
+  onChange,
+  isTraining,
+  disabled,
+}: {
+  method: "holt" | "lstm";
+  onChange: (m: "holt" | "lstm") => void;
+  isTraining: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border bg-background p-0.5 shrink-0">
+      <button
+        type="button"
+        onClick={() => onChange("holt")}
+        className={cn(
+          "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+          method === "holt"
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        Holt
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("lstm")}
+        disabled={disabled}
+        className={cn(
+          "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+          method === "lstm"
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:text-foreground",
+          disabled && "opacity-50 cursor-not-allowed",
+        )}
+        title={disabled ? "Нужно минимум 5 точек истории" : undefined}
+      >
+        {isTraining ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <Brain className="h-3 w-3" />
+        )}
+        LSTM
+      </button>
+    </div>
+  );
+}
+
+function ForecastCard({
+  forecast,
+  isLoading,
+  method,
+  onMethodChange,
+  isTrainingLstm,
+  hasLstmResult,
+}: {
+  forecast: {
+    requests: ForecastResult;
+    events: ForecastResult;
+    horizon: number;
+    unit: string;
+    unitPlural: string;
+    hasEnoughData: boolean;
+    activeMethod: "holt" | "lstm";
+  };
+  isLoading: boolean;
+  method: "holt" | "lstm";
+  onMethodChange: (m: "holt" | "lstm") => void;
+  isTrainingLstm: boolean;
+  hasLstmResult: boolean;
+}) {
+  const methodLabel =
+    forecast.activeMethod === "lstm"
+      ? "нейросеть, которая учится на ваших данных (LSTM)"
+      : "классический алгоритм по тренду (Holt)";
+
+  return (
+    <Card className="border-primary/20 bg-primary/5 relative">
+      {forecast.hasEnoughData && (
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
+          <ForecastMethodToggle
+            method={method}
+            onChange={onMethodChange}
+            isTraining={isTrainingLstm}
+            disabled={!forecast.hasEnoughData}
+          />
+        </div>
+      )}
+      <CardHeader className="pr-32 sm:pr-40">
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          Прогноз нагрузки
+          <span className="text-[10px] font-normal uppercase tracking-wider text-muted-foreground bg-background border rounded-full px-2 py-0.5 ml-1">
+            ML
+          </span>
+        </CardTitle>
+        <CardDescription className="mt-1">
+          Сколько регистраций ожидать в ближайшие {forecast.horizon}{" "}
+          {forecast.unitPlural}. Система смотрит на недавнюю динамику и
+          продолжает её в будущее, показывая наиболее вероятный диапазон.
+          Метод: {methodLabel}.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {method === "lstm" && !isTrainingLstm && !hasLstmResult && forecast.hasEnoughData && (
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground bg-background/50 border rounded-md px-3 py-2">
+            <Brain className="h-3.5 w-3.5" />
+            LSTM пока обучается в фоне, показан Holt-прогноз.
+          </div>
+        )}
+        {method === "lstm" && isTrainingLstm && (
+          <div className="flex items-center gap-2 text-[11px] text-primary bg-primary/5 border border-primary/20 rounded-md px-3 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Обучение нейросети… (обычно ≈ 1–3 с)
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
+          </div>
+        ) : !forecast.hasEnoughData ? (
+          <p className="text-sm text-muted-foreground">
+            Недостаточно данных для прогноза — нужно минимум 5{" "}
+            {forecast.unitPlural} истории.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ForecastTile
+              title="Заявки"
+              icon={Wrench}
+              tone="info"
+              unit={forecast.unit}
+              horizon={forecast.horizon}
+              unitPlural={forecast.unitPlural}
+              result={forecast.requests}
+            />
+            <ForecastTile
+              title="Инциденты (НС)"
+              icon={AlertTriangle}
+              tone="warning"
+              unit={forecast.unit}
+              horizon={forecast.horizon}
+              unitPlural={forecast.unitPlural}
+              result={forecast.events}
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ForecastTile({
+  title,
+  icon: Icon,
+  tone,
+  unit,
+  horizon,
+  unitPlural,
+  result,
+}: {
+  title: string;
+  icon: any;
+  tone: "info" | "warning";
+  unit: string;
+  horizon: number;
+  unitPlural: string;
+  result: ForecastResult;
+}) {
+  const toneCls =
+    tone === "info"
+      ? "bg-info/10 border-info/20 text-info"
+      : "bg-warning/10 border-warning/20 text-warning";
+
+  const avgForecast =
+    result.points.reduce((a, p) => a + p.mean, 0) / result.points.length;
+  const avgLower =
+    result.points.reduce((a, p) => a + p.lower, 0) / result.points.length;
+  const avgUpper =
+    result.points.reduce((a, p) => a + p.upper, 0) / result.points.length;
+
+  const deltaPct =
+    result.historicalMean > 0
+      ? ((avgForecast - result.historicalMean) / result.historicalMean) * 100
+      : null;
+
+  const direction: "up" | "down" | "flat" =
+    deltaPct === null
+      ? "flat"
+      : deltaPct > 5
+        ? "up"
+        : deltaPct < -5
+          ? "down"
+          : "flat";
+
+  const DeltaIcon =
+    direction === "up"
+      ? ArrowUpRight
+      : direction === "down"
+        ? ArrowDownRight
+        : Minus;
+
+  const deltaTone =
+    direction === "up"
+      ? "text-destructive"
+      : direction === "down"
+        ? "text-success"
+        : "text-muted-foreground";
+
+  const total = result.points.reduce((a, p) => a + p.mean, 0);
+
+  return (
+    <div className={cn("p-4 rounded-xl border space-y-3", toneCls)}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-background/60 rounded-lg">
+            <Icon className="h-4 w-4" />
+          </div>
+          <span className="text-sm font-semibold">{title}</span>
+        </div>
+        {deltaPct !== null && (
+          <div className={cn("flex items-center gap-1 text-xs", deltaTone)}>
+            <DeltaIcon className="h-3.5 w-3.5" />
+            <span className="font-medium">
+              {deltaPct > 0 ? "+" : ""}
+              {deltaPct.toFixed(1)}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="text-2xl font-bold leading-none text-foreground">
+          {avgForecast.toFixed(1)}
+          <span className="text-sm font-normal text-muted-foreground ml-1">
+            в {unit}
+          </span>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          95% ДИ: {avgLower.toFixed(1)}–{avgUpper.toFixed(1)}
+        </p>
+      </div>
+
+      <div className="text-xs pt-2 border-t border-current/10 opacity-90">
+        За {horizon} {unitPlural} ожидается ≈{" "}
+        <b className="text-foreground">{total.toFixed(0)}</b>{" "}
+        {title === "Заявки" ? "заявок" : "инцидентов"}.
+      </div>
     </div>
   );
 }

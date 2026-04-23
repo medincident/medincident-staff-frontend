@@ -157,7 +157,7 @@ export function RequestsListView() {
       </div>
 
       {/* DESKTOP TABLE */}
-      <div className="hidden md:block bg-card rounded-xl border overflow-hidden">
+      <div className="hidden 2xl:block bg-card rounded-xl border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50 border-b">
             <TableRow className="hover:bg-transparent border-none">
@@ -239,7 +239,7 @@ export function RequestsListView() {
       </div>
 
       {/* MOBILE VIEW (CARDS) */}
-      <div className="md:hidden space-y-4">
+      <div className="2xl:hidden space-y-4">
         {isLoading ? (
            /* MOBILE SKELETON CARDS */
            Array.from({ length: 3 }).map((_, i) => (

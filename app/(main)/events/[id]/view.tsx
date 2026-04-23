@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -8,7 +9,12 @@ import {
   CheckCircle2,
   FileText,
   MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Wrench,
+  Plus,
+  ChevronRight,
+  Link2,
+  Unlink
 } from "lucide-react";
 import { notify } from "@/lib/toast";
 
@@ -19,12 +25,21 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ChatContainer } from "@/components/chat/chat-container";
 
-import { EVENT_STATUS_MAP } from "@/lib/constants";
-import { IncidentEvent, EventStatus, Category } from "@/lib/types";
+import { EVENT_STATUS_MAP, STATUS_MAP, SERVICE_TYPE_CONFIG } from "@/lib/constants";
+import { IncidentEvent, EventStatus, Category, ServiceRequest } from "@/lib/types";
 import { getBadgeColor } from "@/lib/status-helper";
-import { eventsDb, CLASSIFIER_DB } from "@/lib/mock-db";
+import { eventsDb, requestsDb, CLASSIFIER_DB } from "@/lib/mock-db";
 
 interface EventDetailsViewProps {
   eventId: string;
@@ -36,13 +51,40 @@ function DetailsSection({
   displayCategoryName,
   status,
   onStatusChange,
+  linkedRequests,
+  availableRequests,
+  onLinkRequest,
+  onUnlinkRequest,
 }: {
   event: IncidentEvent;
   displayTypeName: string;
   displayCategoryName: string;
   status: EventStatus;
   onStatusChange: (s: EventStatus) => void;
+  linkedRequests: ServiceRequest[];
+  availableRequests: ServiceRequest[];
+  onLinkRequest: (requestId: string) => void;
+  onUnlinkRequest: (requestId: string) => void;
 }) {
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState("");
+
+  const availableOptions = useMemo(
+    () =>
+      availableRequests.map((r) => ({
+        value: r.id,
+        label: `#${r.number} — ${SERVICE_TYPE_CONFIG[r.type]?.label || r.type}`,
+        description: r.description || undefined,
+      })),
+    [availableRequests],
+  );
+
+  const handleConfirmLink = () => {
+    if (!selectedRequestId) return;
+    onLinkRequest(selectedRequestId);
+    setSelectedRequestId("");
+    setIsLinkDialogOpen(false);
+  };
   return (
     <div className="space-y-6">
       <Card className="gap-3 bg-card border">
@@ -92,6 +134,123 @@ function DetailsSection({
           </div>
         </CardContent>
       </Card>
+
+      <Card className="gap-3 bg-card border">
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-foreground">
+              <Wrench className="h-4 w-4 text-muted-foreground" />
+              Связанные заявки
+              {linkedRequests.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                  {linkedRequests.length}
+                </Badge>
+              )}
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {linkedRequests.length > 0 ? (
+            <div className="space-y-2">
+              {linkedRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="group relative rounded-md border bg-background hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                >
+                  <Link
+                    href={`/requests/${req.id}`}
+                    className="flex items-center justify-between gap-3 p-3 pr-10"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-xs font-mono font-bold text-muted-foreground">
+                          #{req.number}
+                        </span>
+                        <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${getBadgeColor(req.status)}`}>
+                          {STATUS_MAP[req.status] || req.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2 break-words">
+                        {SERVICE_TYPE_CONFIG[req.type]?.label || req.type}
+                      </p>
+                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                        {req.description}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 group-hover:text-primary transition-colors" />
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Отвязать"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onUnlinkRequest(req.id);
+                    }}
+                    className="absolute top-1/2 right-1 -translate-y-1/2 h-7 w-7 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                  >
+                    <Unlink className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">
+              К этому событию пока не привязана ни одна заявка.
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary"
+              onClick={() => setIsLinkDialogOpen(true)}
+              disabled={availableRequests.length === 0}
+            >
+              <Link2 className="mr-2 h-4 w-4" />
+              Привязать существующую
+            </Button>
+            <Link href={`/requests/new?linkedEventId=${event.id}`} className="block">
+              <Button variant="outline" className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary">
+                <Plus className="mr-2 h-4 w-4" />
+                Создать связанную заявку
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
+        <DialogContent className="min-w-0">
+          <DialogHeader className="min-w-0">
+            <DialogTitle>Привязать заявку к событию</DialogTitle>
+            <DialogDescription>
+              Выберите существующую заявку, чтобы связать её с {event.code}. Если заявка уже привязана к другому событию, эта привязка будет перезаписана.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-w-0 w-full">
+            <SearchableSelect
+              options={availableOptions}
+              value={selectedRequestId}
+              onChange={setSelectedRequestId}
+              placeholder="Выберите заявку"
+              emptyMessage="Нет доступных заявок"
+            />
+          </div>
+          <DialogFooter className="min-w-0">
+            <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleConfirmLink} disabled={!selectedRequestId}>
+              <Link2 className="mr-2 h-4 w-4" />
+              Привязать
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -175,6 +334,37 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
 
     return { displayTypeName: typeName, displayCategoryName: categoryName };
   }, [event, classifier]);
+
+  const [requestsVersion, setRequestsVersion] = useState(0);
+
+  const { linkedRequests, availableRequests } = useMemo(() => {
+    if (!event) return { linkedRequests: [], availableRequests: [] };
+    const sortByDate = (a: ServiceRequest, b: ServiceRequest) =>
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    return {
+      linkedRequests: requestsDb.filter(r => r.linkedEventId === event.id).sort(sortByDate),
+      availableRequests: requestsDb.filter(r => r.linkedEventId !== event.id).sort(sortByDate),
+    };
+  }, [event, requestsVersion]);
+
+  const handleLinkRequest = (requestId: string) => {
+    if (!event) return;
+    const idx = requestsDb.findIndex(r => r.id === requestId);
+    if (idx === -1) return;
+    const req = requestsDb[idx];
+    requestsDb[idx] = { ...req, linkedEventId: event.id };
+    setRequestsVersion(v => v + 1);
+    notify.mutationSuccess("Заявка привязана", `Заявка #${req.number} связана с событием ${event.code}.`);
+  };
+
+  const handleUnlinkRequest = (requestId: string) => {
+    const idx = requestsDb.findIndex(r => r.id === requestId);
+    if (idx === -1) return;
+    const req = requestsDb[idx];
+    requestsDb[idx] = { ...req, linkedEventId: undefined };
+    setRequestsVersion(v => v + 1);
+    notify.mutationSuccess("Привязка снята", `Заявка #${req.number} отвязана от события.`);
+  };
 
   if (isLoading) {
     return (
@@ -298,6 +488,10 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
               displayCategoryName={displayCategoryName}
               status={status}
               onStatusChange={handleStatusChange}
+              linkedRequests={linkedRequests}
+              availableRequests={availableRequests}
+              onLinkRequest={handleLinkRequest}
+              onUnlinkRequest={handleUnlinkRequest}
             />
           </TabsContent>
           <TabsContent value="chat" className="flex-1 h-full mt-0 overflow-hidden">
@@ -314,6 +508,10 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
             displayCategoryName={displayCategoryName}
             status={status}
             onStatusChange={handleStatusChange}
+            linkedRequests={linkedRequests}
+            availableRequests={availableRequests}
+            onLinkRequest={handleLinkRequest}
+            onUnlinkRequest={handleUnlinkRequest}
           />
         </div>
         <div className="col-span-1 sticky top-24 h-[600px]">

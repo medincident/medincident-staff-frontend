@@ -33,7 +33,8 @@
 - **openapi-typescript-codegen** — генерит клиент из [openapi.yml](openapi.yml) в [lib/api-generated/](lib/api-generated/)
 - **react-hook-form** + **zod** + **@hookform/resolvers** — все формы
 - **zustand** — в зависимостях, но в коде пока не используется (стейт на `useState`/`useEffect`)
-- **recharts** — графики/аналитика
+- **recharts** — графики/аналитика (обёртка + кастомный `ForecastChart` со ступенькой «сегодня», зоной 95% ДИ и маркерами change-points)
+- **@tensorflow/tfjs** — лёгкая LSTM для прогноза нагрузки в отчётах, обучается прямо в браузере. Загружается **динамическим импортом** только на странице отчётов — чтобы не пухнуть бандл других страниц.
 - **sonner** — тосты
 - **web-push** + VAPID — серверные пуш-уведомления
 - **class-variance-authority**, **clsx**, **tailwind-merge** — через хелпер [lib/utils.ts](lib/utils.ts) `cn()`
@@ -74,11 +75,11 @@ app/                    # Next.js App Router
 components/
   ui/                   # shadcn/ui компоненты (не трогай без необходимости)
   layout/               # header.tsx, sidebar.tsx, bottom-nav.tsx
-  providers/            # ThemeProvider, SessionProvider, ApiProvider, ThemeColorManager
+  providers/            # ThemeProvider, SessionProvider, ApiProvider, ThemeColorManager, MiniAppInit
   auth/role-gate.tsx    # Серверный guard по scope
   pwa/                  # service-worker-register, install-prompt, push-manager, offline-view
   events/, requests/    # Формы сущностей (react-hook-form + zod)
-  charts/               # Dynamic recharts-обёртки
+  charts/               # DynamicChart (shadcn-обёртка recharts) + ForecastChart (кастом с прогнозом + change-points)
   chat/                 # Чат-контейнер на сущности
   icons/                # Локальные SVG-иконки
 
@@ -88,13 +89,19 @@ lib/
     core/               # OpenAPI config, request, ApiError, CancelablePromise
     models/             # DTO
     services/           # *Service.ts: ClinicsService, DepartmentsService, EventsService, OrganizationsService, UsersService
+  analytics/            # Аналитические модули для отчётов (чистый TS, независимы от UI)
+    forecast.ts         # Holt (двойное экспоненциальное сглаживание) + 95% ДИ
+    lstm-forecast.ts    # Async LSTM через @tensorflow/tfjs — та же сигнатура, что у forecastHolt
+    change-points.ts    # Бинарная сегментация с t-тестом Уэлча (детекция сдвига уровня)
   auth/
     auth-options.ts     # authOptions NextAuth + refreshAccessToken
     scopes.ts           # SCOPES константа + Scope type
     session.ts          # getSession() серверный хелпер
+  a11y.ts               # Спец. возможности: grayscale + масштаб шрифта, сохраняются в localStorage
+  miniapp.ts            # Детект Telegram.WebApp / MAX UA + useMiniApp() хук
   constants.ts          # APP_CONFIG, THEME_COLORS, *_MAP локализация
   types.ts              # Доменные типы (User, ServiceRequest, IncidentEvent, и т.д.)
-  mock-db.ts            # Большой in-memory mock, используется многими view
+  mock-db.ts            # Большой in-memory mock + getAnalyticsSeed() для отчётов
   status-helper.ts      # getBadgeColor, getCardBorderColor, CHART_COLORS, enrichChartData
   utils.ts              # cn()
   db.ts                 # Синглтон Prisma
@@ -174,6 +181,35 @@ tsconfig.json           # paths: "@/*": ["./*"]
   - Flask-моки в [backend/app.py](backend/app.py).
 - Многие `view.tsx` **одновременно** зовут `UsersService.getMe()` и читают моки. Когда переводишь страницу на реальный API — **удаляй** импорты из `mock-db`.
 - В [next.config.ts](next.config.ts) есть dev-хак: `@/lib/services/events` в dev резолвится в пустой объект. Не удаляй его, пока не убедишься, что реальный `lib/services/events` не подключается.
+
+### 4.10 Аналитика и ML (страница отчётов)
+Все расчёты — **клиентские**, данные берём как есть из реального API; Python-бэк для аналитики не нужен.
+
+- **Прогноз нагрузки** ([lib/analytics/forecast.ts](lib/analytics/forecast.ts), [lib/analytics/lstm-forecast.ts](lib/analytics/lstm-forecast.ts)):
+  - Дефолт — Holt (синхронный, моментальный).
+  - При выборе LSTM в переключателе карточки «Прогноз нагрузки» подключается модель из tfjs через `await import(...)` (dynamic import) — **никогда** не импортируй `@tensorflow/tfjs` статически в отчётах, это вздует бандл всего раздела.
+  - Обе функции возвращают одну и ту же структуру `ForecastResult` с `points[]` и 95% доверительным интервалом — взаимозаменяемы.
+  - Результат LSTM кэшируется по `forecastSeriesKey` (хеш исторической серии), чтобы не переобучаться на каждый ререндер.
+- **Change points** ([lib/analytics/change-points.ts](lib/analytics/change-points.ts)): бинарная сегментация + Welch t-test, рисуются вертикальными маркерами на `ForecastChart` и списком в карточке «Точки смены режима».
+- **Визуализация** ([components/charts/forecast-chart.tsx](components/charts/forecast-chart.tsx)): `ComposedChart` с `Area` (история + 95% ДИ) + `Line` (пунктирный прогноз) + `ReferenceLine` «сегодня» и для каждой change-point. **Не** переиспользуй для других графиков — специфичен под прогноз.
+- **Аномалии**: σ-based по корзинам, считаются в самом [app/(main)/reports/view.tsx](app/(main)/reports/view.tsx) (в `useMemo`) — не выносим в отдельный модуль, пока алгоритм простой.
+- **Цветовая конвенция на графике отчётов**: линии `Заявки` — синие (`#3b82f6`), `Инциденты` — оранжевые (`#f59e0b`). Но **маркеры change-points**: для `Заявки` — оранжевые, для `Инциденты` — синие (инверсия по пользовательскому запросу, чтобы подпись контрастировала с линией).
+
+### 4.11 Связь «НС ↔ Заявка»
+- В `ServiceRequest.linkedEventId` хранится id события (ссылка "много к одному"). Событие просто фильтрует `requestsDb` по этому полю.
+- В форме заявки ([components/requests/request-form.tsx](components/requests/request-form.tsx)) есть видимый `SearchableSelect` для привязки + pre-fill через query-параметр `?linkedEventId=...`.
+- В детали события ([app/(main)/events/[id]/view.tsx](app/(main)/events/[id]/view.tsx)) — карточка «Связанные заявки» с кнопками «Создать связанную» (переход в форму с pre-fill) и «Привязать существующую» (диалог с `SearchableSelect`). На списке — иконка «Отвязать» (видна всегда на мобильной, по hover на десктопе).
+- Мутации `requestsDb` не триггерят ререндер сами — поднимай `requestsVersion` state и добавляй его в deps `useMemo`.
+
+### 4.12 Специальные возможности и мини-аппа
+- **A11y** ([lib/a11y.ts](lib/a11y.ts)): `grayscale` флаг (через класс `a11y-grayscale` на `<html>`) + `fontScale` множитель (применяется как `font-size: Npct%` на `<html>`, все rem-утилиты Tailwind масштабируются). Сохраняется в `localStorage` под ключом `medincident_a11y`. UI — [app/(main)/profile/accessibility/view.tsx](app/(main)/profile/accessibility/view.tsx).
+- При больших `fontScale` на мобильной могут ломать вёрстку flex-дети без `min-w-0` — у нас это уже заложено в заголовках шапок (`min-w-0 flex-1` на текстовом блоке) и в `<main>` в [app/(main)/layout.tsx](app/(main)/layout.tsx) (`min-w-0 overflow-x-hidden`). Не убирай эти классы.
+- **Mini-app** ([lib/miniapp.ts](lib/miniapp.ts), [components/providers/miniapp-init.tsx](components/providers/miniapp-init.tsx)): детект Telegram.WebApp и MAX UA → ставит `data-miniapp="1"` на `<html>`, синкает CSS-переменную `--dvh` с `window.innerHeight` (и на `visualViewport.resize` — для клавиатуры). Сайдбар, нижнее меню и install-prompt сами ховаются в мини-аппе через `useMiniApp()`.
+
+### 4.13 Паттерн детальных страниц (events/[id], requests/[id])
+- `DetailsSection` — это **отдельно именованный компонент в том же файле**, а не inline внутри рендера родителя. Инлайн-паттерн приводит к unmount/remount на каждый ререндер (теряется состояние, гаснет фокус). Если добавляешь подобный раздел — делай так же.
+- Заголовок карточки деталей: `line-clamp-2 break-words` для `<h1>`, badge статуса в отдельной flex-строке с `flex-wrap` — иначе при длинных номерах/кодах + scaled-шрифте ломает мобильную вёрстку.
+- Breakpoint «мобильная карточка ↔ таблица» на списках заявок и НС — `2xl` (1536px). На `xl` и меньше — карточная вёрстка (по пользовательскому решению).
 
 ---
 
@@ -288,6 +324,9 @@ docker compose up --build
 - В [lib/mock-db.ts](lib/mock-db.ts) некоторые массивы экспортируются как `let` — их мутируют из view. При миграции на API аккуратно с этой семантикой.
 - [backend/app.py](backend/app.py) ловит **любой** POST/PUT/DELETE на `/api/v1/<path:path>` и возвращает 200/201/204 — при отладке можешь увидеть «успех» там, где на реальном бэке будет 4xx.
 - Webpack (не Turbopack) — намеренный выбор (см. флаги в `package.json`). Перед переключением — уточни у пользователя.
+- **tfjs статически не импортировать** — только через `await import("@/lib/analytics/lstm-forecast")` в useEffect. Иначе бандл раздутся.
+- **Bar-vertical в [components/charts/dynamic-chart.tsx](components/charts/dynamic-chart.tsx)** настроен с `interval={0}`, `angle={-25}`, `height={60}` и `tickFormatter`-обрезкой — чтобы подписи столбцов показывались все и не налезали. Если понадобится другое поведение — делай новый тип, не правь этот.
+- **Мутабельные моки** в [lib/mock-db.ts](lib/mock-db.ts) (особенно `requestsDb`): view-компоненты их мутируют и ломают, используй локальный `versionCounter` в state + зависимость в `useMemo`, чтобы триггерить пересчёт производных данных (пример — «Связанные заявки» в событиях).
 
 ---
 

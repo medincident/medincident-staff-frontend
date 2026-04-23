@@ -358,7 +358,7 @@ function EventItem({ evt, typeMap, catMap }: { evt: IncidentEvent, typeMap: Reco
   return (
     <Link
       href={`/events/${evt.id}`}
-      className="group flex items-center justify-between p-4 bg-card border rounded-xl transition-all cursor-pointer border-border"
+      className="group flex items-center justify-between p-4 bg-card border rounded-xl transition-all cursor-pointer border-border hover:border-primary/50"
     >
       <div className="flex items-center gap-4 min-w-0">
         <div className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center border bg-primary/10 border-primary/20 text-primary">

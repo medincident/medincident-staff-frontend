@@ -28,6 +28,7 @@ import {
 type Option = {
   value: string | number; // Разрешаем и числа в типах
   label: string;
+  description?: string;
 };
 
 interface SearchableSelectProps {
@@ -66,16 +67,24 @@ export function SearchableSelect({
       >
         <SelectTrigger
           className={cn(
-            "w-full bg-background text-foreground border-input transition-colors",
+            "w-full bg-background text-foreground border-input transition-colors whitespace-normal",
             "hover:border-primary",
             "focus:ring-0 focus:ring-offset-0 focus:border-primary",
-            "overflow-hidden min-w-0",
-            // Переопределяем базовый line-clamp-1 у SelectValue на truncate —
-            // line-clamp даёт «…» только когда текст разливается на 2+ строки
-            // (он про вертикальное переполнение). Для однострочного
-            // горизонтального overflow нужен text-overflow: ellipsis, который
-            // приходит вместе с truncate.
-            "[&>span[data-slot=select-value]]:block [&>span[data-slot=select-value]]:truncate [&>span[data-slot=select-value]]:min-w-0",
+            "min-w-0 overflow-hidden items-start text-left py-2",
+            // Снимаем фиксированную высоту (h-9/h-8) shadcn, чтобы триггер
+            // растягивался под двустрочный контент (label + description).
+            "data-[size=default]:h-auto data-[size=sm]:h-auto min-h-9",
+            // Переопределяем стили SelectValue через тот же *-селектор, что
+            // у shadcn, иначе tailwind-merge их не схлопывает и line-clamp-1
+            // + flex-row остаются:
+            "*:data-[slot=select-value]:line-clamp-none",
+            "*:data-[slot=select-value]:flex-col",
+            "*:data-[slot=select-value]:items-start",
+            "*:data-[slot=select-value]:gap-0",
+            "*:data-[slot=select-value]:flex-1",
+            "*:data-[slot=select-value]:min-w-0",
+            "*:data-[slot=select-value]:overflow-hidden",
+            "*:data-[slot=select-value]:text-left",
             !stringValue && "text-muted-foreground",
           )}
         >
@@ -102,7 +111,14 @@ export function SearchableSelect({
                 // (pl-8 pr-2 вместо pr-8 pl-2).
                 className="cursor-pointer items-start whitespace-normal focus:bg-accent focus:text-accent-foreground pl-8 pr-2 [&>span:first-child]:left-2 [&>span:first-child]:right-auto [&>span:first-child]:top-1/2 [&>span:first-child]:-translate-y-1/2"
               >
-                {option.label}
+                <div className="flex flex-col min-w-0 w-full text-left gap-0.5">
+                  <span className="line-clamp-1 break-all">{option.label}</span>
+                  {option.description && (
+                    <span className="line-clamp-1 break-all text-xs text-muted-foreground">
+                      {option.description}
+                    </span>
+                  )}
+                </div>
               </SelectItem>
             ))
           ) : (
@@ -148,10 +164,10 @@ export function SearchableSelect({
         align="start"
         style={{ width: "var(--radix-popover-trigger-width)" }}
       >
-        <Command 
+        <Command
              filter={(val, search) => {
-                // val здесь - это label опции (так работает Command по умолчанию), 
-                // если не переопределено filter
+                // val — комбинированная строка "label | description" (см. CommandItem value ниже),
+                // чтобы поиск работал и по описанию.
                 if (val.toLowerCase().includes(search.toLowerCase())) return 1;
                 return 0;
              }}
@@ -167,7 +183,7 @@ export function SearchableSelect({
               {options.map((option) => (
                 <CommandItem
                   key={String(option.value)}
-                  value={option.label} 
+                  value={option.description ? `${option.label} | ${option.description}` : option.label}
                   onMouseDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -176,16 +192,23 @@ export function SearchableSelect({
                     onChange(String(option.value)); // Возвращаем всегда строку
                     setOpen(false);
                   }}
-                  className="cursor-pointer aria-selected:bg-accent aria-selected:text-accent-foreground"
+                  className="cursor-pointer items-start aria-selected:bg-accent aria-selected:text-accent-foreground"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "mr-2 h-4 w-4 mt-0.5 shrink-0",
                       // Сравниваем как строки
                       stringValue === String(option.value) ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {option.label}
+                  <div className="flex flex-col min-w-0 flex-1 text-left gap-0.5">
+                    <span className="line-clamp-1 break-all">{option.label}</span>
+                    {option.description && (
+                      <span className="line-clamp-1 break-all text-xs text-muted-foreground">
+                        {option.description}
+                      </span>
+                    )}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
