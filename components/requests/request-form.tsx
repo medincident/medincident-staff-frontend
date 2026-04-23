@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react"; 
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, Save, Plus, Zap, Calendar, Siren, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Plus, Zap, Calendar, Siren, Link as LinkIcon, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
 
-import { requestsDb, eventsDb } from "@/lib/mock-db";
+import { requestsDb, eventsDb, CLASSIFIER_DB } from "@/lib/mock-db";
 import { ServiceRequest } from "@/lib/types";
 import { SERVICE_TYPE_CONFIG } from "@/lib/constants";
 
@@ -48,9 +48,20 @@ function RequestFormContent({ initialData }: RequestFormProps) {
   const linkedEventIdParam = searchParams.get("linkedEventId");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [linkedEventCode, setLinkedEventCode] = useState<string>("");
-  
+
   const isEditMode = !!initialData;
+
+  const eventOptions = useMemo(() => {
+    const typeNames: Record<string, string> = {};
+    CLASSIFIER_DB.forEach(cat => cat.types.forEach(t => { typeNames[t.id] = t.name; }));
+    return [...eventsDb]
+      .filter(e => e.status !== "closed")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map(e => ({
+        value: e.id,
+        label: `${e.code} — ${typeNames[e.typeId] || e.typeName || e.typeId}`,
+      }));
+  }, []);
 
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(formSchema),
@@ -74,23 +85,6 @@ function RequestFormContent({ initialData }: RequestFormProps) {
       });
     }
   }, [initialData, form]);
-
-  const currentLinkedEventId = form.watch("linkedEventId");
-
-  useEffect(() => {
-    const fetchLinkedEventInfo = async () => {
-      if (!currentLinkedEventId) return;
-      try {
-        const linkedEvent = eventsDb.find(e => e.id === currentLinkedEventId);
-        if (linkedEvent?.code) {
-          setLinkedEventCode(linkedEvent.code);
-        }
-      } catch (e) {
-        console.error("Failed to load linked event info", e);
-      }
-    };
-    fetchLinkedEventInfo();
-  }, [currentLinkedEventId]);
 
   async function onSubmit(values: RequestFormValues) {
     setIsSubmitting(true);
@@ -156,30 +150,47 @@ function RequestFormContent({ initialData }: RequestFormProps) {
       </div>
 
       <div className="bg-card p-6 rounded-xl border space-y-6">
-        
-        {currentLinkedEventId && (
-            <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                <LinkIcon className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-                <div>
-                    <h4 className="font-semibold text-warning text-sm">Привязка к событию</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                        Эта заявка создается для устранения последствий события 
-                        <span className="font-mono font-bold mx-1 text-foreground">
-                            {linkedEventCode || "..."}
-                        </span>
-                    </p>
-                </div>
-            </div>
-        )}
-
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            
+
             <FormField
               control={form.control}
               name="linkedEventId"
               render={({ field }) => (
-                <input type="hidden" {...field} />
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4 text-warning" />
+                    Связанное событие (НС)
+                    <span className="text-xs font-normal text-muted-foreground">— необязательно</span>
+                  </FormLabel>
+                  <FormControl>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                      <SearchableSelect
+                        options={eventOptions}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Выберите событие для привязки"
+                        emptyMessage="События не найдены"
+                      />
+                      {field.value && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => field.onChange("")}
+                          title="Убрать привязку"
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </FormControl>
+                  <p className="text-[11px] text-muted-foreground">
+                    Если заявка создаётся для устранения последствий нежелательного события — укажите его здесь.
+                  </p>
+                  <FormMessage />
+                </FormItem>
               )}
             />
 

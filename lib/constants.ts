@@ -1,7 +1,7 @@
 import { EventStatus, Priority, UserRole } from "./types";
 
 export const APP_CONFIG = {
-  name: "MedIncident",
+  name: "МедИнцидент",
   description: "Система мониторинга НС",
   version: "1.0.0",
   year: 2026,

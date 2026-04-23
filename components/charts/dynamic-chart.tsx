@@ -156,20 +156,28 @@ export function DynamicChart({
 
           /* === 2. ВЕРТИКАЛЬНЫЕ СТОЛБЦЫ (BAR-VERTICAL) === */
           ) : type === "bar-vertical" ? (
-            <BarChart 
-              data={data} 
+            <BarChart
+              data={data}
               margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.2} />
-              <XAxis 
-                dataKey={categoryKey} 
+              <XAxis
+                dataKey={categoryKey}
                 tick={{ fill: AXIS_COLOR, fontSize: 11 }}
-                axisLine={false} 
+                axisLine={false}
                 tickLine={false}
+                interval={0}
+                angle={-25}
+                textAnchor="end"
+                height={60}
+                tickFormatter={(value: unknown) => {
+                  const str = String(value ?? "");
+                  return str.length > 14 ? str.slice(0, 12) + "…" : str;
+                }}
               />
-              <YAxis 
+              <YAxis
                 tick={{ fill: AXIS_COLOR, fontSize: 11 }}
-                axisLine={false} 
+                axisLine={false}
                 tickLine={false}
               />
               <Tooltip cursor={{ fill: 'currentColor', opacity: 0.1 }} content={<CustomTooltip />} />

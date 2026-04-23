@@ -160,7 +160,7 @@ export function EventsListView() {
       </div>
 
       {/* TABLE (DESKTOP) */}
-      <div className="hidden xl:block bg-card rounded-xl border overflow-hidden">
+      <div className="hidden 2xl:block bg-card rounded-xl border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50 border-b">
             <TableRow className="hover:bg-transparent">
@@ -251,7 +251,7 @@ export function EventsListView() {
       </div>
 
       {/* CARDS (MOBILE) */}
-      <div className="xl:hidden space-y-4">
+      <div className="2xl:hidden space-y-4">
         {isLoading ? (
            /* MOB SKELETONS: MATCHING CARD STRUCTURE */
            Array.from({ length: 3 }).map((_, i) => (
