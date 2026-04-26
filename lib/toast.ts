@@ -29,11 +29,6 @@ export const notify = {
   ) {
     toast.info(title, { description });
   },
-  /**
-   * Для catch-блоков мутаций. Если сейчас офлайн — показываем инфо-тост
-   * о постановке в очередь (SW это уже обеспечил через BackgroundSyncPlugin),
-   * иначе — обычную ошибку.
-   */
   mutationError(title: string, description?: string) {
     if (isOffline()) {
       notify.offline();
@@ -41,12 +36,6 @@ export const notify = {
     }
     notify.error(title, description);
   },
-  /**
-   * Для success-пути мутаций. Если сейчас офлайн — пишем, что запрос
-   * поставлен в очередь (т.к. на самом деле он ещё не ушёл на сервер),
-   * иначе — обычный успех. Нужен, в частности, потому что мок-мутации в
-   * формах ничего не бросают и catch-блок не срабатывает.
-   */
   mutationSuccess(title: string, description?: string) {
     if (isOffline()) {
       notify.offline();

@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "./auth-options";
 import { Scope } from "./scopes";
 
-// Типизация новой сессии NextAuth
 export interface JWTPayload {
   user: {
     id: string;

@@ -53,10 +53,8 @@ export function RequestsListView() {
       try {
         setIsLoading(true);
         
-        // Имитируем сетевую задержку для отображения скелетонов
         await new Promise((resolve) => setTimeout(resolve, 600));
         
-        // Загружаем данные из моков
         setRequests(requestsDb);
       } catch (error) {
         console.error("Failed to load requests:", error);
@@ -94,7 +92,6 @@ export function RequestsListView() {
           <p className="text-sm text-muted-foreground">АХО, ИТ, Медтехника и другие службы</p>
         </div>
         
-        {/* Кнопка теперь неактивна при загрузке */}
         <Link href="/requests/new" className={isLoading ? "pointer-events-none" : ""}>
           <Button className="font-semibold" disabled={isLoading}>
             <Plus className="mr-2 h-4 w-4" />
@@ -312,7 +309,7 @@ export function RequestsListView() {
                 </Card>
               </Link>
 
-              {/* EDIT ICON FOR MOBILE (ABSOLUTE POSITION) */}
+              {/* EDIT ICON FOR MOBILE */}
               <div className="absolute top-2 right-2">
                  <Link href={`/requests/${req.id}/edit`}>
                     <Button 

@@ -80,10 +80,6 @@ const ACTIVE_EVENT_STATUSES: EventStatus[] = [
 ];
 
 const DAY_MS = 86_400_000;
-
-// Насколько сильно должно отклониться значение, чтобы мы посчитали день/неделю аномалией.
-// 2σ ≈ примерно «такие выбросы случаются примерно в 5% случаев» — всё, что выше,
-// стоит того, чтобы на него посмотреть человек.
 const ANOMALY_Z_THRESHOLD = 2;
 
 function pctChange(current: number, previous: number): number | null {
@@ -295,7 +291,6 @@ export function ReportsView() {
   }, [filtered, startMs, endMs, effectiveDays]);
 
   // --- АНОМАЛИИ ---
-  // Идея простым языком:
   //   1. Смотрим, сколько заявок/НС регистрируется в типичный день (или неделю).
   //   2. Если в какой-то конкретный день пришло ЗАМЕТНО больше или меньше, чем
   //      обычно, — это и есть аномалия. Значит, что-то произошло: авария,
@@ -429,7 +424,6 @@ export function ReportsView() {
     const reqSeries = frequencyData.buckets.map(b => b["Заявки"]);
     const evtSeries = frequencyData.buckets.map(b => b["Инциденты"]);
 
-    // Фоллбек-прогноз — всегда Holt. LSTM заменяет его, если обучен и выбран.
     const holtReq = forecastHolt(reqSeries, horizon);
     const holtEvt = forecastHolt(evtSeries, horizon);
 
@@ -440,10 +434,6 @@ export function ReportsView() {
 
     const hasEnoughData = frequencyData.buckets.length >= 5;
 
-    // Комбинированный набор точек для графика: история + прогноз.
-    // В точке "сегодня" (последний bucket истории) дублируем последнее
-    // фактическое значение в колонки прогноза/ДИ, чтобы пунктирная линия
-    // начиналась из него без разрыва.
     const chartData: Array<{
       name: string;
       "Заявки"?: number | null;
@@ -1260,18 +1250,11 @@ function SummaryStat({ val, label, className, icon: Icon }: any) {
   return (
     <div
       className={cn(
-        // min-h единый у всех трёх карточек — высота выравнивается по самой
-        // «высокой» (с длинным названием отдела), остальные просто центрируют
-        // контент в этом боксе.
         "p-4 rounded-xl flex flex-col items-center justify-center text-center min-h-[140px]",
         className,
       )}
     >
       {Icon && <Icon className="h-5 w-5 mb-2 opacity-70 shrink-0" />}
-      {/* Длинные названия (например название отдела) теперь переносятся —
-          до 3 строк, с break-words чтобы даже монолитная строка без пробелов
-          не вылезала за рамки. Чуть меньший шрифт на мобильной, чтобы
-          многострочный текст выглядел аккуратнее. */}
       <div className="text-xl sm:text-2xl font-bold leading-tight break-words line-clamp-3 max-w-full">
         {val}
       </div>

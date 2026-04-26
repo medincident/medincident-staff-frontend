@@ -7,7 +7,7 @@ import { notify } from "@/lib/toast";
 
 interface ChatContainerProps {
   entityId: string;
-  entityType: "events" | "requests"; // Определяем, к чему относится чат
+  entityType: "events" | "requests";
   title?: string;
   className?: string;
 }
@@ -26,10 +26,8 @@ export function ChatContainer({
       try {
         setIsLoading(true);
         
-        // Имитируем сетевую задержку загрузки истории чата
         await new Promise((resolve) => setTimeout(resolve, 600));
         
-        // Генерируем моковые сообщения в зависимости от типа
         const initialMessages: ChatMessage[] = [
           {
             id: 1,
@@ -64,7 +62,6 @@ export function ChatContainer({
   const handleSendMessage = async (text: string) => {
     const tempId = Date.now();
     
-    // Формируем наше сообщение
     const newMsg: ChatMessage = {
       id: tempId,
       sender: "Вы",
@@ -73,19 +70,13 @@ export function ChatContainer({
       isMe: true
     };
 
-    // Оптимистично добавляем в UI
     setMessages((prev) => [...prev, newMsg]);
 
     try {
-      // Имитируем отправку на сервер
       await new Promise((resolve) => setTimeout(resolve, 400));
-      
-      // В реальном приложении мы бы заменили tempId на id от сервера.
-      // В моковом варианте просто оставляем всё как есть.
       
     } catch (error) {
       notify.mutationError("Ошибка", "Не удалось отправить сообщение.");
-      // Удаляем сообщение из UI, если "сервер" вернул ошибку
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
@@ -98,7 +89,6 @@ export function ChatContainer({
     );
   }
 
-  // Дефолтный заголовок, если не передан кастомный
   const defaultTitle = entityType === "events" 
     ? `Чат по событию #${entityId.split('_')[1] || entityId}`
     : "Ход работ";

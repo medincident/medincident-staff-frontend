@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/toast";
 import { subscribeUser } from "@/app/actions/push";
 
-// Вспомогательная функция для конвертации ключа
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -22,7 +21,6 @@ export function PushNotificationManager() {
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
 
   useEffect(() => {
-    // Проверяем поддержку
     if ("serviceWorker" in navigator && "PushManager" in window) {
       setIsSupported(true);
       registerAndCheck();
@@ -30,7 +28,6 @@ export function PushNotificationManager() {
   }, []);
 
   async function registerAndCheck() {
-    // Получаем регистрацию SW (она уже должна быть создана в layout)
     const registration = await navigator.serviceWorker.ready;
     const sub = await registration.pushManager.getSubscription();
     setSubscription(sub);
@@ -40,7 +37,6 @@ export function PushNotificationManager() {
     try {
       const registration = await navigator.serviceWorker.ready;
       
-      // 1. Запрашиваем у браузера подписку
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
@@ -50,8 +46,6 @@ export function PushNotificationManager() {
 
       setSubscription(sub);
 
-      // 2. Отправляем слепок подписки на сервер в БД
-      // Сериализуем, т.к. sub — это объект браузера
       const serializedSub = JSON.parse(JSON.stringify(sub));
       const result = await subscribeUser(serializedSub);
 

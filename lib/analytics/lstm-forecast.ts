@@ -5,14 +5,6 @@
 // из WINDOW последних точек. Для многошагового прогноза применяется
 // авторегрессивный режим: предсказали точку → добавили в окно → предсказали
 // следующую.
-//
-// Нормализация: min-max масштабирование к [0,1] — стабилизирует обучение.
-// Доверительный интервал: σ остатков на обучающей выборке × sqrt(h) × z,
-// как и в Holt — грубая, но честная оценка неопределённости.
-//
-// Почему "честная нейросеть" для диплома: используется фреймворк TensorFlow.js,
-// слой LSTM из tf.layers, обратное распространение через Adam. Всё реально
-// обучается, не эмуляция.
 
 import * as tf from "@tensorflow/tfjs";
 import type { ForecastPoint, ForecastResult } from "./forecast";
@@ -39,7 +31,6 @@ export async function forecastLstm(
   const n = values.length;
   const historicalMean = n > 0 ? values.reduce((a, b) => a + b, 0) / n : 0;
 
-  // Маленькие серии — падаем на наивный фоллбек: повторяем последнее значение
   if (n < window + 2) {
     const last = n > 0 ? values[n - 1] : 0;
     return {
@@ -138,12 +129,11 @@ export async function forecastLstm(
     currentWindow = [...currentWindow.slice(1), predNorm];
   }
 
-  // Освобождаем тензоры и модель.
   xsTensor.dispose();
   ysTensor.dispose();
   model.dispose();
 
-  // level ≈ последнее предсказанное значение (для совместимости с Holt-типом)
+  // level ≈ последнее предсказанное значение
   const level = points[0]?.mean ?? historicalMean;
   const trend = points.length >= 2 ? points[1].mean - points[0].mean : 0;
 

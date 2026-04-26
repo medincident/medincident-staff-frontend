@@ -5,7 +5,6 @@ import { requestsDb } from "@/lib/mock-db";
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   
-  // Ищем заявку прямо в массиве
   const request = requestsDb.find((r) => r.id === id);
 
   return {

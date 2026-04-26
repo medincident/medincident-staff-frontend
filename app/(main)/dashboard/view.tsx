@@ -25,11 +25,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
 import { ServiceRequest, Announcement, IncidentEvent, Category } from "@/lib/types";
-// ДОБАВИЛИ PRIORITY_MAP
 import { ROLE_NAMES, PRIORITY_MAP } from "@/lib/constants"; 
 import { UsersService } from "@/lib/api";
 import { eventsDb, requestsDb, MOCK_ANNOUNCEMENTS, CLASSIFIER_DB } from "@/lib/mock-db";
-// ДОБАВИЛИ ИМПОРТ ЦВЕТОВ
 import { getBadgeColor } from "@/lib/status-helper";
 
 const safeDate = (dateString?: string) => {
@@ -48,17 +46,14 @@ export function DashboardView() {
   
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
         
-        // Получаем профиль текущего пользователя через API
         const userData = await UsersService.getMe();
         setUser(userData);
 
-        // Имитируем сетевую задержку для загрузки моковых данных
         await new Promise(resolve => setTimeout(resolve, 600));
 
         // Устанавливаем данные из моков
@@ -77,7 +72,6 @@ export function DashboardView() {
     loadData();
   }, []);
   
-  // --- MAPPINGS & FILTERS
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const types: Record<string, string> = {};
     const cats: Record<string, string> = {};
@@ -103,7 +97,6 @@ export function DashboardView() {
   return (
     <div className="space-y-6 pb-20 overflow-x-hidden">
 
-      {/* HEADER BLOCK */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-card p-6 rounded-xl border min-w-0">
         <div className="w-full md:w-auto min-w-0">
           <h1 className="text-2xl font-bold text-foreground tracking-tight line-clamp-2 break-words">
@@ -146,9 +139,7 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* STATS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* 1. ИНЦИДЕНТЫ */}
         <StatsCard
           title="В расследовании (НС)"
           value={isLoading ? <Skeleton className="h-8 w-12" /> : activeEvents.length}
@@ -158,7 +149,6 @@ export function DashboardView() {
           iconBg="bg-primary/10"
         />
         
-        {/* 2. ВСЕ АКТИВНЫЕ ЗАЯВКИ (Новая карточка) */}
         <StatsCard
           title="Активные заявки"
           value={isLoading ? <Skeleton className="h-8 w-12" /> : activeRequests.length}
@@ -168,7 +158,6 @@ export function DashboardView() {
           iconBg="bg-info/10"
         />
 
-        {/* 3. ТЕКУЩИЕ РАБОТЫ */}
         <StatsCard
           title="Всего в работе"
           value={isLoading ? <Skeleton className="h-8 w-12" /> : requests.filter(r => r.status === 'in_work').length}
@@ -179,10 +168,8 @@ export function DashboardView() {
         />
       </div>
 
-      {/* MAIN CONTENT GRID */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-        {/* LEFT COLUMN */}
         <div className="xl:col-span-2 space-y-6 min-w-0">
           <Tabs defaultValue="ns" className="w-full">
             <div>
@@ -197,7 +184,6 @@ export function DashboardView() {
              
             </div>
 
-            {/* TAB: EVENTS */}
             <TabsContent value="ns" className="space-y-3 mt-0">
               {isLoading ? (
                  Array.from({ length: 3 }).map((_, i) => (
@@ -236,7 +222,6 @@ export function DashboardView() {
               )}
             </TabsContent>
 
-            {/* TAB: REQUESTS */}
             <TabsContent value="requests" className="space-y-3 mt-0">
               {isLoading ? (
                  Array.from({ length: 3 }).map((_, i) => (
@@ -266,7 +251,6 @@ export function DashboardView() {
                             Заявка #{req.number}
                           </h4>
                           
-                          {/* ВЫВОДИМ ОПИСАНИЕ С ОБРЕЗКОЙ В 1 СТРОКУ */}
                           <p className="text-xs text-muted-foreground line-clamp-1">
                             {req.description}
                           </p>
@@ -276,7 +260,6 @@ export function DashboardView() {
                               <Clock className="h-3 w-3" />
                               <span>{safeDate(req.createdAt)}</span>
                             </div>
-                            {/* ТЕПЕРЬ ТУТ КРАСИВЫЙ БЕЙДЖ ПРИОРИТЕТА */}
                             <Badge variant="outline" className={`font-medium text-[9px] h-4 px-1.5 ${getBadgeColor(req.priority)}`}>
                               {PRIORITY_MAP[req.priority]}
                             </Badge>
@@ -301,7 +284,6 @@ export function DashboardView() {
           </Tabs>
         </div>
 
-        {/* RIGHT COLUMN: ANNOUNCEMENTS */}
         <div className="space-y-6 min-w-0">
           <Card className="gap-0 py-0! overflow-hidden">
             <CardHeader className="p-3 pb-3! border-b bg-muted/40 space-y-0 gap-y-0 pt-3">
@@ -313,7 +295,6 @@ export function DashboardView() {
 
             <CardContent className="p-3 pt-4 pb-4 space-y-4">
               {isLoading ? (
-                 /* SKELETONS FOR ANNOUNCEMENTS */
                  Array.from({length: 3}).map((_, i) => (
                     <div key={`ann-skel-${i}`} className="space-y-2 pl-3 relative">
                         <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-muted" />

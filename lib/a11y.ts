@@ -1,10 +1,5 @@
-// lib/a11y.ts
-// Специальные возможности: чёрно-белый режим и масштаб шрифта.
-// Применяются через CSS на <html> и сохраняются в localStorage.
-
 export type A11ySettings = {
   grayscale: boolean;
-  /** Множитель базового размера шрифта (1 = 100%). */
   fontScale: number;
 };
 
@@ -44,19 +39,13 @@ export function saveA11y(settings: A11ySettings): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // localStorage может быть недоступен (приватный режим и т.п.) — игнорируем.
-  }
+  } catch {}
 }
 
 export function applyA11y(settings: A11ySettings): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
 
-  // Чёрно-белый режим через CSS-класс (фильтр описан в globals.css).
   root.classList.toggle("a11y-grayscale", settings.grayscale);
-
-  // Масштаб шрифта через базовый font-size на <html>.
-  // Все rem-юниты в Tailwind отмасштабируются пропорционально.
   root.style.fontSize = `${settings.fontScale * 100}%`;
 }

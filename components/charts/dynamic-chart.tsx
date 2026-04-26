@@ -16,7 +16,6 @@ import {
   Area
 } from "recharts";
 
-// Профессиональная палитра
 const COLORS = [
   "#3b82f6", // blue-500
   "#10b981", // emerald-500
@@ -28,7 +27,6 @@ const COLORS = [
   "#64748b", // slate-500
 ];
 
-// Цвет текста осей (Slate-400 - хорошо виден везде)
 const AXIS_COLOR = "#94a3b8"; 
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -72,9 +70,9 @@ interface DynamicChartProps {
   type: "bar" | "bar-horizontal" | "bar-vertical" | "pie" | "donut" | "area";
   title?: string;
   height?: number;
-  dataKey?: string | string[]; // Теперь поддерживает массив ключей
+  dataKey?: string | string[];
   categoryKey?: string;
-  color?: string | string[];   // Теперь поддерживает массив цветов
+  color?: string | string[];
 }
 
 export function DynamicChart({ 
@@ -95,7 +93,6 @@ export function DynamicChart({
     );
   }
 
-  // Нормализуем ключи и цвета в массивы
   const keys = Array.isArray(dataKey) ? dataKey : [dataKey];
   const colors = Array.isArray(color) ? color : [color || COLORS[0]];
   const isMulti = keys.length > 1;
@@ -111,7 +108,7 @@ export function DynamicChart({
       <div style={{ height }} className="w-full font-sans text-xs">
         <ResponsiveContainer width="100%" height="100%">
           
-          {/* === 1. ГОРИЗОНТАЛЬНЫЕ СТОЛБЦЫ (BAR / BAR-HORIZONTAL) === */}
+          {/* === ГОРИЗОНТАЛЬНЫЕ СТОЛБЦЫ === */}
           {type === "bar" || type === "bar-horizontal" ? (
             <BarChart
               data={data}
@@ -129,8 +126,6 @@ export function DynamicChart({
                 tickLine={false}
                 interval={0}
                 tickFormatter={(value: unknown) => {
-                  // Длинные подписи отделов обрезаем — иначе они перекрывают соседние.
-                  // Полное имя по-прежнему доступно в тултипе.
                   const str = String(value ?? "");
                   return str.length > 26 ? str.slice(0, 24) + "…" : str;
                 }}
@@ -144,9 +139,8 @@ export function DynamicChart({
                   dataKey={key} 
                   barSize={isMulti ? 12 : 20} 
                   radius={[0, 4, 4, 0]}
-                  fill={isMulti ? colors[i % colors.length] : undefined} // Если много ключей, красим из массива цветов
+                  fill={isMulti ? colors[i % colors.length] : undefined}
                 >
-                  {/* Если ключ один, красим каждый столбец уникальным цветом (Cell) */}
                   {!isMulti && data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                   ))}
@@ -154,7 +148,7 @@ export function DynamicChart({
               ))}
             </BarChart>
 
-          /* === 2. ВЕРТИКАЛЬНЫЕ СТОЛБЦЫ (BAR-VERTICAL) === */
+          /* === ВЕРТИКАЛЬНЫЕ СТОЛБЦЫ === */
           ) : type === "bar-vertical" ? (
             <BarChart
               data={data}
@@ -191,7 +185,6 @@ export function DynamicChart({
                   radius={[4, 4, 0, 0]} 
                   fill={colors[i % colors.length]} 
                 >
-                  {/* Если ключ один, раскрашиваем каждый столбец */}
                   {!isMulti && data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                   ))}
@@ -199,7 +192,7 @@ export function DynamicChart({
               ))}
             </BarChart>
 
-          /* === 3. ОБЛАСТЬ/ЛИНЕЙНЫЙ (AREA) === */
+          /* === ОБЛАСТЬ/ЛИНЕЙНЫЙ (AREA) === */
           ) : type === "area" ? (
             <AreaChart 
               data={data} 
@@ -207,7 +200,7 @@ export function DynamicChart({
             >
               <defs>
                 {keys.map((key, i) => {
-                  const safeId = key.replace(/\s+/g, '_'); // Убираем пробелы для ID градиента
+                  const safeId = key.replace(/\s+/g, '_');
                   return (
                     <linearGradient key={`grad-${key}`} id={`color_${safeId}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={colors[i % colors.length]} stopOpacity={0.3}/>
@@ -247,7 +240,7 @@ export function DynamicChart({
               })}
             </AreaChart>
 
-          /* === 4. КРУГОВЫЕ (PIE / DONUT) === */
+          /* === КРУГОВЫЕ (PIE / DONUT) === */
           ) : (
             <PieChart>
               <Pie
@@ -258,7 +251,7 @@ export function DynamicChart({
                 outerRadius={110} 
                 paddingAngle={type === "donut" ? 4 : 0}
                 cornerRadius={type === "donut" ? 4 : 0}
-                dataKey={keys[0]} // Pie всегда работает только с одним ключом
+                dataKey={keys[0]}
                 nameKey={categoryKey}
                 stroke="none"
               >

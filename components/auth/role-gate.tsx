@@ -16,17 +16,14 @@ export async function RoleGate({
 }: RoleGateProps) {
   const session = await getSession();
 
-  // Если нет сессии или скоупов
   if (!session || !session.scopes) {
     return <>{fallback}</>;
   }
 
-  // Админ системы имеет доступ ко всему
   if (session.scopes.includes("admin:system")) {
     return <>{children}</>;
   }
 
-  // Проверка прав
   const hasAccess = requireAll
     ? allowedScopes.every(scope => session.scopes.includes(scope))
     : allowedScopes.some(scope => session.scopes.includes(scope));

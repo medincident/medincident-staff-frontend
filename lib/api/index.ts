@@ -1,4 +1,3 @@
-// Берем ядро из новой сгенерированной папки
 import { OpenAPI } from "@/lib/api-generated/core/OpenAPI";
 
 OpenAPI.BASE =

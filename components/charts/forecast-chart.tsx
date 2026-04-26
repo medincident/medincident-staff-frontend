@@ -17,13 +17,13 @@ const AXIS_COLOR = "#94a3b8";
 
 export type ForecastChartPoint = {
   name: string;
-  // Историческая часть (null для точек из будущего)
+  // Историческая часть
   "Заявки"?: number | null;
   "Инциденты"?: number | null;
-  // Прогноз (null для прошлого, среднее для будущего)
+  // Прогноз
   "Заявки_прогноз"?: number | null;
   "Инциденты_прогноз"?: number | null;
-  // 95% ДИ как [lower, upper] — recharts умеет рендерить Area по кортежу
+  // 95% ДИ
   "Заявки_ДИ"?: [number, number] | null;
   "Инциденты_ДИ"?: [number, number] | null;
   // Флаг, по которому определяем начало прогноза
@@ -31,14 +31,14 @@ export type ForecastChartPoint = {
 };
 
 export type ChangePointMarker = {
-  name: string; // x-координата (значение dataKey="name")
+  name: string; // x-координата
   label?: string; // подпись у линии, напр. "+34% заявок"
   color?: string;
 };
 
 type Props = {
   data: ForecastChartPoint[];
-  forecastStartName?: string; // для ReferenceLine
+  forecastStartName?: string;
   height?: number;
   reqColor?: string;
   evtColor?: string;

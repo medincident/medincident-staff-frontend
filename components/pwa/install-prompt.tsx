@@ -29,27 +29,21 @@ export function InstallPrompt() {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // 1. Проверяем, установлено ли уже приложение
-    //    (display-mode: standalone — современный способ, navigator.standalone — legacy iOS).
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (navigator as any).standalone === true;
     setIsStandalone(standalone);
 
-    // 2. Определяем iOS (у него нет beforeinstallprompt — показываем инструкцию).
     const ua =
       navigator.userAgent || navigator.vendor || (window as any).opera || "";
     const ios = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
     setIsIOS(ios);
 
-    // 3. iOS: сразу показываем инструкцию, если ещё не установлено и недавно не закрывали.
     if (ios && !standalone && !isRecentlyDismissed()) {
       setIsVisible(true);
     }
 
-    // 4. Остальные (Android Chrome, desktop Chromium): ждём beforeinstallprompt.
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Если юзер недавно закрывал нашу модалку — не блокируем дефолтный UI браузера.
       if (isRecentlyDismissed()) return;
 
       e.preventDefault();
@@ -57,16 +51,13 @@ export function InstallPrompt() {
       setIsVisible(true);
     };
 
-    // 5. После успешной установки — прячем и сбрасываем флаг.
     const handleAppInstalled = () => {
       setDeferredPrompt(null);
       setIsVisible(false);
       setIsStandalone(true);
       try {
         localStorage.removeItem(DISMISS_KEY);
-      } catch {
-        // ignore
-      }
+      } catch {}
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -85,9 +76,7 @@ export function InstallPrompt() {
     setIsVisible(false);
     try {
       localStorage.setItem(DISMISS_KEY, String(Date.now()));
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   const handleInstallClick = useCallback(async () => {
@@ -96,17 +85,13 @@ export function InstallPrompt() {
     deferredPrompt.prompt();
     try {
       await deferredPrompt.userChoice;
-    } catch {
-      // ignore
-    }
+    } catch {}
     setDeferredPrompt(null);
     setIsVisible(false);
   }, [deferredPrompt]);
 
   if (miniApp || isStandalone || !isVisible) return null;
 
-  // Для не-iOS показываем модалку только если есть deferredPrompt
-  // (иначе кнопка «Установить сейчас» не имеет смысла — запустить установку нечем).
   if (!isIOS && !deferredPrompt) return null;
 
   return (
