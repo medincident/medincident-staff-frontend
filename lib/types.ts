@@ -1,6 +1,4 @@
-// lib/types.ts
-
-// --- 1. РОЛИ ПОЛЬЗОВАТЕЛЕЙ (Строго по вашему списку) ---
+// --- 1. РОЛИ ПОЛЬЗОВАТЕЛЕЙ ---
 export type UserRole =
   | "admin_system" // 7. Админ системы (видит все техническое)
   | "admin_org" // 6. Админ организации (видит все заявки/НС + аналитику)
@@ -56,7 +54,6 @@ export type Category = {
 };
 
 // --- ЗАЯВКИ (REQUESTS) ---
-// Типы заявок (можно расширять)
 export type ServiceType =
   | "med_equip"
   | "it_equip"
@@ -70,7 +67,7 @@ export type ServiceType =
   | "control"
   | "medical_equip"
   | "electric"
-  | string; // string позволяет добавлять новые без правки кода типов
+  | string;
 
 export type RequestStatus =
   | "created" // Новая (у диспетчера)
@@ -159,7 +156,7 @@ export interface Notification {
   userId?: string; // Кому предназначено (если personal)
 }
 
-// --- ДАШБОРД (ДЛЯ АДМИНОВ И ГОСТЕЙ) ---
+// --- ДАШБОРД ---
 export interface DashboardStats {
   kpi: {
     totalRequests: number;

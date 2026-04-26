@@ -196,8 +196,6 @@ export function EventForm({ eventId }: EventFormProps) {
       <div className="bg-card p-6 rounded-xl border">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Категория и тип в двух колонках — grid жёстко ограничивает ширину
-                каждого FormItem, не давая длинным лейблам в SearchableSelect растягивать контейнер */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}

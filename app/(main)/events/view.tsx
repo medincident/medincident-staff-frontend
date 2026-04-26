@@ -37,29 +37,23 @@ import { EVENT_STATUS_MAP } from "@/lib/constants";
 import { getBadgeColor, getCardBorderColor } from "@/lib/status-helper";
 import { EventStatus, IncidentEvent, Category } from "@/lib/types";
 
-// Импортируем моки напрямую вместо старых сервисов
 import { eventsDb, CLASSIFIER_DB } from "@/lib/mock-db";
 
 export function EventsListView() {
-  // --- STATE ---
   const [events, setEvents] = useState<IncidentEvent[]>([]);
   const [classifier, setClassifier] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Фильтры
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
         
-        // Имитируем небольшую сетевую задержку для реалистичности UI
         await new Promise(resolve => setTimeout(resolve, 600));
 
-        // Берем данные из наших моков
         setEvents(eventsDb);
         setClassifier(CLASSIFIER_DB);
       } catch (error) {
@@ -71,7 +65,6 @@ export function EventsListView() {
     loadData();
   }, []);
 
-  // 2. ПОДГОТОВКА ДАННЫХ
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const types: Record<string, string> = {};
     const cats: Record<string, string> = {};
@@ -85,7 +78,6 @@ export function EventsListView() {
     return { typeNamesMap: types, categoryNamesMap: cats };
   }, [classifier]);
 
-  // 3. ФИЛЬТРАЦИЯ
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
       const typeNameRu = typeNamesMap[event.typeId || ""] || event.typeName || "";

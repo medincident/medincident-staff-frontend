@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import { Notification } from "@/lib/types";
 import { getIntentColors } from "@/lib/status-helper";
 
-// Импортируем моки напрямую вместо старых сервисов
 import { MOCK_NOTIFICATIONS } from "@/lib/mock-db";
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -29,20 +28,16 @@ const ICON_MAP: Record<string, LucideIcon> = {
 export function NotificationsView() {
   const router = useRouter();
   
-  // --- STATE ---
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
         
-        // Имитируем небольшую сетевую задержку для плавности UI
         await new Promise(resolve => setTimeout(resolve, 600));
         
-        // Загружаем уведомления из моков
         setNotifications(MOCK_NOTIFICATIONS);
       } catch (error) {
         console.error("Failed to load notifications:", error);
@@ -53,9 +48,7 @@ export function NotificationsView() {
     loadData();
   }, []);
 
-  // --- HANDLERS ---
   const handleMarkAllRead = async () => {
-    // Так как у нас моки, просто обновляем локальный стейт
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
@@ -65,7 +58,6 @@ export function NotificationsView() {
     return acc;
   }, {} as Record<string, Notification[]>);
 
-  // --- RENDER ---
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
 
@@ -81,7 +73,6 @@ export function NotificationsView() {
           </div>
         </div>
         
-        {/* Кнопка скрывается при загрузке, чтобы не мелькать */}
         {!isLoading && notifications.some(n => !n.read) && (
           <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-primary hover:bg-primary/10 shrink-0">
             <CheckCheck className="mr-2 h-4 w-4" />

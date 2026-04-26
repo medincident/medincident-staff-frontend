@@ -23,11 +23,8 @@ const STATIC_CACHE = "medincident-static";
 const IMAGES_CACHE = "medincident-images";
 const FONTS_CACHE = "medincident-fonts";
 
-// Критичные маршруты, которые обязательно нужно держать офлайн.
-// По схеме proxx.app: кэшируем именно HTML-страницы при install SW.
 const CRITICAL_ROUTES = ["/", "/dashboard", "/events", "/requests", OFFLINE_URL];
 
-// Минимальный HTML-фолбэк на случай полного провала (евикция кэша на iOS и т.п.)
 const OFFLINE_HTML_FALLBACK = `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -72,18 +69,12 @@ const OFFLINE_HTML_FALLBACK = `<!DOCTYPE html>
 
 cleanupOutdatedCaches();
 
-// Precache из workbox-манифеста (он заполняется на этапе билда InjectManifest'ом).
-// Оборачиваем в try/catch на случай, если __WB_MANIFEST не был инжектирован —
-// тогда SW всё равно установится и будет работать через рантайм-кэширование.
 try {
   precacheAndRoute(self.__WB_MANIFEST || []);
 } catch (e) {
   console.warn("[SW] precacheAndRoute failed:", e);
 }
 
-// При установке SW кладём в кэш критичные HTML-маршруты,
-// чтобы при холодном запуске PWA офлайн (в т.ч. с iPhone с домашнего экрана)
-// Safari получил HTML мгновенно и не показал свою нативную ошибку «нет интернета».
 self.addEventListener("install", (event: ExtendableEvent) => {
   event.waitUntil(
     (async () => {
@@ -105,8 +96,6 @@ self.addEventListener("install", (event: ExtendableEvent) => {
 self.skipWaiting();
 clientsClaim();
 
-// --- Очередь для мутаций (оффлайн-синхронизация POST/PUT/DELETE/PATCH).
-// BackgroundSync работает только в Chromium — в Safari iOS он просто no-op.
 const bgSyncPlugin = new BackgroundSyncPlugin("medincident-offline-queue", {
   maxRetentionTime: 24 * 60,
 });
@@ -122,7 +111,6 @@ registerRoute(
   }),
 );
 
-// --- Статика Next.js: _next/static/*, скрипты, стили, воркеры ---
 registerRoute(
   ({ url, request }: { url: URL; request: Request }) =>
     url.pathname.startsWith("/_next/static/") ||
@@ -135,7 +123,6 @@ registerRoute(
   }),
 );
 
-// --- Изображения ---
 registerRoute(
   ({ request }: { request: Request }) => request.destination === "image",
   new CacheFirst({
@@ -150,7 +137,6 @@ registerRoute(
   }),
 );
 
-// --- Шрифты ---
 registerRoute(
   ({ request }: { request: Request }) => request.destination === "font",
   new CacheFirst({
@@ -165,10 +151,6 @@ registerRoute(
   }),
 );
 
-// --- Навигации (HTML): кастомная Stale-While-Revalidate с полным фолбэком.
-// Стратегия копирует подход proxx.app: кэш отдаётся МГНОВЕННО, сеть обновляет
-// его в фоне. Это важно для iOS — Safari не упирается в таймаут сети при
-// холодном запуске и не показывает нативную ошибку.
 const navigationHandler = async ({
   request,
   event,
@@ -178,7 +160,6 @@ const navigationHandler = async ({
 }): Promise<Response> => {
   const cache = await caches.open(PAGES_CACHE);
 
-  // Сетевой fetch (всегда запускаем для фонового обновления кэша).
   const networkPromise = fetch(request)
     .then((response) => {
       if (response && response.ok) {
@@ -188,26 +169,20 @@ const navigationHandler = async ({
     })
     .catch(() => null);
 
-  // 1. Пробуем отдать из кэша — моментально.
   const cached = await cache.match(request, { ignoreSearch: true });
   if (cached) {
-    // В фоне обновляем кэш, если SW-событие это позволяет.
     if (event && typeof event.waitUntil === "function") {
       event.waitUntil(networkPromise);
     }
     return cached;
   }
 
-  // 2. Кэша нет — ждём сеть.
   const networkResponse = await networkPromise;
   if (networkResponse) return networkResponse;
 
-  // 3. Сеть тоже не отдала — отдаём offline-страницу из кэша.
   const offline = await cache.match(OFFLINE_URL);
   if (offline) return offline;
 
-  // 4. Последний рубеж — синтезированный HTML, чтобы НИКОГДА не вернуть
-  // «no response» и не получить нативный экран ошибки Safari.
   return new Response(OFFLINE_HTML_FALLBACK, {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -220,7 +195,6 @@ registerRoute(
   navigationHandler,
 );
 
-// --- Push-уведомления ---
 interface ExtendedNotificationOptions extends NotificationOptions {
   vibrate?: number[];
 }

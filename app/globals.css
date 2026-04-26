@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-/* Class-based dark mode (override Tailwind v4 default, который смотрит на
-   prefers-color-scheme медиа-запрос). У нас управление темой через next-themes
-   с attribute="class" — dark: утилиты должны смотреть только на класс .dark,
-   а не на системные настройки OS. Без этого iOS в системной тёмной теме
-   ломает цвета, когда сайт явно в светлой (и наоборот). */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -159,25 +154,12 @@
     @apply border-border;
   }
   html {
-    /* Резервируем место под вертикальный скроллбар, чтобы контент
-       не «прыгал» при переключении между страницами разной высоты. */
     scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground;
   }
 
-  /* Radix Select / Popover / Dialog используют react-remove-scroll-bar,
-     который при открытии компенсирует «исчезнувший» скроллбар,
-     добавляя body margin-right (и padding-right в padding-режиме)
-     с шириной скроллбара. У нас место уже зарезервировано через
-     scrollbar-gutter на html, поэтому эта компенсация рисуется
-     повторно и сдвигает весь контент вправо.
-
-     Библиотека применяет свои стили с !important на селекторе
-     `body[data-scroll-locked]`. Чтобы его побить, берём большую
-     специфичность — `html body[data-scroll-locked]` (0,1,2) >
-     `body[data-scroll-locked]` (0,1,1). */
   html body[data-scroll-locked] {
     margin-right: 0 !important;
     padding-right: 0 !important;
@@ -189,22 +171,16 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Специальные возможности: чёрно-белый режим.
-   Класс навешивается на <html> из lib/a11y.ts → applyA11y(). */
 html.a11y-grayscale {
   filter: grayscale(1);
   -webkit-filter: grayscale(1);
 }
 
-/* Мини-апп: Telegram/MAX WebView ломает 100vh (не учитывает системный UI).
-   MiniAppInit синхронизирует --dvh с реальным window.innerHeight и ставит
-   data-miniapp="1" на <html>. Ниже применяем эти фиксы к layout. */
 :root {
-  --dvh: 1vh; /* fallback до синхронизации JS */
+  --dvh: 1vh;
 }
 
 [data-miniapp] {
-  /* Все края safe-area нужны в мини-аппе, не только bottom */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -212,8 +188,6 @@ html.a11y-grayscale {
 }
 
 [data-miniapp] body {
-  /* Минимальная высота = реальный вьюпорт (не ломается от системного UI) */
   min-height: calc(var(--dvh) * 100);
-  /* Отступ снизу на случай жеста навигации в Telegram */
   padding-bottom: var(--safe-bottom);
 }

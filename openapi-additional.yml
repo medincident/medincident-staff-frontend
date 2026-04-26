@@ -1,0 +1,960 @@
+openapi: 3.0.3
+info:
+  title: MedIncident — Additional API
+  version: "1.0.0"
+  description: |
+    Спецификация API, которые требуется реализовать на бэкенде для покрытия
+    клиентской части системы «МедИнцидент». Не дублирует то, что уже
+    предоставлено сгенерированным клиентом из основного `openapi.yml`
+    (UsersService, OrganizationsService, ClinicsService, DepartmentsService,
+    EventsService — последний покрывает только классификатор НС).
+
+servers:
+  - url: https://api.medincident.example/api/v1
+    description: Production
+  - url: http://localhost:8080/api/v1
+    description: Local mock
+
+security:
+  - bearerAuth: []
+
+tags:
+  - { name: Incidents,        description: "Нежелательные события (НС)" }
+  - { name: Requests,         description: "Заявки на обслуживание" }
+  - { name: Links,            description: "Связи НС ↔ заявок" }
+  - { name: Chat,             description: "Чат по сущности" }
+  - { name: Notifications,    description: "Уведомления пользователя" }
+  - { name: Announcements,    description: "Глобальные объявления" }
+  - { name: UserSettings,     description: "Персональные настройки" }
+  - { name: Accessibility,    description: "Спец. возможности" }
+  - { name: Help,             description: "Справка и FAQ" }
+  - { name: Push,             description: "Web-Push подписки" }
+  - { name: Analytics,        description: "Лёгкий dataset для клиентской аналитики" }
+  - { name: System,           description: "Системные эндпоинты" }
+
+# NB: все аналитические расчёты (прогноз Holt/LSTM, change-points, аномалии)
+# выполняются на клиенте в lib/analytics/*.ts. Сервер отдаёт только лёгкий
+# набор полей через GET /analytics/snapshot — без описаний, авторов и т.п.
+
+paths:
+
+  # ─────────────────────────── Incidents (НС) ─────────────────────────────
+  /incidents:
+    get:
+      tags: [Incidents]
+      summary: Список инцидентов
+      parameters:
+        - { in: query, name: q,            schema: { type: string } }
+        - { in: query, name: status,       schema: { $ref: "#/components/schemas/IncidentStatus" } }
+        - { in: query, name: categoryId,   schema: { type: string } }
+        - { in: query, name: typeId,       schema: { type: string } }
+        - { in: query, name: clinicId,     schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: string } }
+        - { in: query, name: from,         schema: { type: string, format: date-time } }
+        - { in: query, name: to,           schema: { type: string, format: date-time } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { $ref: "#/components/responses/IncidentList" }
+    post:
+      tags: [Incidents]
+      summary: Создать инцидент
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IncidentCreateInput" }
+      responses:
+        "201":
+          description: Создано
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IncidentEvent" }
+
+  /incidents/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    get:
+      tags: [Incidents]
+      summary: Получить инцидент
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IncidentEvent" }
+    patch:
+      tags: [Incidents]
+      summary: Изменить инцидент
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IncidentUpdateInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IncidentEvent" }
+    delete:
+      tags: [Incidents]
+      summary: Удалить (или архивировать) инцидент
+      responses:
+        "204": { description: Удалено }
+
+  /incidents/{id}/status:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    patch:
+      tags: [Incidents]
+      summary: Сменить статус инцидента
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/IncidentStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IncidentEvent" }
+
+  /incidents/{id}/linked-requests:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    get:
+      tags: [Incidents]
+      summary: Заявки, привязанные к этому инциденту
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ServiceRequest" }
+
+  # ─────────────────────────── Requests ───────────────────────────────────
+  /requests:
+    get:
+      tags: [Requests]
+      summary: Список заявок
+      parameters:
+        - { in: query, name: q,                 schema: { type: string } }
+        - { in: query, name: status,            schema: { $ref: "#/components/schemas/RequestStatus" } }
+        - { in: query, name: priority,          schema: { $ref: "#/components/schemas/RequestPriority" } }
+        - { in: query, name: type,              schema: { type: string } }
+        - { in: query, name: linkedEventId,     schema: { type: string } }
+        - { in: query, name: responsibleDept,   schema: { type: string } }
+        - { in: query, name: from,              schema: { type: string, format: date-time } }
+        - { in: query, name: to,                schema: { type: string, format: date-time } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { $ref: "#/components/responses/RequestList" }
+    post:
+      tags: [Requests]
+      summary: Создать заявку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RequestCreateInput" }
+      responses:
+        "201":
+          description: Создано
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceRequest" }
+
+  /requests/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    get:
+      tags: [Requests]
+      summary: Получить заявку
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceRequest" }
+    patch:
+      tags: [Requests]
+      summary: Изменить заявку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RequestUpdateInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceRequest" }
+    delete:
+      tags: [Requests]
+      summary: Удалить заявку
+      responses:
+        "204": { description: Удалено }
+
+  /requests/{id}/status:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    patch:
+      tags: [Requests]
+      summary: Сменить статус заявки
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/RequestStatus" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceRequest" }
+
+  /requests/{id}/assign:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    patch:
+      tags: [Requests]
+      summary: Назначить исполнителя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [executorId]
+              properties:
+                executorId: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceRequest" }
+
+  # ─────────────────────────── Links НС ↔ Заявки ──────────────────────────
+  /incidents/{id}/links:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    post:
+      tags: [Links]
+      summary: Привязать существующую заявку к инциденту
+      description: Перезаписывает прежнее значение `linkedEventId` у заявки.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceRequest" }
+
+  /incidents/{id}/links/{requestId}:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+      - { in: path, name: requestId, required: true, schema: { type: string } }
+    delete:
+      tags: [Links]
+      summary: Отвязать заявку от инцидента
+      responses:
+        "204": { description: Отвязано }
+
+  # ─────────────────────────── Chat ───────────────────────────────────────
+  /{entity}/{id}/messages:
+    parameters:
+      - { in: path, name: entity, required: true, schema: { type: string, enum: [incidents, requests] } }
+      - $ref: "#/components/parameters/PathId"
+    get:
+      tags: [Chat]
+      summary: История сообщений
+      parameters:
+        - { in: query, name: before, schema: { type: string, format: date-time } }
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ChatMessage" }
+                  nextCursor: { type: string, nullable: true }
+    post:
+      tags: [Chat]
+      summary: Отправить сообщение
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1 }
+      responses:
+        "201":
+          description: Создано
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatMessage" }
+
+  # ─────────────────────────── Notifications ──────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Уведомления текущего пользователя
+      parameters:
+        - { in: query, name: unreadOnly, schema: { type: boolean } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Notification" }
+                  unreadCount: { type: integer }
+                  nextCursor: { type: string, nullable: true }
+
+  /notifications/{id}/read:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    post:
+      tags: [Notifications]
+      summary: Пометить уведомление прочитанным
+      responses:
+        "204": { description: OK }
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Пометить все прочитанными
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  markedCount: { type: integer }
+
+  /notifications/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    delete:
+      tags: [Notifications]
+      summary: Удалить уведомление
+      responses:
+        "204": { description: Удалено }
+
+  # ─────────────────────────── Announcements ──────────────────────────────
+  /announcements:
+    get:
+      tags: [Announcements]
+      summary: Список глобальных объявлений
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Announcement" }
+    post:
+      tags: [Announcements]
+      summary: Создать объявление (только админ)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnnouncementInput" }
+      responses:
+        "201":
+          description: Создано
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Announcement" }
+
+  /announcements/{id}:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+    patch:
+      tags: [Announcements]
+      summary: Обновить объявление
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnnouncementInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Announcement" }
+    delete:
+      tags: [Announcements]
+      summary: Удалить объявление
+      responses:
+        "204": { description: Удалено }
+
+  # ─────────────────────────── User Settings ──────────────────────────────
+  /users/me/settings:
+    get:
+      tags: [UserSettings]
+      summary: Настройки текущего пользователя
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserSettings" }
+    put:
+      tags: [UserSettings]
+      summary: Обновить настройки
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserSettings" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserSettings" }
+
+  # ─────────────────────────── Accessibility ──────────────────────────────
+  /users/me/accessibility:
+    get:
+      tags: [Accessibility]
+      summary: Спец. возможности (опц., можно хранить только в localStorage)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/A11ySettings" }
+    put:
+      tags: [Accessibility]
+      summary: Сохранить спец. возможности
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/A11ySettings" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/A11ySettings" }
+
+  # ─────────────────────────── Help / FAQ ─────────────────────────────────
+  /help/faq:
+    get:
+      tags: [Help]
+      summary: Часто задаваемые вопросы
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/FaqItem" }
+
+  /help/documents:
+    get:
+      tags: [Help]
+      summary: Список инструкций и приказов (PDF и т.п.)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/HelpDocument" }
+
+  # ─────────────────────────── Web-Push ───────────────────────────────────
+  /push/vapid-key:
+    get:
+      tags: [Push]
+      summary: Получить публичный VAPID-ключ
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+
+  /push/subscribe:
+    post:
+      tags: [Push]
+      summary: Сохранить web-push подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PushSubscriptionInput" }
+      responses:
+        "201":
+          description: Создано
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+    delete:
+      tags: [Push]
+      summary: Отписаться
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string }
+      responses:
+        "204": { description: Удалено }
+
+  /push/test:
+    post:
+      tags: [Push]
+      summary: Тестовая отправка пуша (для админа/QA)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body]
+              properties:
+                userId: { type: string, nullable: true }
+                title:  { type: string }
+                body:   { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  delivered: { type: integer }
+                  failed:    { type: integer }
+
+  # ─────────────────────────── Analytics ─────────────────────────────────
+  /analytics/snapshot:
+    get:
+      tags: [Analytics]
+      summary: Лёгкий dataset для клиентской аналитики (НС + заявки одним запросом)
+      description: |
+        Возвращает только те поля, которые реально используются в клиентской
+        аналитике (графики, прогноз, change-points, аномалии). Без описаний,
+        авторов, локаций. Чтобы за один вызов покрыть и текущий, и предыдущий
+        период (для расчёта дельт), фронт обычно передаёт `from = prevStart`,
+        `to = currentEnd` и сам разбивает данные в памяти.
+      parameters:
+        - { in: query, name: from,         required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: to,           required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: clinicId,     schema: { type: string } }
+        - { in: query, name: departmentId, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events, requests]
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/AnalyticsEventItem" }
+                  requests:
+                    type: array
+                    items: { $ref: "#/components/schemas/AnalyticsRequestItem" }
+
+  # ─────────────────────────── System ─────────────────────────────────────
+  /health:
+    get:
+      tags: [System]
+      summary: Проверка живости сервиса
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:  { type: string, example: "ok" }
+                  version: { type: string }
+                  build:   { type: string }
+
+  /me/permissions:
+    get:
+      tags: [System]
+      summary: Скоупы текущего пользователя (если не зашиты в JWT)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scopes:
+                    type: array
+                    items: { type: string }
+
+# ════════════════════════════ COMPONENTS ════════════════════════════════
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PathId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string }
+    Limit:
+      in: query
+      name: limit
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Cursor:
+      in: query
+      name: cursor
+      schema: { type: string }
+
+  responses:
+    IncidentList:
+      description: Список инцидентов
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items: { $ref: "#/components/schemas/IncidentEvent" }
+              nextCursor: { type: string, nullable: true }
+              total: { type: integer }
+    RequestList:
+      description: Список заявок
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items: { $ref: "#/components/schemas/ServiceRequest" }
+              nextCursor: { type: string, nullable: true }
+              total: { type: integer }
+
+  schemas:
+
+    # ─── Enums ──────────────────────────────────────────────────────────
+    IncidentStatus:
+      type: string
+      enum: [created, in_work, investigation, measures, completed, closed]
+    RequestStatus:
+      type: string
+      enum: [created, in_work, purchase, completed, refused, cancelled]
+    RequestPriority:
+      type: string
+      enum: [normal, high, critical]
+    NotificationType:
+      type: string
+      enum: [info, success, warning, error]
+    AnnouncementPriority:
+      type: string
+      enum: [high, normal]
+
+    # ─── Incidents ──────────────────────────────────────────────────────
+    IncidentEvent:
+      type: object
+      required: [id, code, categoryId, typeId, status, author, createdAt]
+      properties:
+        id:           { type: string }
+        code:         { type: string, description: "Например INC-1234. Генерируется бэком." }
+        categoryId:   { type: string }
+        categoryName: { type: string, nullable: true }
+        typeId:       { type: string }
+        typeName:     { type: string, nullable: true }
+        description:  { type: string, nullable: true }
+        location:     { type: string, nullable: true }
+        severity:     { type: string, nullable: true }
+        status:       { $ref: "#/components/schemas/IncidentStatus" }
+        authorId:     { type: string, nullable: true }
+        author:       { type: string }
+        clinicId:     { type: string, nullable: true }
+        departmentId: { type: string, nullable: true }
+        createdAt:    { type: string, format: date-time }
+
+    IncidentCreateInput:
+      type: object
+      required: [categoryId, typeId]
+      properties:
+        categoryId:  { type: string }
+        typeId:      { type: string }
+        description: { type: string }
+        location:    { type: string }
+        severity:    { type: string }
+
+    IncidentUpdateInput:
+      type: object
+      properties:
+        categoryId:  { type: string }
+        typeId:      { type: string }
+        description: { type: string }
+        location:    { type: string }
+        severity:    { type: string }
+
+    # ─── Requests ───────────────────────────────────────────────────────
+    ServiceRequest:
+      type: object
+      required: [id, number, type, priority, status, description, location, authorName, responsibleDept, createdAt]
+      properties:
+        id:               { type: string }
+        number:           { type: integer, description: "Генерируется бэком." }
+        type:             { type: string, description: "Код службы (sanitary, electric, …)." }
+        typeName:         { type: string, nullable: true }
+        priority:         { $ref: "#/components/schemas/RequestPriority" }
+        status:           { $ref: "#/components/schemas/RequestStatus" }
+        description:      { type: string }
+        location:         { type: string }
+        authorId:         { type: string, nullable: true }
+        authorName:       { type: string }
+        responsibleDept:  { type: string }
+        executorId:       { type: string, nullable: true }
+        linkedEventId:    { type: string, nullable: true }
+        createdAt:        { type: string, format: date-time }
+        completedAt:      { type: string, format: date-time, nullable: true }
+
+    RequestCreateInput:
+      type: object
+      required: [type, priority, description, location]
+      properties:
+        type:          { type: string }
+        priority:      { $ref: "#/components/schemas/RequestPriority" }
+        description:   { type: string }
+        location:      { type: string }
+        linkedEventId: { type: string, nullable: true }
+
+    RequestUpdateInput:
+      type: object
+      properties:
+        type:          { type: string }
+        priority:      { $ref: "#/components/schemas/RequestPriority" }
+        description:   { type: string }
+        location:      { type: string }
+        linkedEventId:
+          oneOf:
+            - { type: string }
+            - { type: "null" }
+          description: "null — снять привязку"
+        executorId:    { type: string, nullable: true }
+
+    # ─── Chat ───────────────────────────────────────────────────────────
+    ChatMessage:
+      type: object
+      required: [id, entityType, entityId, senderId, senderName, text, createdAt]
+      properties:
+        id:         { type: string }
+        entityType: { type: string, enum: [incidents, requests] }
+        entityId:   { type: string }
+        senderId:   { type: string }
+        senderName: { type: string }
+        text:       { type: string }
+        createdAt:  { type: string, format: date-time }
+        edited:     { type: boolean, default: false }
+
+    # ─── Notifications ──────────────────────────────────────────────────
+    Notification:
+      type: object
+      required: [id, title, desc, type, read, createdAt]
+      properties:
+        id:         { type: string }
+        title:      { type: string }
+        desc:       { type: string }
+        type:       { $ref: "#/components/schemas/NotificationType" }
+        read:       { type: boolean }
+        createdAt:  { type: string, format: date-time }
+        link:       { type: string, nullable: true, description: "Внутренняя ссылка SPA, например /events/EVT-1" }
+        entityType: { type: string, nullable: true, enum: [incidents, requests, null] }
+        entityId:   { type: string, nullable: true }
+
+    # ─── Announcements ──────────────────────────────────────────────────
+    Announcement:
+      type: object
+      required: [id, title, content, priority, createdAt, authorId]
+      properties:
+        id:        { type: string }
+        title:     { type: string }
+        content:   { type: string }
+        priority:  { $ref: "#/components/schemas/AnnouncementPriority" }
+        createdAt: { type: string, format: date-time }
+        authorId:  { type: string }
+
+    AnnouncementInput:
+      type: object
+      required: [title, content, priority]
+      properties:
+        title:    { type: string }
+        content:  { type: string }
+        priority: { $ref: "#/components/schemas/AnnouncementPriority" }
+
+    # ─── User Settings ──────────────────────────────────────────────────
+    UserSettings:
+      type: object
+      required: [emailNotification, quietMode]
+      properties:
+        emailNotification: { type: boolean }
+        quietMode:
+          type: object
+          required: [enabled, from, to, days]
+          properties:
+            enabled: { type: boolean }
+            from:    { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$", example: "22:00" }
+            to:      { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$", example: "08:00" }
+            days:
+              type: array
+              description: "Номера дней недели (0=Пн, 6=Вс)"
+              items: { type: integer, minimum: 0, maximum: 6 }
+
+    A11ySettings:
+      type: object
+      required: [grayscale, fontScale]
+      properties:
+        grayscale: { type: boolean }
+        fontScale:
+          type: number
+          enum: [0.9, 1, 1.125, 1.25]
+
+    # ─── Help ───────────────────────────────────────────────────────────
+    FaqItem:
+      type: object
+      required: [id, question, answer]
+      properties:
+        id:       { type: string }
+        question: { type: string }
+        answer:   { type: string }
+        order:    { type: integer, nullable: true }
+
+    HelpDocument:
+      type: object
+      required: [id, title, url]
+      properties:
+        id:       { type: string }
+        title:    { type: string }
+        url:      { type: string, format: uri }
+        size:     { type: string, nullable: true, example: "2.4 MB" }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    # ─── Push ───────────────────────────────────────────────────────────
+    PushSubscriptionInput:
+      type: object
+      required: [endpoint, keys]
+      properties:
+        endpoint:  { type: string, format: uri }
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh: { type: string }
+            auth:   { type: string }
+        userAgent: { type: string, nullable: true }
+
+    # ─── Analytics (lean dataset) ───────────────────────────────────────
+    AnalyticsEventItem:
+      type: object
+      required: [createdAt, status, categoryId]
+      properties:
+        createdAt:    { type: string, format: date-time }
+        status:       { $ref: "#/components/schemas/IncidentStatus" }
+        categoryId:   { type: string }
+        categoryName: { type: string, nullable: true, description: "Опционально, для подписей графиков" }
+
+    AnalyticsRequestItem:
+      type: object
+      required: [createdAt, status, priority, type, responsibleDept]
+      properties:
+        createdAt:       { type: string, format: date-time }
+        completedAt:     { type: string, format: date-time, nullable: true }
+        status:          { $ref: "#/components/schemas/RequestStatus" }
+        priority:        { $ref: "#/components/schemas/RequestPriority" }
+        type:            { type: string, description: "Код службы" }
+        responsibleDept: { type: string }
+
+    # ─── Common ─────────────────────────────────────────────────────────
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true

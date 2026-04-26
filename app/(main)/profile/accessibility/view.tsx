@@ -49,7 +49,6 @@ export function AccessibilityView() {
     notify.info("Настройки сброшены", "Применены значения по умолчанию.");
   };
 
-  // Пока грузится — показываем хедер, но сами настройки без вспышки.
   const current = settings ?? DEFAULT_A11Y;
   const isReady = settings !== null;
 

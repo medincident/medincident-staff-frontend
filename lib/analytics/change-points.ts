@@ -57,7 +57,7 @@ function welchT(left: number[], right: number[]): number {
 function findBestSplit(
   values: number[],
   start: number,
-  end: number, // эксклюзивно
+  end: number,
   minSegment: number,
 ): { index: number; absT: number } | null {
   let bestIdx = -1;
@@ -89,7 +89,7 @@ export function detectChangePoints(
   const n = values.length;
   if (n < minSegment * 2) return points;
 
-  // Стек сегментов для рекурсивной бинарной сегментации (без реальной рекурсии)
+  // Стек сегментов для рекурсивной бинарной сегментации
   const queue: Array<[number, number]> = [[0, n]];
 
   while (queue.length && points.length < maxPoints) {

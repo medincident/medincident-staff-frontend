@@ -24,11 +24,9 @@ import { FAQ_DB } from "@/lib/mock-db";
 export function HelpView() {
   const router = useRouter();
   
-  // --- STATE ---
   const [faqItems, setFaqItems] = useState<FaqItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. ЗАГРУЗКА ДАННЫХ
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -36,7 +34,6 @@ export function HelpView() {
         
         await new Promise(resolve => setTimeout(resolve, 600));
         
-        // Берем данные из моков
         setFaqItems(FAQ_DB);
       } catch (error) {
         console.error("Failed to load FAQ:", error);

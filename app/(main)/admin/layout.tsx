@@ -33,18 +33,12 @@ export default function AdminLayout({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Мобильная навигация: 5 разделов не влезают в табы без обрезания,
-          поэтому используем Select. Название текущего раздела всегда видно
-          полностью, иконка слева — визуальный якорь. На десктопе этот блок
-          скрыт (md:hidden), там своя навигация. */}
       <div className="md:hidden w-full pb-4">
         <Select
           value={pathname}
           onValueChange={(href) => router.push(href)}
         >
           <SelectTrigger className="w-full h-11">
-            {/* Кастомное содержимое триггера — дефолтный SelectValue не
-                умеет показывать иконку перед текстом. */}
             <span className="flex items-center gap-2.5 min-w-0">
               <CurrentIcon className="h-4 w-4 text-primary shrink-0" />
               <span className="truncate font-medium">{currentTab.label}</span>

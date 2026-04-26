@@ -3,13 +3,6 @@
 import { useEffect } from "react";
 import { detectMiniApp } from "@/lib/miniapp";
 
-/**
- * Монтируется один раз в корневом layout.
- * В мини-апп окружении:
- *  - ставит data-miniapp на <html> (для CSS-селекторов)
- *  - синхронизирует CSS-переменную --dvh с реальной высотой вьюпорта
- *    (решает сломанный 100vh в WebView Telegram/MAX)
- */
 export function MiniAppInit() {
   useEffect(() => {
     if (!detectMiniApp()) return;
@@ -23,7 +16,6 @@ export function MiniAppInit() {
 
     syncHeight();
     window.addEventListener("resize", syncHeight);
-    // Клавиатура на мобильных тоже меняет innerHeight
     window.visualViewport?.addEventListener("resize", syncHeight);
 
     return () => {
