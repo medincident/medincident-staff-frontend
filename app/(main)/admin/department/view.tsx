@@ -17,53 +17,67 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { notify } from "@/lib/toast";
-import { User } from "@/lib/types";
-import { DepartmentsService } from "@/lib/api";
+import {
+  MembershipQueryServiceService,
+  MembershipCommandServiceService,
+  OrgStructureQueryServiceService,
+  v1EmployeeCardView,
+} from "@/lib/api-generated";
+import { useSession } from "next-auth/react";
 
 export function DepartmentView() {
+  const { data: session } = useSession();
+
   const [headId, setHeadId] = useState("");
   const [isActingEnabled, setIsActingEnabled] = useState(false);
   const [actingId, setActingId] = useState("");
   const [departmentName, setDepartmentName] = useState("");
-  const [staff, setStaff] = useState<User[]>([]);
-  const [description, setDescription] = useState("");
+  const [staff, setStaff] = useState<v1EmployeeCardView[]>([]);
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const departmentId = "YOUR_DEPARTMENT_ID";
-
   useEffect(() => {
     const loadData = async () => {
+      if (!session) return;
+
       try {
         setIsLoading(true);
 
-        const [deptData, staffData, responsiblesData] = await Promise.all([
-          DepartmentsService.getDepartmentById(departmentId),
-          DepartmentsService.listDepartmentEmployees(departmentId, undefined, undefined, 100),
-          DepartmentsService.listDepartmentResponsibles(departmentId)
-        ]);
+        const userId = (session.user as any)?.id;
+        if (!userId) return;
 
-        setDepartmentName(deptData.name || "Настройки отделения");
-        setDescription(deptData.description || "");
+        // Получаем employeeId текущего пользователя
+        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+        const emp = (empRes as any).employee as v1EmployeeCardView | undefined;
+        if (!emp?.departmentId) {
+          notify.error("Ошибка", "У вас не указано отделение.");
+          setIsLoading(false);
+          return;
+        }
 
-        const mappedStaff = staffData.items.map(emp => ({
-          ...emp.user,
-          position: emp.position
-        }));
-        setStaff(mappedStaff as any);
+        setDepartmentId(emp.departmentId);
 
-        const directResponsibles = responsiblesData.items
-          .filter(r => r.isDirectlyAssigned)
-          .map(r => r.user.id);
+        // Загружаем данные отделения
+        const deptRes = await OrgStructureQueryServiceService.orgStructureQueryServiceGetDepartment(emp.departmentId);
+        const deptData = (deptRes as any).department;
+        setDepartmentName(deptData?.name || "Настройки отделения");
 
-        setHeadId(directResponsibles[0] || "");
-        if (directResponsibles.length > 1) {
-          setIsActingEnabled(true);
-          setActingId(directResponsibles[1]);
-        } else {
-          setIsActingEnabled(false);
-          setActingId("");
+        // Загружаем сотрудников отделения
+        const staffRes = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByDepartment(emp.departmentId, 100);
+        const staffItems = (staffRes as any).items as v1EmployeeCardView[] || [];
+        setStaff(staffItems);
+
+        // Загружаем ответственного за отделение
+        try {
+          const headRes = await MembershipQueryServiceService.membershipQueryServiceGetDepartmentResponsible(emp.departmentId);
+          const deptHead = (headRes as any).employee as v1EmployeeCardView | undefined;
+          if (deptHead?.employeeId) {
+            setHeadId(deptHead.employeeId);
+          }
+        } catch {
+          // Руководитель не назначен — ок
         }
       } catch (error) {
         notify.error("Ошибка", "Не удалось загрузить данные отделения.");
@@ -72,38 +86,28 @@ export function DepartmentView() {
       }
     };
 
-    if (departmentId) loadData();
-  }, [departmentId]);
+    loadData();
+  }, [session]);
 
   const handleSave = async () => {
+    if (!departmentId) return;
     try {
       setIsSaving(true);
 
-      await DepartmentsService.updateDepartment(departmentId, {
-        name: departmentName,
-        description: description || null
-      });
-
-      const newResponsibleIds = [headId];
-      if (isActingEnabled && actingId) newResponsibleIds.push(actingId);
-      const validNewIds = newResponsibleIds.filter(Boolean);
-
-      const currentResponsibles = await DepartmentsService.listDepartmentResponsibles(departmentId);
-      const currentDirectIds = currentResponsibles.items
-        .filter(r => r.isDirectlyAssigned)
-        .map(r => r.user.id);
-
-      const toRemove = currentDirectIds.filter(id => !validNewIds.includes(id));
-      const toAdd = validNewIds.filter(id => !currentDirectIds.includes(id));
-
-      for (const id of toRemove) {
-        await DepartmentsService.removeDepartmentResponsible(departmentId, id);
-      }
-      for (const id of toAdd) {
-        await DepartmentsService.addDepartmentResponsible(departmentId, { userId: id });
+      // Обновляем ответственного
+      if (headId) {
+        try {
+          await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsible(departmentId, {
+            employeeId: headId
+          });
+        } catch {
+          // Уже назначен — игнорируем
+        }
       }
 
-      notify.mutationSuccess("Изменения сохранены", "Отделение и структура управления обновлены.");
+      // Примечание: управление заместителем (И.О.) временно недоступно — эндпоинт отсутствует в API.
+
+      notify.mutationSuccess("Изменения сохранены", "Структура управления отделения обновлена.");
     } catch (error) {
       notify.mutationError("Ошибка сохранения", "Проверьте соединение с сервером и попробуйте ещё раз.");
     } finally {
@@ -111,10 +115,12 @@ export function DepartmentView() {
     }
   };
 
-  const renderSelectItem = (u: any) => (
-    <SelectItem key={u.id} value={u.id} className="cursor-pointer">
+  const renderSelectItem = (u: v1EmployeeCardView) => (
+    <SelectItem key={u.employeeId} value={u.employeeId as string} className="cursor-pointer">
       <div className="flex flex-col sm:flex-row sm:items-center w-full max-w-60 sm:max-w-md overflow-hidden text-left">
-        <span className="truncate text-sm font-normal text-foreground">{u.name}</span>
+        <span className="truncate text-sm font-normal text-foreground">
+          {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
+        </span>
         <span className="truncate text-muted-foreground text-xs sm:ml-2">
           ({u.position || "Сотрудник"})
         </span>
@@ -204,7 +210,7 @@ export function DepartmentView() {
                           </div>
                         </SelectTrigger>
                         <SelectContent className="max-w-[90vw] sm:max-w-none max-h-[40vh]">
-                          {staff.filter(u => u.id !== headId).map(renderSelectItem)}
+                          {staff.filter(u => u.employeeId !== headId).map(renderSelectItem)}
                         </SelectContent>
                       </Select>
 

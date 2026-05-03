@@ -1,8 +1,14 @@
+import { withAuth } from "next-auth/middleware";
 import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
 
-export default function middleware(req: NextRequest) {
-  return NextResponse.next();
+const authMiddleware = withAuth({
+  pages: {
+    signIn: "/api/auth/signin",
+  },
+});
+
+export default function middleware(req: NextRequest, event: any) {
+  return authMiddleware(req as any, event);
 }
 
 export const config = {

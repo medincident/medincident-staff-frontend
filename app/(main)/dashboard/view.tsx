@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   AlertTriangle,
   Wrench,
@@ -24,11 +25,21 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-import { ServiceRequest, Announcement, IncidentEvent, Category } from "@/lib/types";
-import { ROLE_NAMES, PRIORITY_MAP } from "@/lib/constants"; 
-import { UsersService } from "@/lib/api";
-import { eventsDb, requestsDb, MOCK_ANNOUNCEMENTS, CLASSIFIER_DB } from "@/lib/mock-db";
+import { ROLE_NAMES, STATUS_MAP } from "@/lib/constants"; 
 import { getBadgeColor } from "@/lib/status-helper";
+
+import { 
+
+  MembershipQueryServiceService,
+  IncidentQueryServiceService,
+  ServiceRequestQueryServiceService,
+  AnnouncementQueryServiceService,
+  IncidentClassifierQueryServiceService,
+  v1IncidentView,
+  v1ServiceRequest,
+  v1AnnouncementView,
+  v1Category
+} from "@/lib/api-generated";
 
 const safeDate = (dateString?: string) => {
   if (!dateString) return "—";
@@ -38,11 +49,13 @@ const safeDate = (dateString?: string) => {
 };
 
 export function DashboardView() {
-  const [user, setUser] = useState<any | null>(null);
-  const [events, setEvents] = useState<IncidentEvent[]>([]);
-  const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [classifier, setClassifier] = useState<Category[]>([]);
+  const { data: session } = useSession();
+
+  const user = session?.user as any;
+  const [events, setEvents] = useState<v1IncidentView[]>([]);
+  const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
+  const [announcements, setAnnouncements] = useState<v1AnnouncementView[]>([]);
+  const [classifier, setClassifier] = useState<v1Category[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
 
@@ -51,17 +64,33 @@ export function DashboardView() {
       try {
         setIsLoading(true);
         
-        const userData = await UsersService.getMe();
-        setUser(userData);
+        const userId = (session?.user as any)?.id;
+        if (userId) {
+          const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+          const orgId = empRes && "employee" in empRes ? empRes.employee?.organizationId : null;
 
-        await new Promise(resolve => setTimeout(resolve, 600));
+          if (orgId) {
+            const [eventsRes, reqsRes, annRes, classRes] = await Promise.all([
+              IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
+              ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequests(orgId, 50),
+              AnnouncementQueryServiceService.announcementQueryServiceListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
+              IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(orgId, 100)
+            ]);
 
-        // Устанавливаем данные из моков
-        setEvents(eventsDb);
-        setRequests(requestsDb);
-        setAnnouncements(MOCK_ANNOUNCEMENTS);
-        setClassifier(CLASSIFIER_DB);
-
+            if (eventsRes && "items" in eventsRes && eventsRes.items) {
+              setEvents(eventsRes.items);
+            }
+            if (reqsRes && "items" in reqsRes && reqsRes.items) {
+              setRequests(reqsRes.items);
+            }
+            if (annRes && "items" in annRes && annRes.items) {
+              setAnnouncements(annRes.items);
+            }
+            if (classRes && "items" in classRes && classRes.items) {
+              setClassifier(classRes.items);
+            }
+          }
+        }
       } catch (error) {
         console.error("Dashboard data load failed:", error);
       } finally {
@@ -70,29 +99,30 @@ export function DashboardView() {
     };
 
     loadData();
-  }, []);
+  }, [session]);
   
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const types: Record<string, string> = {};
     const cats: Record<string, string> = {};
     classifier.forEach(cat => {
-      cats[cat.id] = cat.name;
-      cat.types.forEach(t => { types[t.id] = t.name; });
+      if (cat.id && cat.name) cats[cat.id] = cat.name;
     });
     return { typeNamesMap: types, categoryNamesMap: cats };
   }, [classifier]);
 
-  const activeEvents = events.filter(e => e.status !== 'closed' && e.status !== 'completed');
-  const activeRequests = requests.filter(r => r.status !== 'completed' && r.status !== 'cancelled' && r.status !== 'refused');
-  const recentEvents = events.slice(0, 3);
+  // FIXME: Active items logic based on actual status enums
+  const activeEvents = events.filter(e => {
+      const s = (e.status || "").toLowerCase();
+      return !s.includes("closed") && !s.includes("completed");
+  });
   
-  const myActiveRequests = [...activeRequests]
-    .sort((a, b) => {
-        if (a.priority === 'critical' && b.priority !== 'critical') return -1;
-        if (b.priority === 'critical' && a.priority !== 'critical') return 1;
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-    })
-    .slice(0, 3);
+  const activeRequests = requests.filter(r => {
+      const s = (r.status || "").toLowerCase();
+      return !s.includes("completed") && !s.includes("cancelled") && !s.includes("refused");
+  });
+  
+  const recentEvents = events.slice(0, 3);
+  const myActiveRequests = activeRequests.slice(0, 3);
 
   return (
     <div className="space-y-6 pb-20 overflow-x-hidden">
@@ -160,7 +190,7 @@ export function DashboardView() {
 
         <StatsCard
           title="Всего в работе"
-          value={isLoading ? <Skeleton className="h-8 w-12" /> : requests.filter(r => r.status === 'in_work').length}
+          value={isLoading ? <Skeleton className="h-8 w-12" /> : requests.filter(r => (r.status || "").toLowerCase().includes("in_work")).length}
           desc="Выполняются сейчас"
           icon={Wrench}
           iconColor="text-muted-foreground"
@@ -236,39 +266,42 @@ export function DashboardView() {
                  ))
               ) : myActiveRequests.length > 0 ? (
                 <>
-                  {myActiveRequests.map(req => (
-                    <Link 
-                      key={req.id} 
-                      href={`/requests/${req.id}`}
-                      className="group flex items-center justify-between p-4 bg-card border rounded-xl transition-all cursor-pointer border-border hover:border-primary/50"
-                    >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-colors">
-                          <Wrench className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1.5 min-w-0 flex-1">
-                          <h4 className="font-bold text-sm text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-                            Заявка #{req.number}
-                          </h4>
-                          
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {req.description}
-                          </p>
-
-                          <div className="text-xs text-muted-foreground flex items-center gap-2 pt-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="h-3 w-3" />
-                              <span>{safeDate(req.createdAt)}</span>
+                  {myActiveRequests.map(req => {
+                    const reqStatus = (req.status || "").toLowerCase().replace("service_request_status_", "");
+                    return (
+                        <Link 
+                        key={req.id} 
+                        href={`/requests/${req.id}`}
+                        className="group flex items-center justify-between p-4 bg-card border rounded-xl transition-all cursor-pointer border-border hover:border-primary/50"
+                        >
+                        <div className="flex items-center gap-4 min-w-0">
+                            <div className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-colors">
+                            <Wrench className="h-5 w-5" />
                             </div>
-                            <Badge variant="outline" className={`font-medium text-[9px] h-4 px-1.5 ${getBadgeColor(req.priority)}`}>
-                              {PRIORITY_MAP[req.priority]}
-                            </Badge>
-                          </div>
+                            <div className="space-y-1.5 min-w-0 flex-1">
+                            <h4 className="font-bold text-sm text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                                Заявка #{req.id?.substring(0,8)}
+                            </h4>
+                            
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                                {req.description}
+                            </p>
+
+                            <div className="text-xs text-muted-foreground flex items-center gap-2 pt-0.5">
+                                <div className="flex items-center gap-1.5">
+                                <Clock className="h-3 w-3" />
+                                <span>{safeDate(req.createdAt)}</span>
+                                </div>
+                                <Badge variant="outline" className={`font-medium text-[9px] h-4 px-1.5 ${getBadgeColor(reqStatus as any)}`}>
+                                    {STATUS_MAP[reqStatus as any] || req.status}
+                                </Badge>
+                            </div>
+                            </div>
                         </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition-colors shrink-0 ml-2 group-hover:text-primary" />
-                    </Link>
-                  ))}
+                        <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition-colors shrink-0 ml-2 group-hover:text-primary" />
+                        </Link>
+                    )
+                  })}
                   <Link href="/requests" className="block pt-2">
                     <Button variant="outline" className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary">
                       Перейти ко всем заявкам
@@ -308,7 +341,7 @@ export function DashboardView() {
                 announcements.map((item, index) => (
                   <div key={item.id}>
                     <div className="flex gap-3 items-start relative pl-3">
-                      <div className={`absolute left-0 top-1.5 bottom-1.5 w-0.5 ${item.priority === 'high' ? 'bg-primary' : 'bg-muted-foreground'}`} />
+                      <div className={`absolute left-0 top-1.5 bottom-1.5 w-0.5 ${item.priority === 'ANNOUNCEMENT_PRIORITY_HIGH' ? 'bg-primary' : 'bg-muted-foreground'}`} />
                       <div className="min-w-0">
                         <p className="text-xs font-semibold truncate">{item.title}</p>
                         <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed wrap-break-word">
@@ -332,9 +365,9 @@ export function DashboardView() {
   );
 }
 
-function EventItem({ evt, typeMap, catMap }: { evt: IncidentEvent, typeMap: Record<string, string>, catMap: Record<string, string> }) {
-  const typeName = typeMap[evt.typeId || ""] || evt.typeName || evt.typeId;
-  const categoryName = catMap[evt.categoryId] || evt.categoryName || evt.categoryId;
+function EventItem({ evt, typeMap, catMap }: { evt: v1IncidentView, typeMap: Record<string, string>, catMap: Record<string, string> }) {
+  const typeName = typeMap[evt.typeId || ""] || evt.typeId || "Неизвестный тип";
+  const categoryName = catMap[evt.categoryId || ""] || evt.categoryId || "Неизвестная категория";
 
   return (
     <Link
@@ -347,7 +380,7 @@ function EventItem({ evt, typeMap, catMap }: { evt: IncidentEvent, typeMap: Reco
         </div>
         <div className="space-y-1 min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-mono font-bold text-muted-foreground whitespace-nowrap">{evt.code}</span>
+            <span className="text-xs font-mono font-bold text-muted-foreground whitespace-nowrap">#{evt.id?.substring(0,8)}</span>
           </div>
           <h4 className="font-bold text-sm text-foreground line-clamp-1 break-all transition-colors group-hover:text-primary">
             {typeName}

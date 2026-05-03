@@ -44,11 +44,12 @@ import {
 } from "@/components/ui/select";
 import { notify } from "@/lib/toast";
 import {
-  OrganizationsService,
-  ClinicsService,
-  DepartmentsService,
-  UsersService
-} from "@/lib/api";
+  MembershipQueryServiceService,
+  MembershipCommandServiceService,
+  OrgStructureQueryServiceService,
+  OrgStructureCommandServiceService,
+} from "@/lib/api-generated";
+import type { v1EmployeeCardView } from "@/lib/api-generated";
 
 export function StructureView() {
   const [organizations, setOrganizations] = useState<any[]>([]);
@@ -56,7 +57,7 @@ export function StructureView() {
   const [isOrgsLoading, setIsOrgsLoading] = useState(true);
 
   const [clinics, setClinics] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<v1EmployeeCardView[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -75,10 +76,11 @@ export function StructureView() {
   useEffect(() => {
     const loadOrgs = async () => {
       try {
-        const res = await OrganizationsService.listOrganizations(true);
-        setOrganizations(res.items);
-        if (res.items.length > 0) {
-          setSelectedOrgId(res.items[0].id);
+        const res = await OrgStructureQueryServiceService.orgStructureQueryServiceListOrganizations(100);
+        const items = (res as any).items || [];
+        setOrganizations(items);
+        if (items.length > 0) {
+          setSelectedOrgId(items[0].id);
         }
       } catch (error) {
         notify.error("Ошибка", "Не удалось загрузить список организаций.");
@@ -95,26 +97,39 @@ export function StructureView() {
     try {
       setIsLoading(true);
 
-      const usersRes = await UsersService.listUsers(false, undefined, undefined, 100);
-      setUsers(usersRes.items);
+      // Загружаем сотрудников организации (для выбора руководителей)
+      const usersRes = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByOrganization(selectedOrgId, 100);
+      setUsers((usersRes as any).items || []);
 
-      const clinicsRes = await ClinicsService.listOrganizationClinics(selectedOrgId, true, search || undefined);
+      // Загружаем клиники
+      const clinicsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListClinicsByOrganization(selectedOrgId, 100);
+      const clinicsItems = (clinicsRes as any).items || [];
 
-      const builtClinics = await Promise.all(clinicsRes.items.map(async (clinic) => {
-        const [deptsRes, respRes] = await Promise.all([
-          DepartmentsService.listClinicDepartments(clinic.id, true, search || undefined),
-          ClinicsService.listClinicResponsibles(clinic.id)
-        ]);
+      // Фильтрация по поиску (клиентская)
+      const filteredClinics = search
+        ? clinicsItems.filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()))
+        : clinicsItems;
 
-        const directHead = respRes.items.find(r => r.isDirectlyAssigned)?.user.id;
+      const builtClinics = await Promise.all(filteredClinics.map(async (clinic: any) => {
+        const deptsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListDepartmentsByClinic(clinic.id, 100);
+        const deptsItems = (deptsRes as any).items || [];
 
-        const builtDepts = await Promise.all(deptsRes.items.map(async (dept) => {
-          const dRespRes = await DepartmentsService.listDepartmentResponsibles(dept.id);
-          const dDirectHead = dRespRes.items.find(r => r.isDirectlyAssigned)?.user.id;
-          return { ...dept, headId: dDirectHead };
+        let clinicHeadId: string | undefined;
+        try {
+          const cHeadRes = await MembershipQueryServiceService.membershipQueryServiceGetClinicHead(clinic.id);
+          clinicHeadId = (cHeadRes as any).employee?.employeeId;
+        } catch { /* нет руководителя */ }
+
+        const builtDepts = await Promise.all(deptsItems.map(async (dept: any) => {
+          let deptHeadId: string | undefined;
+          try {
+            const dHeadRes = await MembershipQueryServiceService.membershipQueryServiceGetDepartmentResponsible(dept.id);
+            deptHeadId = (dHeadRes as any).employee?.employeeId;
+          } catch { /* нет заведующего */ }
+          return { ...dept, headId: deptHeadId };
         }));
 
-        return { ...clinic, headId: directHead, departments: builtDepts };
+        return { ...clinic, headId: clinicHeadId, departments: builtDepts };
       }));
 
       setClinics(builtClinics);
@@ -130,23 +145,28 @@ export function StructureView() {
     loadData();
   }, [selectedOrgId, search]);
 
-  const getUserName = (userId?: string) => {
-    if (!userId) return null;
-    const user = users.find(u => u.id === userId);
-    return user ? (user.name || `${user.givenName} ${user.familyName}`) : null;
+  const getUserName = (employeeId?: string) => {
+    if (!employeeId) return null;
+    const user = users.find(u => u.employeeId === employeeId);
+    return user ? (user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim()) : null;
   };
 
   const syncResponsible = async (
     targetId: string,
     oldHeadId: string | undefined,
     newHeadId: string,
-    addMethod: any,
-    removeMethod: any
+    type: "clinic" | "department"
   ) => {
     const finalNewId = newHeadId === "none" ? undefined : newHeadId;
     if (oldHeadId === finalNewId) return;
-    if (oldHeadId) await removeMethod(targetId, oldHeadId);
-    if (finalNewId) await addMethod(targetId, { userId: finalNewId });
+
+    if (type === "clinic") {
+      if (oldHeadId) await MembershipCommandServiceService.membershipCommandServiceRevokeClinicHead(targetId, oldHeadId).catch(() => {});
+      if (finalNewId) await MembershipCommandServiceService.membershipCommandServiceAssignClinicHead(targetId, { employeeId: finalNewId }).catch(() => {});
+    } else {
+      if (oldHeadId) await MembershipCommandServiceService.membershipCommandServiceRevokeDepartmentResponsible(targetId, oldHeadId).catch(() => {});
+      if (finalNewId) await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsible(targetId, { employeeId: finalNewId }).catch(() => {});
+    }
   };
 
   const openClinicModal = (clinic?: any) => {
@@ -154,7 +174,7 @@ export function StructureView() {
       setEditingItem({ id: clinic.id, oldHeadId: clinic.headId });
       setNewName(clinic.name);
       setNewDescription(clinic.description || "");
-      setNewAddress(clinic.physicalAddress?.value || clinic.address || "");
+      setNewAddress(clinic.physicalAddress || "");
       setNewHeadId(clinic.headId || "none");
     } else {
       setEditingItem(null);
@@ -171,26 +191,23 @@ export function StructureView() {
     setIsSaving(true);
     try {
       if (editingItem?.id) {
-        await ClinicsService.updateClinic(editingItem.id, {
+        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateClinicDetails(editingItem.id, {
           name: newName,
-          description: newDescription || null,
-          physicalAddress: { value: newAddress }
+          description: newDescription || ""
         });
-        await syncResponsible(
-          editingItem.id,
-          editingItem.oldHeadId,
-          newHeadId,
-          ClinicsService.addClinicResponsible,
-          ClinicsService.removeClinicResponsible
-        );
+        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateClinicPhysicalAddress(editingItem.id, {
+          physicalAddress: { text: newAddress }
+        });
+        await syncResponsible(editingItem.id, editingItem.oldHeadId, newHeadId, "clinic");
       } else {
-        const newClinic = await ClinicsService.createClinic(selectedOrgId, {
+        const newClinicRes = await OrgStructureCommandServiceService.orgStructureCommandServiceCreateClinic(selectedOrgId, {
           name: newName,
-          description: newDescription || null,
-          physicalAddress: { value: newAddress }
+          description: newDescription || "",
+          physicalAddress: { text: newAddress }
         });
-        if (newHeadId !== "none") {
-          await ClinicsService.addClinicResponsible(newClinic.id, { userId: newHeadId });
+        const newClinicId = (newClinicRes as any).id;
+        if (newHeadId !== "none" && newClinicId) {
+          await MembershipCommandServiceService.membershipCommandServiceAssignClinicHead(newClinicId, { employeeId: newHeadId });
         }
       }
       notify.mutationSuccess("Успешно", "Клиника сохранена.");
@@ -203,31 +220,12 @@ export function StructureView() {
     }
   };
 
-  const toggleClinicStatus = async (id: string, isActive: boolean) => {
-    try {
-      if (isActive) {
-        await ClinicsService.deactivateClinic(id);
-        notify.mutationSuccess("Клиника деактивирована", "Клиника скрыта из активной структуры.");
-      } else {
-        await ClinicsService.reactivateClinic(id);
-        notify.mutationSuccess("Клиника активирована", "Клиника снова доступна для работы.");
-      }
-      loadData();
-    } catch (e) {
-      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус клиники.");
-    }
+  const toggleClinicStatus = async (_id: string, _isActive: boolean) => {
+    notify.error("Не поддерживается", "В новом API удаление/деактивация клиник пока недоступны.");
   };
 
-  const deleteClinic = async (id: string) => {
-    if (confirm("Вы уверены? Удалить клинику можно только если в ней нет отделений и сотрудников.")) {
-      try {
-        await ClinicsService.deleteClinic(id);
-        notify.mutationSuccess("Клиника удалена", "Запись клиники удалена из системы.");
-        loadData();
-      } catch (e) {
-        notify.mutationError("Ошибка удаления", "Убедитесь, что клиника пуста.");
-      }
-    }
+  const deleteClinic = async (_id: string) => {
+    notify.error("Не поддерживается", "В новом API удаление клиник пока недоступно.");
   };
 
   const openDeptModal = (clinicId: string, dept?: any) => {
@@ -251,24 +249,19 @@ export function StructureView() {
     setIsSaving(true);
     try {
       if (editingItem?.id) {
-        await DepartmentsService.updateDepartment(editingItem.id, {
+        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateDepartmentDetails(editingItem.id, {
           name: newName,
-          description: newDescription || null
+          description: newDescription || ""
         });
-        await syncResponsible(
-          editingItem.id,
-          editingItem.oldHeadId,
-          newHeadId,
-          DepartmentsService.addDepartmentResponsible,
-          DepartmentsService.removeDepartmentResponsible
-        );
+        await syncResponsible(editingItem.id, editingItem.oldHeadId, newHeadId, "department");
       } else {
-        const newDept = await DepartmentsService.createDepartment(targetClinicId, {
+        const newDeptRes = await OrgStructureCommandServiceService.orgStructureCommandServiceCreateDepartment(targetClinicId, {
           name: newName,
-          description: newDescription || null
+          description: newDescription || ""
         });
-        if (newHeadId !== "none") {
-          await DepartmentsService.addDepartmentResponsible(newDept.id, { userId: newHeadId });
+        const newDeptId = (newDeptRes as any).id;
+        if (newHeadId !== "none" && newDeptId) {
+          await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsible(newDeptId, { employeeId: newHeadId });
         }
       }
       notify.mutationSuccess("Успешно", "Отделение сохранено.");
@@ -281,31 +274,12 @@ export function StructureView() {
     }
   };
 
-  const toggleDeptStatus = async (id: string, isActive: boolean) => {
-    try {
-      if (isActive) {
-        await DepartmentsService.deactivateDepartment(id);
-        notify.mutationSuccess("Отделение деактивировано", "Отделение скрыто из активной структуры.");
-      } else {
-        await DepartmentsService.reactivateDepartment(id);
-        notify.mutationSuccess("Отделение активировано", "Отделение снова доступно для работы.");
-      }
-      loadData();
-    } catch (e) {
-      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус отделения.");
-    }
+  const toggleDeptStatus = async (_id: string, _isActive: boolean) => {
+    notify.error("Не поддерживается", "В новом API деактивация отделений пока недоступна.");
   };
 
-  const deleteDept = async (deptId: string) => {
-    if (confirm("Удалить отделение? Это действие нельзя отменить.")) {
-      try {
-        await DepartmentsService.deleteDepartment(deptId);
-        notify.mutationSuccess("Отделение удалено", "Запись отделения удалена из системы.");
-        loadData();
-      } catch (e) {
-        notify.mutationError("Ошибка удаления", "Убедитесь, что в отделении нет сотрудников.");
-      }
-    }
+  const deleteDept = async (_deptId: string) => {
+    notify.error("Не поддерживается", "В новом API удаление отделений пока недоступно.");
   };
 
   return (
@@ -395,7 +369,7 @@ export function StructureView() {
             const clinicHeadName = getUserName(clinic.headId);
 
             return (
-              <Card key={clinic.id} className={`flex flex-col overflow-hidden gap-0 p-0 border ${clinic.isActive === false ? 'opacity-70 grayscale-[30%]' : ''}`}>
+              <Card key={clinic.id} className="flex flex-col overflow-hidden gap-0 p-0 border">
                 <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 overflow-hidden pr-2">
@@ -403,18 +377,14 @@ export function StructureView() {
                         <CardTitle className="text-sm font-bold truncate" title={clinic.name}>
                           {clinic.name}
                         </CardTitle>
-                        {clinic.isActive === false ? (
-                          <Badge variant="destructive" className="text-[10px] h-5 px-1.5 shrink-0">Неактивна</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border shrink-0">
-                            {clinic.departments.length} отд.
-                          </Badge>
-                        )}
+                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border shrink-0">
+                          {clinic.departments?.length || 0} отд.
+                        </Badge>
                       </div>
                       <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate" title={clinic.physicalAddress?.value || clinic.address}>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
                           <MapPin className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{clinic.physicalAddress?.value || clinic.address || "Адрес не указан"}</span>
+                          <span className="truncate">{clinic.physicalAddress || "Адрес не указан"}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-primary/80 truncate font-medium">
                           <UserIcon className="h-3 w-3 shrink-0" />
@@ -435,15 +405,9 @@ export function StructureView() {
                         <DropdownMenuItem onClick={() => openClinicModal(clinic)}>
                           <Pencil className="mr-2 h-4 w-4" /> Изменить
                         </DropdownMenuItem>
-                        {clinic.isActive !== false ? (
-                          <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, true)}>
-                            <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, false)}>
-                            <Power className="mr-2 h-4 w-4 text-emerald-500" /> Активировать
-                          </DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, true)}>
+                          <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive focus:bg-destructive/10"
                           onClick={() => deleteClinic(clinic.id)}
@@ -457,19 +421,18 @@ export function StructureView() {
 
                 <CardContent className="p-0 flex-1">
                   <div className="divide-y divide-border/50">
-                    {clinic.departments.length > 0 ? (
+                    {clinic.departments?.length > 0 ? (
                       clinic.departments.map((dept: any) => {
                         const deptHeadName = getUserName(dept.headId);
                         return (
-                          <div key={dept.id} className={`group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm ${dept.isActive === false ? 'opacity-60' : ''}`}>
+                          <div key={dept.id} className="group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm">
                             <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
                               <div className="p-1.5 text-info transition-colors">
                                 <Stethoscope className="h-3.5 w-3.5" />
                               </div>
                               <div className="min-w-0">
-                                <span className="text-foreground font-medium truncate block w-full flex items-center gap-2">
+                                <span className="text-foreground font-medium truncate block w-full">
                                   {dept.name}
-                                  {dept.isActive === false && <Badge variant="outline" className="text-[9px] h-4 py-0 px-1">откл</Badge>}
                                 </span>
                                 <span className="text-xs text-muted-foreground truncate block w-full opacity-80">
                                   {deptHeadName || "Руководитель не назначен"}
@@ -481,8 +444,8 @@ export function StructureView() {
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openDeptModal(clinic.id, dept)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleDeptStatus(dept.id, dept.isActive !== false)}>
-                                {dept.isActive !== false ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5 text-emerald-500" />}
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleDeptStatus(dept.id, true)}>
+                                <PowerOff className="h-3.5 w-3.5" />
                               </Button>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteDept(dept.id)}>
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -525,7 +488,7 @@ export function StructureView() {
       <Dialog open={isClinicDialogOpen} onOpenChange={setIsClinicDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingItem?.id ? 'Редактировать клинику' : 'Новая клиника'}</DialogTitle>
+            <DialogTitle>{editingItem?.id ? "Редактировать клинику" : "Новая клиника"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -549,8 +512,8 @@ export function StructureView() {
                 <SelectContent>
                   <SelectItem value="none">Не назначен</SelectItem>
                   {users.map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name || `${u.givenName} ${u.familyName}`}
+                    <SelectItem key={u.employeeId} value={u.employeeId as string}>
+                      {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -570,7 +533,7 @@ export function StructureView() {
       <Dialog open={isDeptDialogOpen} onOpenChange={setIsDeptDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingItem?.id ? 'Редактировать отделение' : 'Новое отделение'}</DialogTitle>
+            <DialogTitle>{editingItem?.id ? "Редактировать отделение" : "Новое отделение"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -590,8 +553,8 @@ export function StructureView() {
                 <SelectContent>
                   <SelectItem value="none">Не назначен</SelectItem>
                   {users.map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name || `${u.givenName} ${u.familyName}`}
+                    <SelectItem key={u.employeeId} value={u.employeeId as string}>
+                      {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -20,7 +20,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { UserSettings } from "@/lib/types";
-import { SETTINGS_DB } from "@/lib/mock-db";
 
 const WEEKDAYS = [
   { id: 0, label: "Пн" },
@@ -42,8 +41,24 @@ export function SettingsView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 600));
-        setSettings(JSON.parse(JSON.stringify(SETTINGS_DB)));
+        // Simulate network delay for UX
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const saved = localStorage.getItem("medincident_settings");
+        if (saved) {
+          setSettings(JSON.parse(saved));
+        } else {
+          // Default settings
+          setSettings({
+            emailNotification: true,
+            quietMode: {
+              enabled: false,
+              from: "22:00",
+              to: "08:00",
+              days: [5, 6]
+            }
+          });
+        }
       } catch (error) {
         console.error("Failed to load settings:", error);
         notify.error("Не удалось загрузить настройки", "Проверьте соединение и обновите страницу.");
@@ -59,8 +74,8 @@ export function SettingsView() {
 
     setIsSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      Object.assign(SETTINGS_DB, settings);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      localStorage.setItem("medincident_settings", JSON.stringify(settings));
       notify.mutationSuccess("Успешно", "Настройки сохранены.");
       router.refresh();
     } catch (error) {

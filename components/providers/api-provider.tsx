@@ -3,7 +3,7 @@
 import { useEffect, ReactNode } from "react";
 import { useSession, signOut } from "next-auth/react";
 import axios from "axios";
-import { OpenAPI } from "@/lib/api";
+import { OpenAPI } from "@/lib/api-generated";
 
 export function ApiProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();

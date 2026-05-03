@@ -5,11 +5,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, Save, Plus, Zap, Calendar, Siren, Link as LinkIcon, X } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { ArrowLeft, Loader2, Save, Plus, Link as LinkIcon, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -18,112 +18,131 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
 
-import { requestsDb, eventsDb, CLASSIFIER_DB } from "@/lib/mock-db";
-import { ServiceRequest } from "@/lib/types";
-import { SERVICE_TYPE_CONFIG } from "@/lib/constants";
+import { 
+  ServiceRequestCommandServiceService,
+  RequestClassifierQueryServiceService,
+  MembershipQueryServiceService,
+  IncidentQueryServiceService,
+  v1RequestType,
+  v1IncidentView,
+  ServiceRequestQueryServiceService
+} from "@/lib/api-generated";
 
 const formSchema = z.object({
-  type: z.string().min(1, { message: "Выберите тип работ" }),
-  location: z.string().min(1, { message: "Укажите кабинет или место" }),
-  priority: z.enum(["normal", "high", "critical"], {
-    message: "Выберите приоритет",
-  }),
+  typeId: z.string().min(1, { message: "Выберите тип работ" }),
   description: z.string().min(5, { message: "Опишите проблему (минимум 5 символов)" }),
-  linkedEventId: z.string().optional(),
+  incidentId: z.string().optional(),
 });
 
 type RequestFormValues = z.infer<typeof formSchema>;
 
 interface RequestFormProps {
-  initialData?: RequestFormValues & { id?: string; number?: number };
+  requestId?: string;
 }
 
-function RequestFormContent({ initialData }: RequestFormProps) {
+function RequestFormContent({ requestId }: RequestFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const linkedEventIdParam = searchParams.get("linkedEventId");
+  const { data: session } = useSession();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requestTypes, setRequestTypes] = useState<v1RequestType[]>([]);
+  const [incidents, setIncidents] = useState<v1IncidentView[]>([]);
+  const [employeeDeptId, setEmployeeDeptId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(!!requestId);
 
-  const isEditMode = !!initialData;
-
-  const eventOptions = useMemo(() => {
-    const typeNames: Record<string, string> = {};
-    CLASSIFIER_DB.forEach(cat => cat.types.forEach(t => { typeNames[t.id] = t.name; }));
-    return [...eventsDb]
-      .filter(e => e.status !== "closed")
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .map(e => ({
-        value: e.id,
-        label: `${e.code} — ${typeNames[e.typeId] || e.typeName || e.typeId}`,
-      }));
-  }, []);
+  const isEditMode = !!requestId;
 
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      type: initialData?.type || "",
-      location: initialData?.location || "",
-      priority: (initialData?.priority as "normal" | "high" | "critical") || "normal",
-      description: initialData?.description || "",
-      linkedEventId: initialData?.linkedEventId || linkedEventIdParam || "",
+      typeId: "",
+      description: "",
+      incidentId: linkedEventIdParam || "",
     },
   });
 
   useEffect(() => {
-    if (initialData) {
-      form.reset({
-        type: initialData.type,
-        location: initialData.location,
-        priority: initialData.priority as "normal" | "high" | "critical",
-        description: initialData.description,
-        linkedEventId: initialData.linkedEventId,
-      });
-    }
-  }, [initialData, form]);
+    const loadContext = async () => {
+      if (!(session?.user as any)?.id) return;
+      try {
+        const userId = (session?.user as any)?.id;
+        if (!userId) return;
+        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+        const orgId = empRes && "employee" in empRes ? empRes.employee?.organizationId : null;
+        if (empRes && "employee" in empRes && empRes.employee?.departmentId) {
+            setEmployeeDeptId(empRes.employee.departmentId);
+        }
+
+        if (orgId) {
+          const [typeRes, incRes] = await Promise.all([
+            RequestClassifierQueryServiceService.requestClassifierQueryServiceListActiveRequestTypesByOrganization(orgId, 100),
+            IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100)
+          ]);
+          
+          if (typeRes && "items" in typeRes && typeRes.items) {
+            setRequestTypes(typeRes.items);
+          }
+          if (incRes && "items" in incRes && incRes.items) {
+            setIncidents(incRes.items);
+          }
+        }
+        
+        if (requestId) {
+            const reqRes = await ServiceRequestQueryServiceService.serviceRequestQueryServiceGetServiceRequest(requestId);
+            if (reqRes && "serviceRequest" in reqRes && reqRes.serviceRequest) {
+                form.reset({
+                    typeId: reqRes.serviceRequest.typeId || "",
+                    description: reqRes.serviceRequest.description || "",
+                    incidentId: reqRes.serviceRequest.incidentId || "",
+                });
+            }
+        }
+      } catch (err) {
+        console.error("Failed to load context:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadContext();
+  }, [session, requestId, form]);
+
+  const eventOptions = useMemo(() => {
+    return incidents.map(e => ({
+      value: e.id || "",
+      label: `#{${e.id?.substring(0,8)}} — ${e.description?.substring(0, 50)}...`,
+    })).filter(o => o.value);
+  }, [incidents]);
+
+  const typeOptions = useMemo(() => {
+    return requestTypes.map(t => ({
+      value: t.id || "",
+      label: t.name || t.id || "",
+    })).filter(o => o.value);
+  }, [requestTypes]);
 
   async function onSubmit(values: RequestFormValues) {
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 600));
-
-      const dept = SERVICE_TYPE_CONFIG[values.type]?.dept || "Не определен";
-
-      if (isEditMode && initialData?.id) {
-        const reqIndex = requestsDb.findIndex(r => r.id === initialData.id);
-        if (reqIndex > -1) {
-          requestsDb[reqIndex] = {
-            ...requestsDb[reqIndex],
-            type: values.type,
-            location: values.location,
-            priority: values.priority,
-            description: values.description,
-            linkedEventId: values.linkedEventId,
-            responsibleDept: dept
-          };
-        }
-        notify.mutationSuccess("Заявка обновлена", `Заявка #${initialData.number || "сохранена"} успешно обновлена.`);
+      if (isEditMode && requestId) {
+        await ServiceRequestCommandServiceService.serviceRequestCommandServiceUpdateServiceRequestDescription(
+          requestId,
+          { description: values.description }
+        );
+        notify.mutationSuccess("Заявка обновлена", `Описание заявки успешно обновлено.`);
       } else {
-        const newReqNumber = Math.floor(1000 + Math.random() * 9000);
-        const newRequest: ServiceRequest = {
-          id: `req_${Date.now()}`,
-          number: newReqNumber,
-          type: values.type,
-          priority: values.priority,
-          status: "created",
-          description: values.description,
-          location: values.location,
-          createdAt: new Date().toISOString(),
-          authorName: "Текущий пользователь",
-          linkedEventId: values.linkedEventId,
-          responsibleDept: dept
-        };
-        requestsDb.unshift(newRequest);
-        notify.mutationSuccess("Заявка создана", `Номер заявки #${newReqNumber}. Исполнители уведомлены.`);
+        await ServiceRequestCommandServiceService.serviceRequestCommandServiceCreateServiceRequest({
+            departmentId: employeeDeptId,
+            typeId: values.typeId,
+            description: values.description,
+            incidentId: values.incidentId || undefined,
+            executorEmployeeIds: []
+        });
+        notify.mutationSuccess("Заявка создана", `Ваша заявка успешно отправлена.`);
       }
 
       router.push("/requests");
@@ -135,6 +154,14 @@ function RequestFormContent({ initialData }: RequestFormProps) {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (isLoading) {
+    return (
+        <div className="flex h-[50vh] w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
   }
 
   return (
@@ -155,7 +182,7 @@ function RequestFormContent({ initialData }: RequestFormProps) {
 
             <FormField
               control={form.control}
-              name="linkedEventId"
+              name="incidentId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
@@ -167,12 +194,13 @@ function RequestFormContent({ initialData }: RequestFormProps) {
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                       <SearchableSelect
                         options={eventOptions}
-                        value={field.value}
+                        value={field.value || ""}
                         onChange={field.onChange}
                         placeholder="Выберите событие для привязки"
                         emptyMessage="События не найдены"
+                        disabled={isEditMode}
                       />
-                      {field.value && (
+                      {field.value && !isEditMode && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -194,124 +222,25 @@ function RequestFormContent({ initialData }: RequestFormProps) {
               )}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Тип работ</FormLabel>
-                    <FormControl>
-                        <SearchableSelect
-                            options={Object.entries(SERVICE_TYPE_CONFIG).map(([key, config]) => ({ 
-                                value: key, 
-                                label: config.label 
-                            }))}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Выберите службу"
-                            emptyMessage="Служба не найдена"
-                        />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-
-                <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Местоположение</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Напр. Кабинет 305" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-            </div>
-
             <FormField
-              control={form.control}
-              name="priority"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Приоритет выполнения</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="grid grid-cols-1 md:grid-cols-3 gap-3"
-                    >
-                      <FormItem className="space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="normal" className="peer sr-only" />
-                        </FormControl>
-                        <FormLabel className="
-                          flex flex-col md:flex-row items-center md:items-start gap-3 p-4 rounded-xl border-2 bg-card cursor-pointer transition-all
-                          hover:bg-accent hover:border-accent-foreground/30
-                          peer-data-[state=checked]:border-info
-                          peer-data-[state=checked]:bg-info/15
-                          group
-                        ">
-                           <div className="h-10 w-10 rounded-full bg-info/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-info/20 text-info">
-                             <Calendar className="h-5 w-5" />
-                           </div>
-                           <div className="space-y-1 text-center md:text-left">
-                             <span className="font-semibold text-sm block text-foreground">Обычный</span>
-                             <span className="text-[11px] text-muted-foreground leading-tight block">В порядке очереди</span>
-                           </div>
-                        </FormLabel>
-                      </FormItem>
-
-                      <FormItem className="space-y-0">
-                          <FormControl>
-                          <RadioGroupItem value="high" className="peer sr-only" />
-                        </FormControl>
-                        <FormLabel className="
-                          flex flex-col md:flex-row items-center md:items-start gap-3 p-4 rounded-xl border-2 bg-card cursor-pointer transition-all
-                          hover:bg-accent hover:border-accent-foreground/30
-                          peer-data-[state=checked]:border-warning
-                          peer-data-[state=checked]:bg-warning/15
-                          group
-                        ">
-                           <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-warning/20 text-warning">
-                             <Zap className="h-5 w-5 fill-current" />
-                           </div>
-                           <div className="space-y-1 text-center md:text-left">
-                             <span className="font-semibold text-sm block text-foreground">Срочный</span>
-                             <span className="text-[11px] text-muted-foreground leading-tight block">Затрудняет работу</span>
-                           </div>
-                        </FormLabel>
-                      </FormItem>
-
-                      <FormItem className="space-y-0">
-                          <FormControl>
-                          <RadioGroupItem value="critical" className="peer sr-only" />
-                        </FormControl>
-                        <FormLabel className="
-                          flex flex-col md:flex-row items-center md:items-start gap-3 p-4 rounded-xl border-2 bg-card cursor-pointer transition-all
-                          hover:bg-accent hover:border-accent-foreground/30
-                          peer-data-[state=checked]:border-destructive 
-                          peer-data-[state=checked]:bg-destructive/15
-                          group
-                        ">
-                           <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0 group-data-[state=checked]:bg-destructive/20 text-destructive">
-                             <Siren className="h-5 w-5" />
-                           </div>
-                           <div className="space-y-1 text-center md:text-left">
-                             <span className="font-semibold text-sm block text-foreground">Критичный</span>
-                             <span className="text-[11px] text-muted-foreground leading-tight block">Авария / Угроза</span>
-                           </div>
-                        </FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
+            control={form.control}
+            name="typeId"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Тип работ</FormLabel>
+                <FormControl>
+                    <SearchableSelect
+                        options={typeOptions}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Выберите службу"
+                        emptyMessage="Служба не найдена"
+                        disabled={isEditMode}
+                    />
+                </FormControl>
+                <FormMessage />
                 </FormItem>
-              )}
+            )}
             />
 
             <FormField
@@ -322,7 +251,7 @@ function RequestFormContent({ initialData }: RequestFormProps) {
                   <FormLabel>Суть проблемы</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Что сломалось, где именно, требуется ли запчасть..." 
+                      placeholder="Что сломалось, требуется ли запчасть..." 
                       className="resize-none min-h-24"
                       {...field} 
                     />

@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { Scope } from "@/lib/auth/scopes";
+import { Scope, SCOPES } from "@/lib/auth/scopes";
 
 interface RoleGateProps {
   children: React.ReactNode;
@@ -20,7 +20,7 @@ export async function RoleGate({
     return <>{fallback}</>;
   }
 
-  if (session.scopes.includes("admin:system")) {
+  if (session.scopes.includes(SCOPES.SYSTEM_ADMIN)) {
     return <>{children}</>;
   }
 

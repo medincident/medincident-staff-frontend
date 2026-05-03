@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { SCOPES } from "@/lib/auth/scopes";
 import { 
   AlertTriangle, 
   BarChart3, 
@@ -15,8 +17,9 @@ import { useMiniApp } from "@/lib/miniapp";
 export function BottomNav() {
   const pathname = usePathname();
   const miniApp = useMiniApp();
+  const { data: session } = useSession();
 
-  const isAdmin = true;
+  const isAdmin = (session as any)?.scopes?.includes(SCOPES.SYSTEM_ADMIN) || (session as any)?.scopes?.includes(SCOPES.ORG_ADMIN);
 
   if (miniApp) return null;
 

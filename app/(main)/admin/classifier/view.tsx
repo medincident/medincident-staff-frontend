@@ -19,13 +19,12 @@ import {
 import { notify } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import {
-  EventsService,
-  CategoryBrief,
-  EventType,
-  CreateCategoryRequest,
-  CreateEventTypeRequest
-} from "@/lib/api";
+  IncidentClassifierQueryServiceService,
+  IncidentClassifierCommandServiceService,
+  MembershipQueryServiceService,
+} from "@/lib/api-generated";
 import { getBadgeColor } from "@/lib/status-helper";
+import { useSession } from "next-auth/react";
 
 // Русское склонение числительных с существительным (1 тип / 2 типа / 5 типов)
 const getDeclension = (n: number, words: string[]) => {
@@ -34,8 +33,11 @@ const getDeclension = (n: number, words: string[]) => {
 };
 
 export function ClassifierView() {
-  const [categories, setCategories] = useState<CategoryBrief[]>([]);
-  const [typesMap, setTypesMap] = useState<Record<string, EventType[]>>({});
+  const { data: session } = useSession();
+
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [typesMap, setTypesMap] = useState<Record<string, any[]>>({});
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
 
   const [isLoading, setIsLoading] = useState(true);
@@ -50,24 +52,52 @@ export function ClassifierView() {
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemPatientCanReport, setNewItemPatientCanReport] = useState(false);
 
+  // Получаем organizationId текущего пользователя один раз
   useEffect(() => {
-    loadCategories();
-  }, [search]);
+    const initOrg = async () => {
+      if (!session) return;
+      try {
+        const userId = (session.user as any)?.id;
+        if (!userId) return;
+        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+        const emp = (empRes as any).employee;
+        if (emp?.organizationId) {
+          setOrganizationId(emp.organizationId);
+        }
+      } catch {
+        notify.error("Ошибка", "Не удалось определить организацию пользователя.");
+      }
+    };
+    initOrg();
+  }, [session]);
+
+  useEffect(() => {
+    if (organizationId) loadCategories();
+  }, [search, organizationId]);
 
   const loadCategories = async () => {
+    if (!organizationId) return;
     try {
       setIsLoading(true);
-      const result = await EventsService.listEventCategories(true, search || undefined);
-      const fetchedCats = result.items;
-      setCategories(fetchedCats);
+      const result = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(organizationId, 100);
+      const fetchedCats = (result as any).items || [];
+
+      // Фильтрация по поиску на клиенте
+      const filtered = search
+        ? fetchedCats.filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()))
+        : fetchedCats;
+
+      setCategories(filtered);
 
       const typesResults = await Promise.all(
-        fetchedCats.map(cat =>
-          EventsService.listEventCategoryTypes(cat.id).then(res => ({ id: cat.id, types: res.items }))
+        filtered.map((cat: any) =>
+          IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(cat.id, 100)
+            .then(res => ({ id: cat.id, types: (res as any).items || [] }))
+            .catch(() => ({ id: cat.id, types: [] }))
         )
       );
 
-      const newTypesMap: Record<string, EventType[]> = {};
+      const newTypesMap: Record<string, any[]> = {};
       typesResults.forEach(res => { newTypesMap[res.id] = res.types; });
       setTypesMap(newTypesMap);
     } catch (error) {
@@ -91,22 +121,20 @@ export function ClassifierView() {
   };
 
   const saveCategory = async () => {
-    if (!newItemName.trim()) return;
+    if (!newItemName.trim() || !organizationId) return;
     setIsSaving(true);
     try {
       if (editingItem) {
-        await EventsService.updateEventCategory(editingItem.id, {
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceUpdateIncidentCategoryDetails(editingItem.id, {
           name: newItemName,
-          description: newItemDescription || null
+          description: newItemDescription || ""
         });
       } else {
-        const payload: CreateCategoryRequest = {
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceCreateIncidentCategory(organizationId, {
           name: newItemName,
-          code: `cat_${Date.now()}`,
-          parentId: targetCategoryId,
-          description: newItemDescription || null
-        };
-        await EventsService.createEventCategory(payload);
+          description: newItemDescription || "",
+          parentCategoryId: targetCategoryId || undefined
+        });
       }
       notify.mutationSuccess("Сохранено", "Категория сохранена в справочнике.");
       setIsCategoryDialogOpen(false);
@@ -121,10 +149,10 @@ export function ClassifierView() {
   const toggleCategoryStatus = async (id: string, currentStatus: boolean) => {
     try {
       if (currentStatus) {
-        await EventsService.deactivateEventCategory(id);
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeactivateIncidentCategory(id);
         notify.mutationSuccess("Категория деактивирована", "Категория скрыта из активного справочника.");
       } else {
-        await EventsService.reactivateEventCategory(id);
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceReactivateIncidentCategory(id);
         notify.mutationSuccess("Категория активирована", "Категория снова доступна для использования.");
       }
       loadCategories();
@@ -136,7 +164,7 @@ export function ClassifierView() {
   const deleteCategory = async (id: string) => {
     if (confirm("Удалить категорию и все ее подкатегории/типы?")) {
       try {
-        await EventsService.deleteEventCategory(id);
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeleteIncidentCategory(id);
         notify.mutationSuccess("Категория удалена", "Запись категории удалена из справочника.");
         loadCategories();
       } catch (e) {
@@ -145,7 +173,7 @@ export function ClassifierView() {
     }
   };
 
-  const openCategoryModal = (cat?: CategoryBrief & { description?: string }, parentId?: string) => {
+  const openCategoryModal = (cat?: any, parentId?: string) => {
     setEditingItem(cat ? { id: cat.id, name: cat.name } : null);
     setNewItemName(cat ? cat.name : "");
     setNewItemDescription(cat?.description || "");
@@ -158,23 +186,29 @@ export function ClassifierView() {
     setIsSaving(true);
     try {
       if (editingItem) {
-        await EventsService.updateEventType(editingItem.id, {
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceUpdateIncidentTypeDetails(editingItem.id, {
           name: newItemName,
-          description: newItemDescription || null,
-          patientCanReport: newItemPatientCanReport
+          description: newItemDescription || ""
         });
+        // Обновляем разрешение для пациентов отдельным вызовом
+        if (newItemPatientCanReport) {
+          await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceAllowIncidentTypeForPatients(editingItem.id).catch(() => {});
+        } else {
+          await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDisallowIncidentTypeForPatients(editingItem.id).catch(() => {});
+        }
       } else {
-        const payload: CreateEventTypeRequest = {
+        const res = await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceCreateIncidentType(targetCategoryId, {
           name: newItemName,
-          code: `type_${Date.now()}`,
-          description: newItemDescription || null,
-          patientCanReport: newItemPatientCanReport
-        };
-        await EventsService.createEventType(targetCategoryId, payload);
+          description: newItemDescription || ""
+        });
+        const newTypeId = (res as any).id;
+        if (newTypeId && newItemPatientCanReport) {
+          await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceAllowIncidentTypeForPatients(newTypeId).catch(() => {});
+        }
       }
 
-      const typesResult = await EventsService.listEventCategoryTypes(targetCategoryId);
-      setTypesMap(prev => ({ ...prev, [targetCategoryId!]: typesResult.items }));
+      const typesResult = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(targetCategoryId, 100);
+      setTypesMap(prev => ({ ...prev, [targetCategoryId!]: (typesResult as any).items || [] }));
 
       notify.mutationSuccess("Сохранено", "Тип события сохранён в справочнике.");
       setIsTypeDialogOpen(false);
@@ -188,14 +222,14 @@ export function ClassifierView() {
   const toggleTypeStatus = async (typeId: string, categoryId: string, currentStatus: boolean) => {
     try {
       if (currentStatus) {
-        await EventsService.deactivateEventType(typeId);
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeactivateIncidentType(typeId);
         notify.mutationSuccess("Тип события деактивирован", "Тип скрыт из активного справочника.");
       } else {
-        await EventsService.reactivateEventType(typeId);
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceReactivateIncidentType(typeId);
         notify.mutationSuccess("Тип события активирован", "Тип снова доступен для использования.");
       }
-      const typesResult = await EventsService.listEventCategoryTypes(categoryId);
-      setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
+      const typesResult = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(categoryId, 100);
+      setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
     } catch (e) {
       notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус типа события.");
     }
@@ -204,9 +238,9 @@ export function ClassifierView() {
   const deleteType = async (typeId: string, categoryId: string) => {
     if (confirm("Удалить этот тип события?")) {
       try {
-        await EventsService.deleteEventType(typeId);
-        const typesResult = await EventsService.listEventCategoryTypes(categoryId);
-        setTypesMap(prev => ({ ...prev, [categoryId]: typesResult.items }));
+        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeleteIncidentType(typeId);
+        const typesResult = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(categoryId, 100);
+        setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
         notify.mutationSuccess("Тип удалён", "Запись типа события удалена из справочника.");
       } catch (e) {
         notify.mutationError("Ошибка удаления", "Не удалось удалить тип события.");
@@ -214,12 +248,12 @@ export function ClassifierView() {
     }
   };
 
-  const openTypeModal = (categoryId: string, type?: EventType) => {
+  const openTypeModal = (categoryId: string, type?: any) => {
     setTargetCategoryId(categoryId);
     setEditingItem(type ? { id: type.id, name: type.name } : null);
     setNewItemName(type ? type.name : "");
     setNewItemDescription(type?.description || "");
-    setNewItemPatientCanReport(type ? type.patientCanReport : false);
+    setNewItemPatientCanReport(type ? (type.patientAllowed === true) : false);
     setIsTypeDialogOpen(true);
   };
 
@@ -248,7 +282,7 @@ export function ClassifierView() {
           <Button
             onClick={() => openCategoryModal()}
             className="w-full sm:w-auto shrink-0"
-            disabled={isLoading || isSaving}
+            disabled={isLoading || isSaving || !organizationId}
           >
             {isSaving ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -270,9 +304,10 @@ export function ClassifierView() {
         ) : (
           categories.map((cat) => {
             const isExpanded = expandedCats.has(cat.id);
-            const depth = cat.parentId ? 1 : 0;
+            const depth = cat.parentCategoryId ? 1 : 0;
             const typesCount = typesMap[cat.id]?.length || 0;
             const typesLabel = getDeclension(typesCount, ["тип", "типа", "типов"]);
+            const isActive = cat.isActive !== false;
 
             return (
               <div key={cat.id} className="flex flex-col">
@@ -310,9 +345,9 @@ export function ClassifierView() {
 
                       <Badge
                         variant="outline"
-                        className={getBadgeColor(cat.isActive !== false ? "active" : "inactive")}
+                        className={getBadgeColor(isActive ? "active" : "inactive")}
                       >
-                        {cat.isActive !== false ? "Активна" : "Неактивна"}
+                        {isActive ? "Активна" : "Неактивна"}
                       </Badge>
                     </div>
                   </div>
@@ -334,7 +369,7 @@ export function ClassifierView() {
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(cat); }}>
                           <Pencil className="mr-2 h-4 w-4" /> Изменить
                         </DropdownMenuItem>
-                        {cat.isActive !== false ? (
+                        {isActive ? (
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, true); }}>
                             <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
                           </DropdownMenuItem>
@@ -369,68 +404,71 @@ export function ClassifierView() {
                         Нет типов событий
                       </div>
                     ) : (
-                      typesMap[cat.id].map((type) => (
-                        <div
-                          key={type.id}
-                          className={`flex items-center justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors ${type.isActive === false ? "opacity-70" : ""}`}
-                        >
+                      typesMap[cat.id].map((type) => {
+                        const typeActive = type.isActive !== false;
+                        return (
                           <div
-                            className="flex items-center gap-2 flex-1 min-w-0"
-                            style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+                            key={type.id}
+                            className={`flex items-center justify-between gap-2 p-3 sm:p-4 hover:bg-muted/30 transition-colors ${!typeActive ? "opacity-70" : ""}`}
                           >
-                            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 flex-1 min-w-0">
-                              <span
-                                className={`text-sm break-words min-w-0 ${type.isActive === false ? "text-muted-foreground line-through" : "text-foreground"}`}
-                              >
-                                {type.name}
-                              </span>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {type.isActive === false && (
-                                  <Badge variant="outline" className={getBadgeColor("inactive")}>
-                                    Неактивен
+                            <div
+                              className="flex items-center gap-2 flex-1 min-w-0"
+                              style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+                            >
+                              <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 shrink-0" />
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 flex-1 min-w-0">
+                                <span
+                                  className={`text-sm break-words min-w-0 ${!typeActive ? "text-muted-foreground line-through" : "text-foreground"}`}
+                                >
+                                  {type.name}
+                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {!typeActive && (
+                                    <Badge variant="outline" className={getBadgeColor("inactive")}>
+                                      Неактивен
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {type.patientAllowed ? "Для пациентов" : "Внутреннее"}
                                   </Badge>
-                                )}
-                                <Badge variant="outline" className="text-[10px]">
-                                  {type.patientCanReport ? "Для пациентов" : "Внутреннее"}
-                                </Badge>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center -mr-2 sm:mr-0 shrink-0 ml-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground"
-                              onClick={() => openTypeModal(cat.id, type)}
-                              title="Изменить"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground"
-                              onClick={() => toggleTypeStatus(type.id, cat.id, type.isActive !== false)}
-                              title={type.isActive !== false ? "Деактивировать" : "Активировать"}
-                            >
-                              {type.isActive !== false
-                                ? <PowerOff className="h-4 w-4" />
-                                : <Power className="h-4 w-4 text-emerald-500" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={() => deleteType(type.id, cat.id)}
-                              title="Удалить навсегда"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center -mr-2 sm:mr-0 shrink-0 ml-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground"
+                                onClick={() => openTypeModal(cat.id, type)}
+                                title="Изменить"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground"
+                                onClick={() => toggleTypeStatus(type.id, cat.id, typeActive)}
+                                title={typeActive ? "Деактивировать" : "Активировать"}
+                              >
+                                {typeActive
+                                  ? <PowerOff className="h-4 w-4" />
+                                  : <Power className="h-4 w-4 text-emerald-500" />}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => deleteType(type.id, cat.id)}
+                                title="Удалить навсегда"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 )}

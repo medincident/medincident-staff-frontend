@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
     ArrowLeft,
-    MapPin,
     User,
     Wrench,
     AlertTriangle,
@@ -24,11 +23,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { notify } from "@/lib/toast";
 
-import { RequestStatus, ServiceRequest } from "@/lib/types";
-import { STATUS_MAP, PRIORITY_MAP, SERVICE_TYPE_CONFIG } from "@/lib/constants";
+import { RequestStatus } from "@/lib/types";
+import { STATUS_MAP } from "@/lib/constants";
 import { getBadgeColor } from "@/lib/status-helper";
 import { ChatContainer } from "@/components/chat/chat-container";
-import { requestsDb } from "@/lib/mock-db";
+
+import { 
+    ServiceRequestQueryServiceService,
+    ServiceRequestCommandServiceService,
+    RequestClassifierQueryServiceService,
+    v1ServiceRequest,
+    v1RequestType
+} from "@/lib/api-generated";
 
 interface RequestDetailsViewProps {
     requestId: string;
@@ -36,15 +42,16 @@ interface RequestDetailsViewProps {
 
 function DetailsSection({
     request,
+    requestType,
     status,
     onStatusChange,
 }: {
-    request: ServiceRequest;
-    status: RequestStatus | "";
-    onStatusChange: (s: RequestStatus) => void;
+    request: v1ServiceRequest;
+    requestType: v1RequestType | null;
+    status: string;
+    onStatusChange: (s: string) => void;
 }) {
     const router = useRouter();
-    const serviceConfig = SERVICE_TYPE_CONFIG[request.type];
 
     return (
         <div className="space-y-6">
@@ -53,11 +60,8 @@ function DetailsSection({
                     <div className="flex items-center justify-between mb-1">
                         <div className="text-xs text-primary font-semibold uppercase tracking-wider flex items-center gap-1.5">
                             <Wrench className="h-3 w-3" />
-                            {serviceConfig?.label || request.type}
+                            {requestType?.name || request.typeId || "Неизвестный тип"}
                         </div>
-                        <Badge variant="outline" className={`border-0 ${getBadgeColor(request.priority)}`}>
-                            {PRIORITY_MAP[request.priority]}
-                        </Badge>
                     </div>
                     <CardTitle className="text-lg text-foreground leading-snug">
                         {request.description}
@@ -65,12 +69,7 @@ function DetailsSection({
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                    <div className="flex items-start gap-3 text-sm text-foreground bg-muted/50 p-3 rounded-lg border-0">
-                        <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                        <span className="font-medium">{request.location}</span>
-                    </div>
-
-                    {request.linkedEventId && (
+                    {request.incidentId && (
                         <div className="flex items-start gap-3 text-sm p-4 rounded-lg border transition-colors bg-warning/10 border-warning/20">
                             <div className="p-1.5 bg-warning/20 rounded-md shrink-0">
                                 <AlertTriangle className="h-4 w-4 text-warning" />
@@ -81,12 +80,12 @@ function DetailsSection({
                                 </span>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
                                     Эта работа выполняется для устранения последствий события
-                                    <span className="font-mono font-bold mx-1 opacity-90 text-foreground">#{request.linkedEventId}</span>.
+                                    <span className="font-mono font-bold mx-1 opacity-90 text-foreground">#{request.incidentId?.substring(0,8)}</span>.
                                 </p>
                                 <Button
                                     variant="link"
                                     className="h-auto p-0 text-warning text-xs font-semibold hover:text-warning/80 mt-1"
-                                    onClick={() => router.push(`/events/${request.linkedEventId}`)}
+                                    onClick={() => router.push(`/events/${request.incidentId}`)}
                                 >
                                     Перейти к событию &rarr;
                                 </Button>
@@ -99,7 +98,7 @@ function DetailsSection({
                     <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1.5">
                             <User className="h-3.5 w-3.5" />
-                            Автор: <span className="text-foreground">{request.authorName || "Неизвестен"}</span>
+                            Автор: <span className="text-foreground">{request.authorDisplayName || "Неизвестен"}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5" />
@@ -107,7 +106,7 @@ function DetailsSection({
                         </div>
                         <div className="flex items-center gap-1.5">
                             <Clock className="h-3.5 w-3.5" />
-                            Срок: 24 часа
+                            Обновлено: {request.updatedAt ? new Date(request.updatedAt).toLocaleDateString() : "-"}
                         </div>
                     </div>
                 </CardContent>
@@ -123,7 +122,7 @@ function DetailsSection({
                 <CardContent className="pt-0 space-y-4">
                     <div className="space-y-1.5">
                         <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
-                        <Select value={status} onValueChange={(v) => onStatusChange(v as RequestStatus)}>
+                        <Select value={status} onValueChange={(v) => onStatusChange(v)}>
                             <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
                                 <SelectValue />
                             </SelectTrigger>
@@ -144,21 +143,16 @@ function DetailsSection({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-muted-foreground ml-1">Исполнитель</label>
-                            <Select defaultValue="worker_1">
-                                <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
-                                    <SelectValue placeholder="Не назначен" />
-                                </SelectTrigger>
-                                <SelectContent className="border">
-                                    <SelectItem value="not_assigned">Не назначен</SelectItem>
-                                    <SelectItem value="worker_1">Петров В.В.</SelectItem>
-                                    <SelectItem value="worker_2">Сидоров А.А.</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <div className="flex items-center h-10 px-3 rounded-md border border-primary/20 bg-background text-[11px] leading-tight text-foreground">
+                                {request.executors && request.executors.length > 0 
+                                    ? request.executors.map(e => (e as any).displayName || "Исполнитель").join(", ")
+                                    : "Не назначен"}
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-muted-foreground ml-1">Ответственный отдел</label>
                             <div className="flex items-center h-10 px-3 rounded-md border border-primary/20 bg-background text-[11px] leading-tight text-muted-foreground">
-                                {serviceConfig?.dept || "Не определен"}
+                                {request.departmentId || "Не определен"}
                             </div>
                         </div>
                     </div>
@@ -171,19 +165,34 @@ function DetailsSection({
 export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
     const router = useRouter();
 
-    const [request, setRequest] = useState<ServiceRequest | null>(null);
-    const [status, setStatus] = useState<RequestStatus | "">("");
+    const [request, setRequest] = useState<v1ServiceRequest | null>(null);
+    const [requestType, setRequestType] = useState<v1RequestType | null>(null);
+    const [status, setStatus] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setIsLoading(true);
-                await new Promise(resolve => setTimeout(resolve, 500));
-                const foundRequest = requestsDb.find(r => r.id === requestId);
-                if (foundRequest) {
+                
+                const reqRes = await ServiceRequestQueryServiceService.serviceRequestQueryServiceGetServiceRequest(requestId);
+                if (reqRes && "serviceRequest" in reqRes && reqRes.serviceRequest) {
+                    const foundRequest = reqRes.serviceRequest;
                     setRequest(foundRequest);
-                    setStatus(foundRequest.status as RequestStatus);
+                    
+                    const reqStatus = (foundRequest.status || "").toLowerCase().replace("service_request_status_", "");
+                    setStatus(reqStatus);
+
+                    if (foundRequest.typeId) {
+                        try {
+                            const typeRes = await RequestClassifierQueryServiceService.requestClassifierQueryServiceGetRequestType(foundRequest.typeId);
+                            if (typeRes && "requestType" in typeRes && typeRes.requestType) {
+                                setRequestType(typeRes.requestType);
+                            }
+                        } catch (e) {
+                            console.warn("Failed to load request type", e);
+                        }
+                    }
                 }
             } catch (error) {
                 console.error("Failed to load request:", error);
@@ -195,23 +204,28 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         fetchData();
     }, [requestId]);
 
-    const handleStatusChange = async (newStatus: RequestStatus) => {
-        if (!request) return;
+    const handleStatusChange = async (newStatus: string) => {
+        if (!request || !request.id) return;
 
         const prevStatus = status;
         setStatus(newStatus);
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 400));
-            const updatedRequest = { ...request, status: newStatus };
-            const reqIndex = requestsDb.findIndex(r => r.id === requestId);
-            if (reqIndex > -1) {
-                requestsDb[reqIndex] = updatedRequest;
+            let apiStatus = newStatus.toUpperCase();
+            if (!apiStatus.startsWith("SERVICE_REQUEST_STATUS_")) {
+                apiStatus = `SERVICE_REQUEST_STATUS_${apiStatus}`;
             }
+
+            await ServiceRequestCommandServiceService.serviceRequestCommandServiceUpdateServiceRequestStatus(request.id, {
+                newStatus: apiStatus as any
+            });
+
+            const updatedRequest = { ...request, status: apiStatus };
             setRequest(updatedRequest);
+
             notify.mutationSuccess(
                 "Статус обновлён",
-                `Заявка переведена в статус "${STATUS_MAP[newStatus]}".`,
+                `Заявка переведена в статус "${STATUS_MAP[newStatus as RequestStatus]}".`,
             );
         } catch (error) {
             console.error(error);
@@ -254,7 +268,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <h1 className="text-lg font-bold text-foreground line-clamp-2 break-words min-w-0">
-                            Заявка #{request.number}
+                            Заявка #{request.id?.substring(0,8)}
                         </h1>
                         <Badge variant="outline" className={`shrink-0 ${getBadgeColor(status as RequestStatus)}`}>
                             {STATUS_MAP[status as RequestStatus] || status}
@@ -273,7 +287,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                         <TabsTrigger value="chat" className="flex gap-2"><MessageSquare className="h-4 w-4" /> <span>Чат</span></TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="flex-1 overflow-y-auto mt-0">
-                        <DetailsSection request={request} status={status} onStatusChange={handleStatusChange} />
+                        <DetailsSection request={request} requestType={requestType} status={status} onStatusChange={handleStatusChange} />
                     </TabsContent>
                     <TabsContent value="chat" className="flex-1 mt-0 h-full overflow-hidden">
                         <ChatContainer entityId={requestId} entityType="requests" className="h-full" />
@@ -283,7 +297,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
 
             <div className="hidden md:grid grid-cols-3 gap-6 items-start">
                 <div className="col-span-2 space-y-6">
-                    <DetailsSection request={request} status={status} onStatusChange={handleStatusChange} />
+                    <DetailsSection request={request} requestType={requestType} status={status} onStatusChange={handleStatusChange} />
                 </div>
                 <div className="col-span-1 sticky top-24 h-[600px]">
                     <ChatContainer entityId={requestId} entityType="requests" />

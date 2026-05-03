@@ -32,16 +32,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { notify } from "@/lib/toast";
 import {
-  UsersService,
-  ClinicsService,
-  DepartmentsService
-} from "@/lib/api";
+  MembershipQueryServiceService,
+  MembershipCommandServiceService,
+  OrgStructureQueryServiceService,
+} from "@/lib/api-generated";
+import type { v1EmployeeCardView } from "@/lib/api-generated";
 import { getBadgeColor } from "@/lib/status-helper";
+import { useSession } from "next-auth/react";
 
 export function UsersView() {
-  const organizationId = "YOUR_ORG_ID";
+  const { data: session } = useSession();
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<v1EmployeeCardView[]>([]);
+  const [admins, setAdmins] = useState<string[]>([]);
   const [clinics, setClinics] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +56,6 @@ export function UsersView() {
   const [formData, setFormData] = useState({
     givenName: "",
     familyName: "",
-    middleName: "",
     email: "",
     position: "",
     clinicId: "",
@@ -67,21 +70,41 @@ export function UsersView() {
     try {
       setIsLoading(true);
 
-      const usersListRes = await UsersService.listUsers(true, search || undefined, undefined, 50);
+      const userId = (session?.user as any)?.id;
+      if (!userId) return;
 
-      // Для каждого пользователя отдельно запрашиваем детали, чтобы получить employment и полное ФИО
-      const fullUsers = await Promise.all(
-        usersListRes.items.map(u => UsersService.getUserById(u.id))
-      );
-      setUsers(fullUsers);
+      // Получаем organizationId из профиля текущего сотрудника
+      const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+      const emp = (empRes as any).employee as v1EmployeeCardView | undefined;
+      const orgId = emp?.organizationId;
+      if (!orgId) {
+        notify.error("Ошибка", "Не удалось определить организацию.");
+        return;
+      }
+      setOrganizationId(orgId);
+
+      const [usersListRes, adminsRes] = await Promise.all([
+        MembershipQueryServiceService.membershipQueryServiceSearchEmployeesByOrganization(orgId, search || undefined, 50),
+        MembershipQueryServiceService.membershipQueryServiceListOrgAdmins(orgId, 100)
+      ]);
+
+      if (usersListRes && "items" in usersListRes && usersListRes.items) {
+        setUsers(usersListRes.items as v1EmployeeCardView[]);
+      }
+
+      if (adminsRes && "items" in adminsRes && adminsRes.items) {
+        setAdmins((adminsRes.items as any[]).map((a: any) => a.employeeId));
+      }
 
       if (clinics.length === 0) {
-        const clinicsRes = await ClinicsService.listOrganizationClinics(organizationId, false);
-        const builtClinics = await Promise.all(clinicsRes.items.map(async (clinic) => {
-          const deptsRes = await DepartmentsService.listClinicDepartments(clinic.id, false);
-          return { ...clinic, departments: deptsRes.items };
-        }));
-        setClinics(builtClinics);
+        const clinicsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListClinicsByOrganization(orgId, 100);
+        if (clinicsRes && "items" in clinicsRes && clinicsRes.items) {
+          const builtClinics = await Promise.all((clinicsRes.items as any[]).map(async (clinic: any) => {
+            const deptsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListDepartmentsByClinic(clinic.id, 100);
+            return { ...clinic, departments: (deptsRes as any).items || [] };
+          }));
+          setClinics(builtClinics);
+        }
       }
     } catch (error) {
       console.error("Failed to load users data:", error);
@@ -93,49 +116,56 @@ export function UsersView() {
 
   useEffect(() => {
     loadData();
-  }, [search]);
+  }, [search, session]);
 
-  const handleEditUser = (user: any) => {
-    setEditingUserId(user.id);
+  const handleEditUser = (user: v1EmployeeCardView) => {
+    setEditingUserId(user.employeeId || null);
     setFormData({
-      givenName: user.givenName || "",
-      familyName: user.familyName || "",
-      middleName: user.middleName || "",
+      givenName: user.firstName || "",
+      familyName: user.lastName || "",
       email: user.email || "",
-      position: user.employment?.position || "",
-      clinicId: user.employment?.clinic?.id || "",
-      departmentId: user.employment?.department?.id || "",
-      isActive: user.isActive !== false,
-      isAdmin: user.isAdmin || false
+      position: user.position || "",
+      clinicId: user.clinicId || "",
+      departmentId: user.departmentId || "",
+      isActive: !user.terminatedAt,
+      isAdmin: admins.includes(user.employeeId || "")
     });
     setIsDialogOpen(true);
   };
 
   const handleSaveUser = async () => {
-    if (!editingUserId || !formData.givenName.trim()) return;
+    if (!editingUserId) return;
 
     setIsSaving(true);
     try {
-      await UsersService.updateUserDisplayName(editingUserId, {
-        givenName: formData.givenName,
-        familyName: formData.familyName || null,
-        middleName: formData.middleName || null
-      });
+      const currentUser = users.find(u => u.employeeId === editingUserId);
+      if (!currentUser) return;
 
-      const currentUser = users.find(u => u.id === editingUserId);
-      if (currentUser && currentUser.isActive !== formData.isActive) {
-        if (formData.isActive) {
-          await UsersService.reactivateUser(editingUserId);
-        } else {
-          await UsersService.deactivateUser(editingUserId);
+      if (formData.departmentId && formData.departmentId !== currentUser.departmentId) {
+        await MembershipCommandServiceService.membershipCommandServiceUpdateEmployeeDepartment(editingUserId, {
+          departmentId: formData.departmentId
+        });
+      }
+
+      if (formData.position && formData.position !== currentUser.position) {
+        await MembershipCommandServiceService.membershipCommandServiceUpdateEmployeePosition(editingUserId, {
+          position: formData.position
+        });
+      }
+
+      const wasAdmin = admins.includes(editingUserId);
+      if (organizationId) {
+        if (formData.isAdmin && !wasAdmin) {
+          await MembershipCommandServiceService.membershipCommandServiceAssignOrganizationAdmin(organizationId, {
+            employeeId: editingUserId
+          });
+        } else if (!formData.isAdmin && wasAdmin) {
+          await MembershipCommandServiceService.membershipCommandServiceRevokeOrganizationAdmin(organizationId, editingUserId);
         }
       }
 
-      if (formData.departmentId) {
-        await DepartmentsService.addDepartmentEmployee(formData.departmentId, {
-          userId: editingUserId,
-          position: formData.position || "Сотрудник"
-        });
+      if (currentUser && !currentUser.terminatedAt && !formData.isActive) {
+        await MembershipCommandServiceService.membershipCommandServiceTerminateEmployee(editingUserId);
       }
 
       notify.mutationSuccess("Успешно", "Данные пользователя обновлены.");
@@ -152,23 +182,22 @@ export function UsersView() {
   const toggleUserStatus = async (id: string, isActive: boolean) => {
     try {
       if (isActive) {
-        await UsersService.deactivateUser(id);
-        notify.mutationSuccess("Пользователь деактивирован", "Учётная запись заблокирована для входа.");
+        await MembershipCommandServiceService.membershipCommandServiceTerminateEmployee(id);
+        notify.mutationSuccess("Пользователь деактивирован", "Сотрудник уволен.");
+        loadData();
       } else {
-        await UsersService.reactivateUser(id);
-        notify.mutationSuccess("Пользователь активирован", "Учётная запись снова доступна.");
+        notify.mutationError("Ошибка", "Невозможно восстановить уволенного сотрудника.");
       }
-      loadData();
     } catch (e) {
       notify.mutationError("Ошибка", "Не удалось изменить статус пользователя.");
     }
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (confirm("Удалить пользователя навсегда? Это действие нельзя отменить.")) {
+    if (confirm("Уволить сотрудника навсегда? Это действие нельзя отменить.")) {
       try {
-        await UsersService.deleteUser(id);
-        notify.mutationSuccess("Успешно", "Пользователь удалён.");
+        await MembershipCommandServiceService.membershipCommandServiceTerminateEmployee(id);
+        notify.mutationSuccess("Успешно", "Сотрудник уволен.");
         loadData();
       } catch (e) {
         notify.mutationError("Ошибка удаления", "Возможно, пользователь связан с историческими данными.");
@@ -197,96 +226,68 @@ export function UsersView() {
         />
       </div>
 
+      {/* Desktop table */}
       <div className="hidden lg:block bg-card rounded-lg border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow className="border-b">
-              <TableHead className="text-muted-foreground w-62.5">Сотрудник</TableHead>
-              <TableHead className="text-muted-foreground w-37.5">Статус</TableHead>
+              <TableHead className="text-muted-foreground">Сотрудник</TableHead>
+              <TableHead className="text-muted-foreground">Статус</TableHead>
               <TableHead className="text-muted-foreground">Роль / Должность</TableHead>
               <TableHead className="text-muted-foreground">Место работы</TableHead>
-              <TableHead className="text-right text-muted-foreground w-25">Действия</TableHead>
+              <TableHead className="text-right text-muted-foreground">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && users.length === 0 && Array.from({ length: 5 }).map((_, i) => (
               <TableRow key={`skel-${i}`} className="border-b">
-                <TableCell>
-                  <div className="space-y-2">
-                    <Skeleton className="h-5 w-40" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                </TableCell>
+                <TableCell><div className="space-y-2"><Skeleton className="h-5 w-40" /><Skeleton className="h-3 w-32" /></div></TableCell>
                 <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Skeleton className="h-8 w-8 rounded-md" />
-                  </div>
-                </TableCell>
+                <TableCell><div className="space-y-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20" /></div></TableCell>
+                <TableCell><div className="space-y-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20" /></div></TableCell>
+                <TableCell className="text-right"><div className="flex justify-end gap-1"><Skeleton className="h-8 w-8 rounded-md" /></div></TableCell>
               </TableRow>
             ))}
 
             {!isLoading && users.map(user => {
-              const emp = user.employment;
-              const clinicName = emp?.clinic?.name || "—";
-              const deptName = emp?.department?.name;
-              const isActive = user.isActive !== false;
+              const isActive = !user.terminatedAt;
+              const isAdmin = admins.includes(user.employeeId || "");
 
               return (
-                <TableRow key={user.id} className={`border-b ${!isActive ? "opacity-60 bg-muted/20" : ""}`}>
+                <TableRow key={user.employeeId} className={`border-b ${!isActive ? "opacity-60 bg-muted/20" : ""}`}>
                   <TableCell>
-                    <div className="font-medium text-foreground">{user.name || `${user.givenName} ${user.familyName}`}</div>
+                    <div className="font-medium text-foreground">{user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim()}</div>
                     <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-0.5">
-                      <span className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" /> {user.email || "Нет email"}
-                      </span>
+                      <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {user.email || "Нет email"}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={getBadgeColor(isActive ? "active" : "inactive")}>
                       {isActive ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <Ban className="w-3 h-3 mr-1" />}
-                      {isActive ? "Активен" : "Деактивирован"}
+                      {isActive ? "Активен" : "Уволен"}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className={`font-medium text-sm ${!user.isAdmin ? "text-foreground" : "text-primary font-bold"}`}>
-                        {user.isAdmin ? "Администратор" : "Сотрудник"}
+                      <span className={`font-medium text-sm ${isAdmin ? "text-primary font-bold" : "text-foreground"}`}>
+                        {isAdmin ? "Администратор" : "Сотрудник"}
                       </span>
-                      <span className="text-xs text-muted-foreground">{emp?.position || "Должность не указана"}</span>
+                      <span className="text-xs text-muted-foreground">{user.position || "Должность не указана"}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {user.isAdmin ? (
-                      <span className="text-xs italic text-muted-foreground">Центральный офис</span>
-                    ) : (
-                      <>
-                        <div className="font-medium text-xs text-foreground">{clinicName}</div>
-                        {deptName && <div className="text-[10px] text-muted-foreground">{deptName}</div>}
-                      </>
-                    )}
+                    <div className="font-medium text-xs text-foreground">{user.clinicName || "—"}</div>
+                    {user.departmentName && <div className="text-[10px] text-muted-foreground">{user.departmentName}</div>}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => handleEditUser(user)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleUserStatus(user.id, isActive)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleUserStatus(user.employeeId as string, isActive)}>
                         {isActive ? <PowerOff className="h-4 w-4 text-warning" /> : <Power className="h-4 w-4 text-emerald-500" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteUser(user.id)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteUser(user.employeeId as string)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -298,6 +299,7 @@ export function UsersView() {
         </Table>
       </div>
 
+      {/* Mobile cards */}
       <div className="lg:hidden space-y-3">
         {isLoading && users.length === 0 && Array.from({ length: 3 }).map((_, i) => (
           <Card key={`skel-mob-${i}`} className="overflow-hidden p-0 border">
@@ -309,20 +311,18 @@ export function UsersView() {
         ))}
 
         {!isLoading && users.map(user => {
-          const emp = user.employment;
-          const clinicName = emp?.clinic?.name || "Не назначено";
-          const deptName = emp?.department?.name;
-          const isActive = user.isActive !== false;
+          const isActive = !user.terminatedAt;
+          const isAdmin = admins.includes(user.employeeId || "");
 
           return (
-            <Card key={user.id} className={`overflow-hidden p-0 border ${!isActive ? "opacity-60 bg-muted/20" : "bg-card"}`}>
+            <Card key={user.employeeId} className={`overflow-hidden p-0 border ${!isActive ? "opacity-60 bg-muted/20" : "bg-card"}`}>
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-3">
                   <div className="font-semibold text-foreground text-sm">
-                    {user.name || `${user.givenName} ${user.familyName}`}
+                    {user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim()}
                   </div>
                   <Badge variant="outline" className={`${getBadgeColor(isActive ? "active" : "inactive")} whitespace-nowrap`}>
-                    {isActive ? "Активен" : "Отключен"}
+                    {isActive ? "Активен" : "Уволен"}
                   </Badge>
                 </div>
 
@@ -330,16 +330,16 @@ export function UsersView() {
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Briefcase className="h-3.5 w-3.5" />
                     <div className="flex flex-col leading-tight">
-                      <span className="font-medium text-foreground text-xs">{user.isAdmin ? "Администратор" : "Сотрудник"}</span>
-                      <span className="text-[10px]">{emp?.position || "Должность не указана"}</span>
+                      <span className="font-medium text-foreground text-xs">{isAdmin ? "Администратор" : "Сотрудник"}</span>
+                      <span className="text-[10px]">{user.position || "Должность не указана"}</span>
                     </div>
                   </div>
-                  {!user.isAdmin && (
+                  {!isAdmin && (
                     <div className="flex items-start gap-2 text-muted-foreground">
                       <Building className="h-3.5 w-3.5 mt-0.5" />
                       <div className="flex flex-col leading-tight">
-                        <span className="text-xs">{clinicName}</span>
-                        {deptName && <span className="text-[10px] text-muted-foreground">{deptName}</span>}
+                        <span className="text-xs">{user.clinicName || "Не назначено"}</span>
+                        {user.departmentName && <span className="text-[10px] text-muted-foreground">{user.departmentName}</span>}
                       </div>
                     </div>
                   )}
@@ -383,18 +383,13 @@ export function UsersView() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Имя *</Label>
+                <Label>Имя</Label>
                 <Input value={formData.givenName} onChange={(e) => setFormData({ ...formData, givenName: e.target.value })} />
               </div>
               <div className="grid gap-2">
                 <Label>Фамилия</Label>
                 <Input value={formData.familyName} onChange={(e) => setFormData({ ...formData, familyName: e.target.value })} />
               </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Отчество</Label>
-              <Input value={formData.middleName} onChange={(e) => setFormData({ ...formData, middleName: e.target.value })} />
             </div>
 
             <div className="grid gap-2 border-t pt-4">
@@ -441,7 +436,7 @@ export function UsersView() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Отмена</Button>
-            <Button onClick={handleSaveUser} disabled={!formData.givenName.trim() || isSaving}>
+            <Button onClick={handleSaveUser} disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Сохранить"}
             </Button>
           </DialogFooter>

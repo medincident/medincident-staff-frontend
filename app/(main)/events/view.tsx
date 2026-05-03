@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   Plus,
   Calendar,
@@ -35,13 +36,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { EVENT_STATUS_MAP } from "@/lib/constants";
 import { getBadgeColor, getCardBorderColor } from "@/lib/status-helper";
-import { EventStatus, IncidentEvent, Category } from "@/lib/types";
+import { EventStatus } from "@/lib/types";
+import { SCOPES } from "@/lib/auth/scopes";
 
-import { eventsDb, CLASSIFIER_DB } from "@/lib/mock-db";
+import { 
+  IncidentQueryServiceService, 
+  IncidentClassifierQueryServiceService,
+  MembershipQueryServiceService,
+  v1IncidentView,
+  v1Category,
+  classifierV1Type
+} from "@/lib/api-generated";
 
 export function EventsListView() {
-  const [events, setEvents] = useState<IncidentEvent[]>([]);
-  const [classifier, setClassifier] = useState<Category[]>([]);
+  const { data: session } = useSession();
+  const [events, setEvents] = useState<v1IncidentView[]>([]);
+  const [categories, setCategories] = useState<v1Category[]>([]);
+  const [types, setTypes] = useState<classifierV1Type[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,13 +60,53 @@ export function EventsListView() {
 
   useEffect(() => {
     const loadData = async () => {
+      const userId = (session?.user as any)?.id;
+      if (!userId) return;
+
       try {
         setIsLoading(true);
         
-        await new Promise(resolve => setTimeout(resolve, 600));
+        // Получаем профиль сотрудника для получения organizationId
+        let orgId = "";
+        try {
+          const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+          if (empRes && "employee" in empRes && empRes.employee?.organizationId) {
+            orgId = empRes.employee.organizationId;
+          }
+        } catch (e) {
+          console.warn("Could not fetch employee profile, fallback to MyIncidents only", e);
+        }
 
-        setEvents(eventsDb);
-        setClassifier(CLASSIFIER_DB);
+        // Загружаем инциденты на основе роли
+        const isDispatcherOrAdmin = (session as any).scopes?.some((s: string) => 
+          [SCOPES.SYSTEM_ADMIN, SCOPES.ORG_ADMIN, SCOPES.ORG_DISPATCHER].includes(s as any)
+        );
+
+        let incidentsRes;
+        if (isDispatcherOrAdmin && orgId) {
+          incidentsRes = await IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100);
+        } else {
+          incidentsRes = await IncidentQueryServiceService.incidentQueryServiceListMyIncidents(100);
+        }
+
+        if (incidentsRes && "items" in incidentsRes && incidentsRes.items) {
+          setEvents(incidentsRes.items);
+        }
+
+        // Загружаем классификаторы
+        if (orgId) {
+          const [catsRes, typesRes] = await Promise.all([
+            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(orgId, 100),
+            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListActiveTypesByOrganization(orgId, 100)
+          ]);
+
+          if (catsRes && "items" in catsRes && catsRes.items) {
+            setCategories(catsRes.items);
+          }
+          if (typesRes && "items" in typesRes && typesRes.items) {
+            setTypes(typesRes.items);
+          }
+        }
       } catch (error) {
         console.error("Failed to load events:", error);
       } finally {
@@ -63,29 +114,36 @@ export function EventsListView() {
       }
     };
     loadData();
-  }, []);
+  }, [session]);
 
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
-    const types: Record<string, string> = {};
-    const cats: Record<string, string> = {};
+    const typeMap: Record<string, string> = {};
+    const catMap: Record<string, string> = {};
     
-    classifier.forEach((cat) => {
-      cats[cat.id] = cat.name;
-      cat.types.forEach((t) => {
-        types[t.id] = t.name;
-      });
+    categories.forEach((cat) => {
+      if (cat.id && cat.name) catMap[cat.id] = cat.name;
     });
-    return { typeNamesMap: types, categoryNamesMap: cats };
-  }, [classifier]);
+    
+    types.forEach((t) => {
+      if (t.id && t.name) typeMap[t.id] = t.name;
+    });
+    
+    return { typeNamesMap: typeMap, categoryNamesMap: catMap };
+  }, [categories, types]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
-      const typeNameRu = typeNamesMap[event.typeId || ""] || event.typeName || "";
-      const categoryNameRu = categoryNamesMap[event.categoryId] || event.categoryName || "";
+      const typeNameRu = typeNamesMap[event.typeId || ""] || event.typeId || "";
+      const categoryNameRu = categoryNamesMap[event.categoryId || ""] || event.categoryId || "";
+      
+      // Идентификатором инцидента в новом API служит просто ID (или можно использовать обрезанный UUID для отображения как "Код")
+      const shortId = event.id ? event.id.substring(0, 8) : "";
 
-      const searchString = `${event.code} ${typeNameRu} ${categoryNameRu} ${event.description || ""}`.toLowerCase();
+      const searchString = `${shortId} ${typeNameRu} ${categoryNameRu} ${event.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === "all" || event.status === statusFilter;
+      
+      const evtStatus = (event.status || "").toLowerCase().replace("incident_status_", "");
+      const matchesStatus = statusFilter === "all" || evtStatus === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -182,52 +240,56 @@ export function EventsListView() {
                  </TableRow>
                ))
             ) : filteredEvents.length > 0 ? (
-              filteredEvents.map((event) => (
-                <TableRow
-                  key={event.id}
-                  className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer group"
-                  onClick={() => window.location.href = `/events/${event.id}`}
-                >
-                  <TableCell className="font-mono font-bold text-xs text-muted-foreground">
-                    {event.code}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col max-w-87.5">
-                      <span className="font-semibold text-foreground truncate">
-                        {typeNamesMap[event.typeId || ""] || event.typeName || event.typeId}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground line-clamp-1">
-                        {event.description}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {categoryNamesMap[event.categoryId] || event.categoryName || event.categoryId}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`whitespace-nowrap font-medium ${getBadgeColor(event.status)}`}>
-                      {EVENT_STATUS_MAP[event.status as EventStatus] || event.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs whitespace-nowrap">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>{new Date(event.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <Link href={`/events/${event.id}/edit`}>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                        >
-                            <Edit className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredEvents.map((event) => {
+                const evtStatusStr = (event.status || "").toLowerCase().replace("incident_status_", "");
+                
+                return (
+                  <TableRow
+                    key={event.id}
+                    className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer group"
+                    onClick={() => window.location.href = `/events/${event.id}`}
+                  >
+                    <TableCell className="font-mono font-bold text-xs text-muted-foreground">
+                      {event.id?.substring(0, 8)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col max-w-87.5">
+                        <span className="font-semibold text-foreground truncate">
+                          {typeNamesMap[event.typeId || ""] || event.typeId}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground line-clamp-1">
+                          {event.description}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {categoryNamesMap[event.categoryId || ""] || event.categoryId}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`whitespace-nowrap font-medium ${getBadgeColor(evtStatusStr as any)}`}>
+                        {EVENT_STATUS_MAP[evtStatusStr as EventStatus] || event.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs whitespace-nowrap">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{event.createdAt ? new Date(event.createdAt).toLocaleDateString() : ""}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <Link href={`/events/${event.id}/edit`}>
+                          <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                          >
+                              <Edit className="h-4 w-4" />
+                          </Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
@@ -245,92 +307,95 @@ export function EventsListView() {
       {/* CARDS (MOBILE) */}
       <div className="2xl:hidden space-y-4">
         {isLoading ? (
-           /* MOB SKELETONS: MATCHING CARD STRUCTURE */
            Array.from({ length: 3 }).map((_, i) => (
              <div key={`mob-skel-${i}`} className="border rounded-xl bg-card overflow-hidden relative">
                <div className="p-4 pr-12 pb-3 space-y-3">
                  <div className="space-y-1.5">
-                   <Skeleton className="h-3 w-16" /> {/* Code */}
-                   <Skeleton className="h-5 w-3/4" /> {/* Title */}
+                   <Skeleton className="h-3 w-16" />
+                   <Skeleton className="h-5 w-3/4" />
                  </div>
                  <div className="flex gap-2">
-                   <Skeleton className="h-5 w-20 rounded-full" /> {/* Status */}
-                   <Skeleton className="h-5 w-24 rounded-full" /> {/* Category */}
+                   <Skeleton className="h-5 w-20 rounded-full" />
+                   <Skeleton className="h-5 w-24 rounded-full" />
                  </div>
                  <div className="flex items-center gap-2">
                    <Skeleton className="h-3.5 w-3.5 rounded-full" />
-                   <Skeleton className="h-3 w-24" /> {/* Author */}
+                   <Skeleton className="h-3 w-24" />
                  </div>
                </div>
                <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/5">
                  <div className="flex gap-2">
                    <Skeleton className="h-3 w-3" />
-                   <Skeleton className="h-3 w-20" /> {/* Date */}
+                   <Skeleton className="h-3 w-20" />
                  </div>
-                 <Skeleton className="h-4 w-4 rounded-full opacity-20" /> {/* Chevron */}
+                 <Skeleton className="h-4 w-4 rounded-full opacity-20" />
                </div>
                <div className="absolute top-3 right-3">
-                 <Skeleton className="h-8 w-8 rounded-md" /> {/* Edit button */}
+                 <Skeleton className="h-8 w-8 rounded-md" />
                </div>
              </div>
            ))
         ) : filteredEvents.length > 0 ? (
-          filteredEvents.map((event) => (
-            <div key={event.id} className="relative">
-              <Link href={`/events/${event.id}`} className="block">
-                <Card className={`relative overflow-hidden transition-all active:scale-[0.98] border p-0 gap-0 bg-card ${getCardBorderColor(event.status)}`}>
-                  <div className="p-4 pr-12 pb-3">
-                    <div className="mb-2">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
-                          {event.code}
+          filteredEvents.map((event) => {
+            const evtStatusStr = (event.status || "").toLowerCase().replace("incident_status_", "");
+
+            return (
+              <div key={event.id} className="relative">
+                <Link href={`/events/${event.id}`} className="block">
+                  <Card className={`relative overflow-hidden transition-all active:scale-[0.98] border p-0 gap-0 bg-card ${getCardBorderColor(evtStatusStr as any)}`}>
+                    <div className="p-4 pr-12 pb-3">
+                      <div className="mb-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                            {event.id?.substring(0, 8)}
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-2 break-words">
+                          {typeNamesMap[event.typeId || ""] || event.typeId}
+                        </h3>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <Badge variant="outline" className={`text-[10px] h-5 px-2 font-medium ${getBadgeColor(evtStatusStr as any)}`}>
+                          {EVENT_STATUS_MAP[evtStatusStr as EventStatus] || event.status}
+                        </Badge>
+                        <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border">
+                          {categoryNamesMap[event.categoryId || ""] || event.categoryId}
                         </span>
                       </div>
-                      <h3 className="font-bold text-foreground text-sm leading-tight line-clamp-2 break-words">
-                        {typeNamesMap[event.typeId || ""] || event.typeName || event.typeId}
-                      </h3>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2 mb-3">
-                      <Badge variant="outline" className={`text-[10px] h-5 px-2 font-medium ${getBadgeColor(event.status)}`}>
-                        {EVENT_STATUS_MAP[event.status as EventStatus] || event.status}
-                      </Badge>
-                      <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border">
-                        {categoryNamesMap[event.categoryId] || event.categoryName || event.categoryId}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <User className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{event.author || "Неизвестный"}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/5 mt-1">
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(event.createdAt).toLocaleDateString()}
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <User className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{event.registrar?.displayName || "Неизвестный"}</span>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
-                  </div>
-                </Card>
-              </Link>
 
-              <div className="absolute top-3 right-3">
-                <Link href={`/events/${event.id}/edit`}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                    <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/5 mt-1">
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : ""}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+                    </div>
+                  </Card>
                 </Link>
+
+                <div className="absolute top-3 right-3">
+                  <Link href={`/events/${event.id}/edit`}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card rounded-2xl border border-dashed">
             <Search className="h-10 w-10 mb-3 opacity-20" />

@@ -13,8 +13,6 @@ import { cn } from "@/lib/utils";
 import { Notification } from "@/lib/types";
 import { getIntentColors } from "@/lib/status-helper";
 
-import { MOCK_NOTIFICATIONS } from "@/lib/mock-db";
-
 const ICON_MAP: Record<string, LucideIcon> = {
   info: Info,
   warning: AlertTriangle,
@@ -36,9 +34,10 @@ export function NotificationsView() {
       try {
         setIsLoading(true);
         
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        setNotifications(MOCK_NOTIFICATIONS);
+        // TODO: Replace with real API call when notification endpoint is added
+        setNotifications([]);
       } catch (error) {
         console.error("Failed to load notifications:", error);
       } finally {

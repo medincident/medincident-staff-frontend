@@ -46,8 +46,12 @@ import {
   PRIORITY_MAP,
   STATUS_MAP,
 } from "@/lib/constants";
-import { getAnalyticsSeed } from "@/lib/mock-db";
 import type { EventStatus, Priority, RequestStatus } from "@/lib/types";
+import { useSession } from "next-auth/react";
+import { 
+  AnalyticsQueryServiceService,
+  MembershipQueryServiceService
+} from "@/lib/api-generated";
 import { forecastHolt, type ForecastResult } from "@/lib/analytics/forecast";
 import {
   detectChangePoints,
@@ -118,6 +122,7 @@ function stdDev(arr: number[]): number {
 }
 
 export function ReportsView() {
+  const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodValue>("30d");
   const [forecastMethod, setForecastMethod] = useState<"holt" | "lstm">("holt");
@@ -142,12 +147,48 @@ export function ReportsView() {
     defaultCustomRange,
   );
 
-  const seedData = useMemo(() => getAnalyticsSeed(), []);
+  const [seedData, setSeedData] = useState<{ events: any[], requests: any[] }>({ events: [], requests: [] });
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const userId = (session?.user as any)?.id;
+        if (!userId) return;
+
+        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+        const orgId = empRes && "employee" in empRes ? empRes.employee?.organizationId : null;
+
+        if (orgId) {
+          // Fetch the full historical snapshot without date limits to support LSTM
+          const snapshotRes = await AnalyticsQueryServiceService.analyticsQueryServiceGetSnapshot(orgId);
+          if (snapshotRes && !("code" in snapshotRes)) {
+            const snap = snapshotRes as any;
+            const mappedEvents = (snap.incidents || []).map((i: any) => ({
+              ...i,
+              status: (i.status || "").toLowerCase().replace("incident_status_", ""),
+              priority: (i.priority || "").toLowerCase().replace("incident_priority_", ""),
+            }));
+
+            const mappedRequests = (snap.requests || []).map((r: any) => ({
+              ...r,
+              status: (r.status || "").toLowerCase().replace("service_request_status_", ""),
+              priority: "low",
+              responsibleDept: r.departmentId || "Не указана",
+            }));
+
+            setSeedData({ events: mappedEvents, requests: mappedRequests });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load analytics snapshot", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [session]);
 
   const { startMs, endMs, prevStartMs, prevEndMs, effectiveDays } = useMemo(() => {
     const now = Date.now();
@@ -173,7 +214,7 @@ export function ReportsView() {
     const cfg = PERIODS.find((p) => p.value === period)!;
     if (period === "all") {
       const earliest = seedData.events
-        .concat(seedData.requests as any)
+        .concat(seedData.requests)
         .reduce(
           (min: number, it: any) => Math.min(min, new Date(it.createdAt).getTime()),
           now,

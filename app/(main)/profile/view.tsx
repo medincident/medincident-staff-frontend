@@ -27,31 +27,21 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/constants";
-import { UsersService } from "@/lib/api";
+import { useSession } from "next-auth/react";
 
 export function ProfileView() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        const userData = await UsersService.getMe();
-        setUser(userData);
-      } catch (error) {
-        console.error("Failed to load profile:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
     setMounted(true);
+    setIsLoading(false);
   }, []);
+
+  const user = session?.user as any;
 
   const handleLogout = () => {
     router.push("/login");

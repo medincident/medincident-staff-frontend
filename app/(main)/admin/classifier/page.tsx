@@ -1,5 +1,7 @@
 import { Metadata } from "next";
 import { ClassifierView } from "@/app/(main)/admin/classifier/view";
+import { RoleGate } from "@/components/auth/role-gate";
+import { SCOPES } from "@/lib/auth/scopes";
 
 export const metadata: Metadata = {
   title: "Классификатор событий",
@@ -7,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function ClassifierPage() {
-  return <ClassifierView />;
+  return (
+    <RoleGate allowedScopes={[SCOPES.SYSTEM_ADMIN, SCOPES.ORG_ADMIN]} fallback={<div className="p-8 text-center text-muted-foreground">Доступ запрещен</div>}>
+      <ClassifierView />
+    </RoleGate>
+  );
 }

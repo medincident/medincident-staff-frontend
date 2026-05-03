@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { ArrowLeft, Loader2, Save, Plus, AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,9 +21,16 @@ import {
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
-import { Category, IncidentEvent } from "@/lib/types";
 
-import { CLASSIFIER_DB, eventsDb } from "@/lib/mock-db";
+import { 
+  IncidentQueryServiceService, 
+  IncidentCommandServiceService, 
+  IncidentClassifierQueryServiceService,
+  MembershipQueryServiceService,
+  v1Category,
+  classifierV1Type,
+  v1IncidentView
+} from "@/lib/api-generated";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, { message: "Пожалуйста, выберите категорию" }),
@@ -38,10 +46,14 @@ interface EventFormProps {
 
 export function EventForm({ eventId }: EventFormProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const isEditMode = !!eventId;
 
-  const [classifier, setClassifier] = useState<Category[]>([]);
-  const [existingEvent, setExistingEvent] = useState<IncidentEvent | null>(null);
+  const [categories, setCategories] = useState<v1Category[]>([]);
+  const [types, setTypes] = useState<classifierV1Type[]>([]);
+  const [existingEvent, setExistingEvent] = useState<v1IncidentView | null>(null);
+  const [orgId, setOrgId] = useState<string>("");
+  const [employeeDeptId, setEmployeeDeptId] = useState<string>("");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,20 +70,51 @@ export function EventForm({ eventId }: EventFormProps) {
 
   useEffect(() => {
     const loadData = async () => {
+      const userId = (session?.user as any)?.id;
+      if (!userId) return;
+
       try {
         setIsLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setClassifier(CLASSIFIER_DB);
+        
+        let currentOrgId = "";
+        try {
+          const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
+          if (empRes && "employee" in empRes) {
+            if (empRes.employee?.organizationId) {
+              currentOrgId = empRes.employee.organizationId;
+              setOrgId(currentOrgId);
+            }
+            if (empRes.employee?.departmentId) {
+              setEmployeeDeptId(empRes.employee.departmentId);
+            }
+          }
+        } catch (e) {
+          console.warn("Could not fetch employee profile", e);
+        }
+
+        if (currentOrgId) {
+          const [catsRes, typesRes] = await Promise.all([
+            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(currentOrgId, 100),
+            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListActiveTypesByOrganization(currentOrgId, 100)
+          ]);
+          if (catsRes && "items" in catsRes && catsRes.items) {
+            setCategories(catsRes.items);
+          }
+          if (typesRes && "items" in typesRes && typesRes.items) {
+            setTypes(typesRes.items);
+          }
+        }
 
         if (isEditMode && eventId) {
-          const eventData = eventsDb.find(e => e.id === eventId);
-          if (!eventData) {
+          const incidentRes = await IncidentQueryServiceService.incidentQueryServiceGetIncident(eventId);
+          if (!incidentRes || !("incident" in incidentRes) || !incidentRes.incident) {
             setNotFound(true);
           } else {
+            const eventData = incidentRes.incident;
             setExistingEvent(eventData);
             form.reset({
-              categoryId: String(eventData.categoryId),
-              typeId: String(eventData.typeId),
+              categoryId: String(eventData.categoryId || ""),
+              typeId: String(eventData.typeId || ""),
               description: eventData.description || "",
             });
           }
@@ -85,54 +128,36 @@ export function EventForm({ eventId }: EventFormProps) {
     };
 
     loadData();
-  }, [eventId, isEditMode, form]);
+  }, [eventId, isEditMode, form, session]);
 
   const selectedCategoryId = form.watch("categoryId");
 
   const availableTypes = useMemo(() => {
     if (!selectedCategoryId) return [];
-    const category = classifier.find(
-      (c) => String(c.id) === String(selectedCategoryId)
-    );
-    return category?.types || [];
-  }, [selectedCategoryId, classifier]);
+    return types.filter(t => String(t.categoryId) === String(selectedCategoryId));
+  }, [selectedCategoryId, types]);
 
   async function onSubmit(values: EventFormValues) {
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 600));
-
-      const selectedCategory = classifier.find(c => String(c.id) === values.categoryId);
-      const selectedType = availableTypes.find(t => String(t.id) === values.typeId);
-
-      if (isEditMode && existingEvent) {
-        const eventIndex = eventsDb.findIndex(e => e.id === existingEvent.id);
-        if (eventIndex > -1) {
-          eventsDb[eventIndex] = {
-            ...existingEvent,
-            categoryId: values.categoryId,
-            typeId: values.typeId,
-            description: values.description,
-            categoryName: selectedCategory?.name,
-            typeName: selectedType?.name
-          };
-        }
+      if (isEditMode && existingEvent && existingEvent.id) {
+        // В режиме редактирования можно обновить только описание
+        await IncidentCommandServiceService.incidentCommandServiceUpdateIncidentDescription(existingEvent.id, {
+          description: values.description || ""
+        });
         notify.mutationSuccess("Изменения сохранены", "Данные события обновлены.");
       } else {
-        const newEvent: IncidentEvent = {
-          id: `evt_${Date.now()}`,
-          code: `INC-${Math.floor(1000 + Math.random() * 9000)}`,
-          createdAt: new Date().toISOString(),
-          status: "created",
-          author: "Текущий пользователь",
+        // Создание нового события
+        const res = await IncidentCommandServiceService.incidentCommandServiceCreateIncident({
+          departmentId: employeeDeptId,
           categoryId: values.categoryId,
           typeId: values.typeId,
-          description: values.description,
-          categoryName: selectedCategory?.name,
-          typeName: selectedType?.name
-        };
-        eventsDb.unshift(newEvent);
-        notify.mutationSuccess("Событие зарегистрировано", `Код ${newEvent.code}. Ответственные будут уведомлены.`);
+          description: values.description || "",
+          occurredAt: new Date().toISOString()
+        });
+        
+        const newId = (res as any)?.id || "Новое событие";
+        notify.mutationSuccess("Событие зарегистрировано", `Ответственные будут уведомлены.`);
       }
 
       router.push("/events");
@@ -189,7 +214,7 @@ export function EventForm({ eventId }: EventFormProps) {
           <ArrowLeft className="h-5 w-5 text-foreground" />
         </Button>
         <h1 className="text-2xl font-bold text-foreground">
-          {isEditMode ? `Редактирование ${existingEvent?.code || ''}` : "Новое событие"}
+          {isEditMode ? `Редактирование события` : "Новое событие"}
         </h1>
       </div>
 
@@ -205,9 +230,9 @@ export function EventForm({ eventId }: EventFormProps) {
                     <FormLabel>Категория</FormLabel>
                     <FormControl>
                       <SearchableSelect
-                        options={classifier.map((c) => ({
+                        options={categories.map((c) => ({
                           value: String(c.id),
-                          label: c.name,
+                          label: c.name || String(c.id),
                         }))}
                         value={field.value}
                         onChange={(val) => {
@@ -217,7 +242,7 @@ export function EventForm({ eventId }: EventFormProps) {
                           }
                         }}
                         placeholder={isLoading ? "Загрузка..." : "Выберите категорию..."}
-                        disabled={isLoading}
+                        disabled={isLoading || isEditMode}
                       />
                     </FormControl>
                     <FormMessage />
@@ -235,11 +260,11 @@ export function EventForm({ eventId }: EventFormProps) {
                       <SearchableSelect
                         options={availableTypes.map((t) => ({
                           value: String(t.id),
-                          label: t.name,
+                          label: t.name || String(t.id),
                         }))}
                         value={field.value}
                         onChange={field.onChange}
-                        disabled={!selectedCategoryId || isLoading}
+                        disabled={!selectedCategoryId || isLoading || isEditMode}
                         placeholder={
                           selectedCategoryId
                             ? "Выберите тип..."

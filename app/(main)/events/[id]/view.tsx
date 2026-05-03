@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   ArrowLeft,
   User,
@@ -14,7 +15,6 @@ import {
   Plus,
   ChevronRight,
   Link2,
-  Unlink
 } from "lucide-react";
 import { notify } from "@/lib/toast";
 
@@ -25,21 +25,24 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ChatContainer } from "@/components/chat/chat-container";
 
 import { EVENT_STATUS_MAP, STATUS_MAP, SERVICE_TYPE_CONFIG } from "@/lib/constants";
-import { IncidentEvent, EventStatus, Category, ServiceRequest } from "@/lib/types";
+import { EventStatus } from "@/lib/types";
 import { getBadgeColor } from "@/lib/status-helper";
-import { eventsDb, requestsDb, CLASSIFIER_DB } from "@/lib/mock-db";
+import { SCOPES } from "@/lib/auth/scopes";
+
+import {
+  IncidentQueryServiceService,
+  IncidentCommandServiceService,
+  IncidentClassifierQueryServiceService,
+  MembershipQueryServiceService,
+  ServiceRequestQueryServiceService,
+  v1IncidentView,
+  v1Category,
+  classifierV1Type,
+  v1ServiceRequest
+} from "@/lib/api-generated";
 
 interface EventDetailsViewProps {
   eventId: string;
@@ -52,39 +55,14 @@ function DetailsSection({
   status,
   onStatusChange,
   linkedRequests,
-  availableRequests,
-  onLinkRequest,
-  onUnlinkRequest,
 }: {
-  event: IncidentEvent;
+  event: v1IncidentView;
   displayTypeName: string;
   displayCategoryName: string;
   status: EventStatus;
   onStatusChange: (s: EventStatus) => void;
-  linkedRequests: ServiceRequest[];
-  availableRequests: ServiceRequest[];
-  onLinkRequest: (requestId: string) => void;
-  onUnlinkRequest: (requestId: string) => void;
+  linkedRequests: v1ServiceRequest[];
 }) {
-  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
-  const [selectedRequestId, setSelectedRequestId] = useState("");
-
-  const availableOptions = useMemo(
-    () =>
-      availableRequests.map((r) => ({
-        value: r.id,
-        label: `#${r.number} — ${SERVICE_TYPE_CONFIG[r.type]?.label || r.type}`,
-        description: r.description || undefined,
-      })),
-    [availableRequests],
-  );
-
-  const handleConfirmLink = () => {
-    if (!selectedRequestId) return;
-    onLinkRequest(selectedRequestId);
-    setSelectedRequestId("");
-    setIsLinkDialogOpen(false);
-  };
   return (
     <div className="space-y-6">
       <Card className="gap-3 bg-card border">
@@ -106,7 +84,7 @@ function DetailsSection({
           <Separator className="bg-border" />
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <User className="h-3 w-3" />
-            Автор: <span className="text-foreground">{event.author}</span>
+            Автор: <span className="text-foreground">{event.registrar?.displayName || "Неизвестный"}</span>
           </div>
         </CardContent>
       </Card>
@@ -152,49 +130,38 @@ function DetailsSection({
         <CardContent className="space-y-3">
           {linkedRequests.length > 0 ? (
             <div className="space-y-2">
-              {linkedRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="group relative rounded-md border bg-background hover:border-primary/50 hover:bg-muted/30 transition-colors"
-                >
-                  <Link
-                    href={`/requests/${req.id}`}
-                    className="flex items-center justify-between gap-3 p-3 pr-10"
+              {linkedRequests.map((req) => {
+                const reqStatus = (req.status || "").toLowerCase().replace("service_request_status_", "");
+                return (
+                  <div
+                    key={req.id}
+                    className="group relative rounded-md border bg-background hover:border-primary/50 hover:bg-muted/30 transition-colors"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-xs font-mono font-bold text-muted-foreground">
-                          #{req.number}
-                        </span>
-                        <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${getBadgeColor(req.status)}`}>
-                          {STATUS_MAP[req.status] || req.status}
-                        </Badge>
+                    <Link
+                      href={`/requests/${req.id}`}
+                      className="flex items-center justify-between gap-3 p-3 pr-10"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="text-xs font-mono font-bold text-muted-foreground">
+                            #{req.id?.substring(0, 8)}
+                          </span>
+                          <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${getBadgeColor(reqStatus as any)}`}>
+                            {STATUS_MAP[reqStatus as any] || req.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2 break-words">
+                          {SERVICE_TYPE_CONFIG[req.typeId as any]?.label || req.typeId}
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                          {req.description}
+                        </p>
                       </div>
-                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2 break-words">
-                        {SERVICE_TYPE_CONFIG[req.type]?.label || req.type}
-                      </p>
-                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                        {req.description}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 group-hover:text-primary transition-colors" />
-                  </Link>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    title="Отвязать"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onUnlinkRequest(req.id);
-                    }}
-                    className="absolute top-1/2 right-1 -translate-y-1/2 h-7 w-7 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                  >
-                    <Unlink className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 group-hover:text-primary transition-colors" />
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground italic">
@@ -202,17 +169,7 @@ function DetailsSection({
             </p>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary"
-              onClick={() => setIsLinkDialogOpen(true)}
-              disabled={availableRequests.length === 0}
-            >
-              <Link2 className="mr-2 h-4 w-4" />
-              Привязать существующую
-            </Button>
+          <div className="pt-2">
             <Link href={`/requests/new?linkedEventId=${event.id}`} className="block">
               <Button variant="outline" className="w-full border-dashed text-muted-foreground hover:text-primary hover:border-primary">
                 <Plus className="mr-2 h-4 w-4" />
@@ -222,44 +179,18 @@ function DetailsSection({
           </div>
         </CardContent>
       </Card>
-
-      <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
-        <DialogContent className="min-w-0">
-          <DialogHeader className="min-w-0">
-            <DialogTitle>Привязать заявку к событию</DialogTitle>
-            <DialogDescription>
-              Выберите существующую заявку, чтобы связать её с {event.code}. Если заявка уже привязана к другому событию, эта привязка будет перезаписана.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-w-0 w-full">
-            <SearchableSelect
-              options={availableOptions}
-              value={selectedRequestId}
-              onChange={setSelectedRequestId}
-              placeholder="Выберите заявку"
-              emptyMessage="Нет доступных заявок"
-            />
-          </div>
-          <DialogFooter className="min-w-0">
-            <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)}>
-              Отмена
-            </Button>
-            <Button onClick={handleConfirmLink} disabled={!selectedRequestId}>
-              <Link2 className="mr-2 h-4 w-4" />
-              Привязать
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
 export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const router = useRouter();
+  const { data: session } = useSession();
 
-  const [event, setEvent] = useState<IncidentEvent | null>(null);
-  const [classifier, setClassifier] = useState<Category[]>([]);
+  const [event, setEvent] = useState<v1IncidentView | null>(null);
+  const [categories, setCategories] = useState<v1Category[]>([]);
+  const [types, setTypes] = useState<classifierV1Type[]>([]);
+  const [linkedRequests, setLinkedRequests] = useState<v1ServiceRequest[]>([]);
   const [status, setStatus] = useState<EventStatus>("created");
 
   const [isLoading, setIsLoading] = useState(true);
@@ -267,47 +198,80 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
 
   useEffect(() => {
     const loadData = async () => {
+      const userId = (session?.user as any)?.id;
+      if (!userId) return;
+      
       try {
         setIsLoading(true);
-        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        const foundEvent = eventsDb.find((e) => e.id === eventId);
-
-        if (!foundEvent) {
+        const incidentRes = await IncidentQueryServiceService.incidentQueryServiceGetIncident(eventId);
+        
+        if (!incidentRes || !("incident" in incidentRes) || !incidentRes.incident) {
           setNotFound(true);
-        } else {
-          setEvent(foundEvent);
-          setClassifier(CLASSIFIER_DB);
-          setStatus(foundEvent.status as EventStatus);
+          return;
+        }
+
+        const foundEvent = incidentRes.incident;
+        setEvent(foundEvent);
+        
+        const evtStatus = (foundEvent.status || "").toLowerCase().replace("incident_status_", "") as EventStatus;
+        setStatus(evtStatus || "created");
+
+        // Загружаем связанные заявки
+        try {
+          const reqs = await ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequestsByIncident(eventId, 100);
+          if (reqs && "items" in reqs && reqs.items) {
+            setLinkedRequests(reqs.items);
+          }
+        } catch (e) {
+          console.warn("Could not load linked requests", e);
+        }
+
+        // Получаем организацию для загрузки классификаторов (если есть organizationId в событии)
+        if (foundEvent.organizationId) {
+          const [catsRes, typesRes] = await Promise.all([
+            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(foundEvent.organizationId, 100),
+            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListActiveTypesByOrganization(foundEvent.organizationId, 100)
+          ]);
+
+          if (catsRes && "items" in catsRes && catsRes.items) {
+            setCategories(catsRes.items);
+          }
+          if (typesRes && "items" in typesRes && typesRes.items) {
+            setTypes(typesRes.items);
+          }
         }
       } catch (error) {
         console.error("Failed to load event:", error);
         notify.error("Ошибка загрузки данных", "Не удалось получить информацию о событии.");
+        setNotFound(true);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [eventId]);
+  }, [eventId, session]);
 
   const handleStatusChange = async (newStatus: EventStatus) => {
-    if (!event) return;
+    if (!event || !event.id) return;
 
     const prevStatus = status;
     setStatus(newStatus);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-
-      const updatedEvent = { ...event, status: newStatus };
-
-      const eventIndex = eventsDb.findIndex(e => e.id === eventId);
-      if (eventIndex > -1) {
-        eventsDb[eventIndex] = updatedEvent;
+      let apiStatus = newStatus.toUpperCase();
+      if (!apiStatus.startsWith("INCIDENT_STATUS_")) {
+        apiStatus = `INCIDENT_STATUS_${apiStatus}`;
       }
+      
+      await IncidentCommandServiceService.incidentCommandServiceUpdateIncidentStatus(event.id, {
+        newStatus: apiStatus as any
+      });
 
+      const updatedEvent = { ...event, status: apiStatus as any };
       setEvent(updatedEvent);
+      
       notify.mutationSuccess(
         "Статус обновлён",
         `Событие переведено в статус "${EVENT_STATUS_MAP[newStatus]}".`,
@@ -322,49 +286,20 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const { displayTypeName, displayCategoryName } = useMemo(() => {
     if (!event) return { displayTypeName: "...", displayCategoryName: "..." };
 
-    let typeName = event.typeName || event.typeId;
-    let categoryName = event.categoryName || event.categoryId;
+    let typeName = event.typeId || "";
+    let categoryName = event.categoryId || "";
 
-    const category = classifier.find(c => c.id === event.categoryId);
-    if (category) {
+    const category = categories.find(c => c.id === event.categoryId);
+    if (category && category.name) {
       categoryName = category.name;
-      const type = category.types.find(t => t.id === event.typeId);
-      if (type) typeName = type.name;
+    }
+    const type = types.find(t => t.id === event.typeId);
+    if (type && type.name) {
+      typeName = type.name;
     }
 
     return { displayTypeName: typeName, displayCategoryName: categoryName };
-  }, [event, classifier]);
-
-  const [requestsVersion, setRequestsVersion] = useState(0);
-
-  const { linkedRequests, availableRequests } = useMemo(() => {
-    if (!event) return { linkedRequests: [], availableRequests: [] };
-    const sortByDate = (a: ServiceRequest, b: ServiceRequest) =>
-      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-    return {
-      linkedRequests: requestsDb.filter(r => r.linkedEventId === event.id).sort(sortByDate),
-      availableRequests: requestsDb.filter(r => r.linkedEventId !== event.id).sort(sortByDate),
-    };
-  }, [event, requestsVersion]);
-
-  const handleLinkRequest = (requestId: string) => {
-    if (!event) return;
-    const idx = requestsDb.findIndex(r => r.id === requestId);
-    if (idx === -1) return;
-    const req = requestsDb[idx];
-    requestsDb[idx] = { ...req, linkedEventId: event.id };
-    setRequestsVersion(v => v + 1);
-    notify.mutationSuccess("Заявка привязана", `Заявка #${req.number} связана с событием ${event.code}.`);
-  };
-
-  const handleUnlinkRequest = (requestId: string) => {
-    const idx = requestsDb.findIndex(r => r.id === requestId);
-    if (idx === -1) return;
-    const req = requestsDb[idx];
-    requestsDb[idx] = { ...req, linkedEventId: undefined };
-    setRequestsVersion(v => v + 1);
-    notify.mutationSuccess("Привязка снята", `Заявка #${req.number} отвязана от события.`);
-  };
+  }, [event, categories, types]);
 
   if (isLoading) {
     return (
@@ -458,14 +393,14 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h1 className="text-lg font-bold text-foreground line-clamp-2 break-words min-w-0">
-              Событие #{event.code}
+              Событие #{event.id?.substring(0, 8)}
             </h1>
             <Badge variant="outline" className={`shrink-0 ${getBadgeColor(status)}`}>
               {EVENT_STATUS_MAP[status] || status}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground truncate mt-1">
-            Создано {new Date(event.createdAt).toLocaleString()}
+            Создано {event.createdAt ? new Date(event.createdAt).toLocaleString() : ""}
           </p>
         </div>
       </div>
@@ -489,9 +424,6 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
               status={status}
               onStatusChange={handleStatusChange}
               linkedRequests={linkedRequests}
-              availableRequests={availableRequests}
-              onLinkRequest={handleLinkRequest}
-              onUnlinkRequest={handleUnlinkRequest}
             />
           </TabsContent>
           <TabsContent value="chat" className="flex-1 h-full mt-0 overflow-hidden">
@@ -509,9 +441,6 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
             status={status}
             onStatusChange={handleStatusChange}
             linkedRequests={linkedRequests}
-            availableRequests={availableRequests}
-            onLinkRequest={handleLinkRequest}
-            onUnlinkRequest={handleUnlinkRequest}
           />
         </div>
         <div className="col-span-1 sticky top-24 h-[600px]">

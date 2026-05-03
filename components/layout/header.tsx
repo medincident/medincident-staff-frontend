@@ -20,8 +20,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
-import { UsersService } from "@/lib/api";
-import { MOCK_NOTIFICATIONS } from "@/lib/mock-db";
+import { useSession } from "next-auth/react";
 import { Notification } from "@/lib/types";
 
 const NOTIFICATION_ICONS: Record<string, any> = {
@@ -35,9 +34,9 @@ const NOTIFICATION_ICONS: Record<string, any> = {
 export function Header() {
   const router = useRouter();
 
-  const [user, setUser] = useState<any | null>(null);
+  const { data: session } = useSession();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -53,20 +52,8 @@ export function Header() {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        const userData = await UsersService.getMe();
-        setUser(userData);
-        
-        setNotifications(MOCK_NOTIFICATIONS as Notification[]);
-      } catch (error) {
-        console.error("Header data load failed", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
+    // TODO: Replace with real API call when notification endpoint is added
+    setNotifications([]);
   }, []);
 
   const handleMarkAllRead = (e: React.MouseEvent) => {
@@ -78,6 +65,7 @@ export function Header() {
     router.push("/login");
   };
 
+  const user = session?.user as any;
   const displayName = user?.name || `${user?.givenName || ""} ${user?.familyName || ""}`.trim() || "Пользователь";
 
   return (

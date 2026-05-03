@@ -1,0 +1,12 @@
+/* generated using openapi-typescript-codegen -- do not edit */
+/* istanbul ignore file */
+/* tslint:disable */
+/* eslint-disable */
+export enum commandIncidentV1IncidentStatus {
+    INCIDENT_STATUS_UNSPECIFIED = 'INCIDENT_STATUS_UNSPECIFIED',
+    INCIDENT_STATUS_PENDING = 'INCIDENT_STATUS_PENDING',
+    INCIDENT_STATUS_IN_PROGRESS = 'INCIDENT_STATUS_IN_PROGRESS',
+    INCIDENT_STATUS_DONE = 'INCIDENT_STATUS_DONE',
+    INCIDENT_STATUS_REJECTED = 'INCIDENT_STATUS_REJECTED',
+    INCIDENT_STATUS_CANCELLED = 'INCIDENT_STATUS_CANCELLED',
+}
