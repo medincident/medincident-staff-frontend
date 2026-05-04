@@ -85,9 +85,13 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.sub as string;
         (session as any).scopes = token.scopes;
-        (session as any).accessToken = token.accessToken;
+        // Бэк ожидает JWT-токен пользователя из PKCE-обмена. В Zitadel
+        // id_token всегда подписан как JWT и содержит claim'ы пользователя,
+        // а access_token может быть opaque (если в настройках проекта не
+        // включён JWT Auth Token Type) — отсюда "Invalid or expired token"
+        // при попытке валидировать его на бэке. Поэтому отдаём id_token.
         (session as any).idToken = token.idToken;
-        (session as any).jwtToken = token.accessToken ?? token.idToken;
+        (session as any).accessToken = token.accessToken;
         (session as any).error = token.error;
       }
       return session;

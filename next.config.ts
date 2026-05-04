@@ -13,17 +13,6 @@ const withPWA = require("@ducanh2912/next-pwa").default({
 });
 
 const nextConfig: NextConfig = {
-  webpack: (config, { dev }) => {
-    // Применяем хак только в режиме разработки (npm run dev)
-    if (dev) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        // Говорим Webpack игнорировать этот импорт (вернет пустой объект {})
-        "@/lib/services/events": false,
-      };
-    }
-    return config;
-  },
   async headers() {
     return [
       {

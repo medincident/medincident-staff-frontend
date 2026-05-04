@@ -6,6 +6,14 @@ import axios from "axios";
 import type { AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
 import { OpenAPI } from "@/lib/api-generated";
 
+// Достаём подписанный JWT-токен пользователя из NextAuth-сессии. Используем
+// id_token, потому что бэк валидирует именно подпись JWT — а access_token в
+// Zitadel может быть opaque, если в настройках проекта не включён JWT Auth
+// Token Type.
+function pickToken(session: any): string {
+  return (session?.idToken as string | undefined) ?? "";
+}
+
 export function ApiProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
 
@@ -13,30 +21,14 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
     OpenAPI.WITH_CREDENTIALS = true;
 
-    // Always resolve token from the latest NextAuth session so refreshed
-    // access tokens are picked up even after the app is already mounted.
-    OpenAPI.TOKEN = async () => {
-      const latestSession = await getSession();
-      return (
-        ((latestSession as any)?.jwtToken as string | undefined) ||
-        ((latestSession as any)?.accessToken as string | undefined) ||
-        ((latestSession as any)?.idToken as string | undefined) ||
-        ""
-      );
-    };
+    OpenAPI.TOKEN = async () => pickToken(await getSession());
 
     const requestInterceptor = axios.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
-        const latestSession = await getSession();
-        const latestToken =
-          ((latestSession as any)?.jwtToken as string | undefined) ||
-          ((latestSession as any)?.accessToken as string | undefined) ||
-          ((latestSession as any)?.idToken as string | undefined);
-
-        if (latestToken) {
-          config.headers.Authorization = `Bearer ${latestToken}`;
+        const token = pickToken(await getSession());
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
         }
-
         return config;
       }
     );
@@ -51,12 +43,9 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
           originalRequest._retry = true;
 
-          const refreshedSession = await getSession();
-          const refreshedToken =
-            ((refreshedSession as any)?.jwtToken as string | undefined) ||
-            ((refreshedSession as any)?.accessToken as string | undefined) ||
-            ((refreshedSession as any)?.idToken as string | undefined);
-
+          // Сессия могла обновиться (refresh-token flow в auth-options),
+          // попробуем перезапросить с новым токеном один раз.
+          const refreshedToken = pickToken(await getSession());
           if (refreshedToken) {
             originalRequest.headers = {
               ...(originalRequest.headers || {}),
