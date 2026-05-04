@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import {
   Bell, User as UserIcon, Settings, LogOut, Check, Info, AlertTriangle, CheckCheck, Shield, Loader2
 } from "lucide-react";
@@ -20,7 +20,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
-import { useSession } from "next-auth/react";
 import { Notification } from "@/lib/types";
 
 const NOTIFICATION_ICONS: Record<string, any> = {
@@ -32,8 +31,6 @@ const NOTIFICATION_ICONS: Record<string, any> = {
 };
 
 export function Header() {
-  const router = useRouter();
-
   const { data: session } = useSession();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,8 +58,8 @@ export function Header() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  const handleLogout = () => {
-    router.push("/login");
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/logout" });
   };
 
   const user = session?.user as any;

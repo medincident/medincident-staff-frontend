@@ -3,7 +3,7 @@
 import { useEffect, ReactNode } from "react";
 import { useSession, signOut, getSession } from "next-auth/react";
 import axios from "axios";
-import type { AxiosRequestConfig } from "axios";
+import type { AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
 import { OpenAPI } from "@/lib/api-generated";
 
 export function ApiProvider({ children }: { children: ReactNode }) {
@@ -20,7 +20,20 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       return ((latestSession as any)?.accessToken as string | undefined) || "";
     };
 
-    const interceptor = axios.interceptors.response.use(
+    const requestInterceptor = axios.interceptors.request.use(
+      async (config: InternalAxiosRequestConfig) => {
+        const latestSession = await getSession();
+        const latestToken = (latestSession as any)?.accessToken as string | undefined;
+
+        if (latestToken) {
+          config.headers.Authorization = `Bearer ${latestToken}`;
+        }
+
+        return config;
+      }
+    );
+
+    const responseInterceptor = axios.interceptors.response.use(
       (response) => response,
       async (error) => {
         const originalRequest = error.config as
@@ -41,9 +54,9 @@ export function ApiProvider({ children }: { children: ReactNode }) {
             return axios.request(originalRequest);
           }
 
-          await signOut({ callbackUrl: window.location.pathname });
+          await signOut({ callbackUrl: "/logout" });
         } else if (error.response?.status === 401) {
-          await signOut({ callbackUrl: window.location.pathname });
+          await signOut({ callbackUrl: "/logout" });
         }
 
         return Promise.reject(error);
@@ -51,7 +64,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
-      axios.interceptors.response.eject(interceptor);
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
     };
   }, [session]);
 
