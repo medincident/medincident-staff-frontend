@@ -17,13 +17,21 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     // access tokens are picked up even after the app is already mounted.
     OpenAPI.TOKEN = async () => {
       const latestSession = await getSession();
-      return ((latestSession as any)?.accessToken as string | undefined) || "";
+      return (
+        ((latestSession as any)?.jwtToken as string | undefined) ||
+        ((latestSession as any)?.accessToken as string | undefined) ||
+        ((latestSession as any)?.idToken as string | undefined) ||
+        ""
+      );
     };
 
     const requestInterceptor = axios.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         const latestSession = await getSession();
-        const latestToken = (latestSession as any)?.accessToken as string | undefined;
+        const latestToken =
+          ((latestSession as any)?.jwtToken as string | undefined) ||
+          ((latestSession as any)?.accessToken as string | undefined) ||
+          ((latestSession as any)?.idToken as string | undefined);
 
         if (latestToken) {
           config.headers.Authorization = `Bearer ${latestToken}`;
@@ -44,7 +52,10 @@ export function ApiProvider({ children }: { children: ReactNode }) {
           originalRequest._retry = true;
 
           const refreshedSession = await getSession();
-          const refreshedToken = (refreshedSession as any)?.accessToken as string | undefined;
+          const refreshedToken =
+            ((refreshedSession as any)?.jwtToken as string | undefined) ||
+            ((refreshedSession as any)?.accessToken as string | undefined) ||
+            ((refreshedSession as any)?.idToken as string | undefined);
 
           if (refreshedToken) {
             originalRequest.headers = {

@@ -26,6 +26,7 @@ async function refreshAccessToken(token: any) {
     return {
       ...token,
       accessToken: refreshedTokens.access_token,
+      idToken: refreshedTokens.id_token ?? token.idToken,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
       expiresAt: Date.now() + refreshedTokens.expires_in * 1000,
     };
@@ -64,6 +65,7 @@ export const authOptions: NextAuthOptions = {
         return {
           ...token,
           accessToken: account.access_token,
+          idToken: account.id_token,
           refreshToken: account.refresh_token,
           expiresAt: account.expires_at
             ? account.expires_at * 1000
@@ -84,6 +86,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.sub as string;
         (session as any).scopes = token.scopes;
         (session as any).accessToken = token.accessToken;
+        (session as any).idToken = token.idToken;
+        (session as any).jwtToken = token.accessToken ?? token.idToken;
         (session as any).error = token.error;
       }
       return session;
