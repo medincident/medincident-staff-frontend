@@ -3,11 +3,23 @@
 import { signIn } from "next-auth/react";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function AutoLoginPage() {
+  const router = useRouter();
+  const { status } = useSession();
+
   useEffect(() => {
-    signIn("zitadel");
-  }, []);
+    if (status === "authenticated") {
+      router.replace("/dashboard");
+      return;
+    }
+
+    if (status === "unauthenticated") {
+      signIn("zitadel", { callbackUrl: "/dashboard" });
+    }
+  }, [router, status]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-muted/30">
