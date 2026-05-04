@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 const authMiddleware = withAuth({
   pages: {
-    signIn: "/api/auth/signin",
+    signIn: "/login",
   },
 });
 

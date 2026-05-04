@@ -39,6 +39,9 @@ async function refreshAccessToken(token: any) {
 }
 
 export const authOptions: NextAuthOptions = {
+  pages: {
+    signIn: "/login",
+  },
   providers: [
     ZitadelProvider({
       issuer: process.env.ZITADEL_ISSUER as string,
