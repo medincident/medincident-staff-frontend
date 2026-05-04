@@ -54,9 +54,9 @@ export function ApiProvider({ children }: { children: ReactNode }) {
             return axios.request(originalRequest);
           }
 
-          await signOut({ callbackUrl: "/logout" });
+          await signOut({ callbackUrl: "/login" });
         } else if (error.response?.status === 401) {
-          await signOut({ callbackUrl: "/logout" });
+          await signOut({ callbackUrl: "/login" });
         }
 
         return Promise.reject(error);

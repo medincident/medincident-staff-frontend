@@ -17,7 +17,14 @@ export default function AutoLoginPage() {
     }
 
     if (status === "unauthenticated") {
-      signIn("zitadel", { callbackUrl: "/dashboard" });
+      signIn(
+        "zitadel",
+        { callbackUrl: "/dashboard" },
+        {
+          prompt: "login",
+          max_age: "0",
+        }
+      );
     }
   }, [router, status]);
 

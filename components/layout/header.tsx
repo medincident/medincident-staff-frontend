@@ -59,7 +59,7 @@ export function Header() {
   };
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/logout" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   const user = session?.user as any;
