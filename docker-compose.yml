@@ -1,6 +1,6 @@
 services:
   nextjs:
-    image: ghcr.io/dreyndev/ilizarovnsproject_frontend:latest
+    image: ghcr.io/medincident/medincident-staff-frontend:latest
     container_name: nextjs_app
     restart: unless-stopped
     expose:

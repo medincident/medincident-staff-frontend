@@ -38,9 +38,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          # GHCR требует lowercase, репа называется в смешанном регистре —
-          # фиксируем имя пакета явно.
-          images: ghcr.io/dreyndev/ilizarovnsproject_frontend
+          images: ghcr.io/medincident/medincident-staff-frontend
           tags: |
             type=raw,value=latest
             type=sha,format=short
