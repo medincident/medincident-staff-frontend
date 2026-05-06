@@ -6,10 +6,24 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, Loader2, Save, Plus, Link as LinkIcon, X } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Plus, Link as LinkIcon, X, Check, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Form,
   FormControl,
@@ -19,22 +33,28 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { cn } from "@/lib/utils";
 import { notify } from "@/lib/toast";
 
-import { 
+import {
   ServiceRequestCommandServiceService,
   RequestClassifierQueryServiceService,
-  MembershipQueryServiceService,
   IncidentQueryServiceService,
+  MembershipQueryServiceService,
   v1RequestType,
   v1IncidentView,
+  v1EmployeeCardView,
   ServiceRequestQueryServiceService
 } from "@/lib/api-generated";
+import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { cleanText } from "@/lib/text";
 
 const formSchema = z.object({
   typeId: z.string().min(1, { message: "Выберите тип работ" }),
   description: z.string().min(5, { message: "Опишите проблему (минимум 5 символов)" }),
   incidentId: z.string().optional(),
+  executorEmployeeIds: z.array(z.string()),
 });
 
 type RequestFormValues = z.infer<typeof formSchema>;
@@ -48,11 +68,14 @@ function RequestFormContent({ requestId }: RequestFormProps) {
   const searchParams = useSearchParams();
   const linkedEventIdParam = searchParams.get("linkedEventId");
   const { data: session } = useSession();
+  const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestTypes, setRequestTypes] = useState<v1RequestType[]>([]);
   const [incidents, setIncidents] = useState<v1IncidentView[]>([]);
   const [employeeDeptId, setEmployeeDeptId] = useState<string>("");
+  const [staff, setStaff] = useState<v1EmployeeCardView[]>([]);
+  const [executorPopoverOpen, setExecutorPopoverOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(!!requestId);
 
   const isEditMode = !!requestId;
@@ -63,32 +86,44 @@ function RequestFormContent({ requestId }: RequestFormProps) {
       typeId: "",
       description: "",
       incidentId: linkedEventIdParam || "",
+      executorEmployeeIds: [],
     },
   });
 
   useEffect(() => {
+    if (isOrgResolving) return;
     const loadContext = async () => {
       if (!(session?.user as any)?.id) return;
       try {
         const userId = (session?.user as any)?.id;
         if (!userId) return;
-        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-        const orgId = empRes && "employee" in empRes ? empRes.employee?.organizationId : null;
-        if (empRes && "employee" in empRes && empRes.employee?.departmentId) {
-            setEmployeeDeptId(empRes.employee.departmentId);
-        }
+        // Ищем employee в активной организации — у мульти-орг сотрудника
+        // в каждой орге своё отделение, заявку создаём именно от своего
+        // отделения активной орги.
+        const emp = await getMyEmployeeInOrg(userId, activeOrgId);
+        const orgId = emp?.organizationId ?? activeOrgId ?? null;
+        const deptId = emp?.departmentId ?? null;
+        if (deptId) setEmployeeDeptId(deptId);
 
         if (orgId) {
-          const [typeRes, incRes] = await Promise.all([
+          const [typeRes, incRes, staffRes] = await Promise.all([
             RequestClassifierQueryServiceService.requestClassifierQueryServiceListActiveRequestTypesByOrganization(orgId, 100),
-            IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100)
+            IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100),
+            // Кандидаты на исполнение — сотрудники того же отделения, в котором
+            // создаётся заявка. Так же сделано в [id]/view.tsx для AssignExecutors.
+            deptId
+              ? MembershipQueryServiceService.membershipQueryServiceListEmployeesByDepartment(deptId, 200)
+              : Promise.resolve(null),
           ]);
-          
+
           if (typeRes && "items" in typeRes && typeRes.items) {
             setRequestTypes(typeRes.items);
           }
           if (incRes && "items" in incRes && incRes.items) {
             setIncidents(incRes.items);
+          }
+          if (staffRes && "items" in staffRes && staffRes.items) {
+            setStaff(staffRes.items as v1EmployeeCardView[]);
           }
         }
         
@@ -109,7 +144,7 @@ function RequestFormContent({ requestId }: RequestFormProps) {
       }
     };
     loadContext();
-  }, [session, requestId, form]);
+  }, [session, requestId, form, activeOrgId, isOrgResolving]);
 
   const eventOptions = useMemo(() => {
     return incidents.map(e => ({
@@ -128,19 +163,34 @@ function RequestFormContent({ requestId }: RequestFormProps) {
   async function onSubmit(values: RequestFormValues) {
     setIsSubmitting(true);
     try {
+      // Бэк-валидация: description required min=1/max=10000 + no_extra_ws.
+      const description = cleanText(values.description);
+      if (!description) {
+        notify.error("Заполните описание", "Описание заявки обязательно.");
+        setIsSubmitting(false);
+        return;
+      }
+      const incidentId = values.incidentId?.trim() || undefined;
+
       if (isEditMode && requestId) {
         await ServiceRequestCommandServiceService.serviceRequestCommandServiceUpdateServiceRequestDescription(
           requestId,
-          { description: values.description }
+          { description }
         );
         notify.mutationSuccess("Заявка обновлена", `Описание заявки успешно обновлено.`);
       } else {
+        // Бэк-валидация executorEmployeeIds: required, min=1, dive uuid.
+        if (!values.executorEmployeeIds || values.executorEmployeeIds.length === 0) {
+          notify.error("Выберите исполнителя", "Заявка должна быть назначена минимум на одного сотрудника.");
+          setIsSubmitting(false);
+          return;
+        }
         await ServiceRequestCommandServiceService.serviceRequestCommandServiceCreateServiceRequest({
             departmentId: employeeDeptId,
             typeId: values.typeId,
-            description: values.description,
-            incidentId: values.incidentId || undefined,
-            executorEmployeeIds: []
+            description,
+            ...(incidentId ? { incidentId } : {}),
+            executorEmployeeIds: values.executorEmployeeIds,
         });
         notify.mutationSuccess("Заявка создана", `Ваша заявка успешно отправлена.`);
       }
@@ -243,6 +293,123 @@ function RequestFormContent({ requestId }: RequestFormProps) {
             )}
             />
 
+            {!isEditMode && (
+              <FormField
+                control={form.control}
+                name="executorEmployeeIds"
+                render={({ field }) => {
+                  const selectedIds = field.value || [];
+                  const selectedEmps = staff.filter((e) =>
+                    e.employeeId ? selectedIds.includes(e.employeeId) : false,
+                  );
+                  const empLabel = (e: v1EmployeeCardView) =>
+                    e.displayName ||
+                    [e.firstName, e.lastName].filter(Boolean).join(" ") ||
+                    e.employeeId ||
+                    "";
+                  const toggle = (id: string) => {
+                    const next = selectedIds.includes(id)
+                      ? selectedIds.filter((x) => x !== id)
+                      : [...selectedIds, id];
+                    field.onChange(next);
+                  };
+                  return (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-primary" />
+                        Исполнители
+                      </FormLabel>
+                      <FormControl>
+                        <Popover open={executorPopoverOpen} onOpenChange={setExecutorPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between bg-background font-normal hover:border-primary",
+                                selectedIds.length === 0 && "text-muted-foreground",
+                              )}
+                            >
+                              <span className="truncate">
+                                {selectedIds.length === 0
+                                  ? "Выберите сотрудников отделения"
+                                  : `Выбрано: ${selectedIds.length}`}
+                              </span>
+                              <Users className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="p-0 bg-popover border-border"
+                            align="start"
+                            style={{ width: "var(--radix-popover-trigger-width)" }}
+                          >
+                            <Command className="bg-popover text-popover-foreground">
+                              <CommandInput placeholder="Поиск по ФИО..." className="h-9 border-none focus:ring-0" />
+                              <CommandList>
+                                <CommandEmpty>Сотрудники не найдены</CommandEmpty>
+                                <CommandGroup>
+                                  {staff
+                                    .filter((e) => e.employeeId)
+                                    .map((e) => {
+                                      const id = e.employeeId as string;
+                                      const checked = selectedIds.includes(id);
+                                      return (
+                                        <CommandItem
+                                          key={id}
+                                          value={`${empLabel(e)} ${e.position ?? ""}`}
+                                          onSelect={() => toggle(id)}
+                                          className="cursor-pointer items-start"
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4 mt-0.5 shrink-0", checked ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex flex-col min-w-0 flex-1 text-left gap-0.5">
+                                            <span className="line-clamp-1 break-all">{empLabel(e)}</span>
+                                            {e.position && (
+                                              <span className="line-clamp-1 break-all text-xs text-muted-foreground">
+                                                {e.position}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </CommandItem>
+                                      );
+                                    })}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </FormControl>
+                      {selectedEmps.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {selectedEmps.map((e) => (
+                            <Badge
+                              key={e.employeeId}
+                              variant="secondary"
+                              className="pl-2 pr-1 gap-1"
+                            >
+                              <span className="line-clamp-1 max-w-[160px]">{empLabel(e)}</span>
+                              <button
+                                type="button"
+                                onClick={() => toggle(e.employeeId as string)}
+                                className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20 transition-colors"
+                                aria-label="Убрать"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        Минимум один сотрудник. Кандидаты — сотрудники вашего отделения.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="description"
@@ -250,10 +417,10 @@ function RequestFormContent({ requestId }: RequestFormProps) {
                 <FormItem>
                   <FormLabel>Суть проблемы</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Что сломалось, требуется ли запчасть..." 
+                    <Textarea
+                      placeholder="Что сломалось, требуется ли запчасть..."
                       className="resize-none min-h-24"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />

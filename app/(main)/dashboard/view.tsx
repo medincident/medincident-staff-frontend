@@ -25,12 +25,12 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-import { ROLE_NAMES, STATUS_MAP } from "@/lib/constants"; 
+import { STATUS_MAP } from "@/lib/constants";
+import { SCOPES } from "@/lib/auth/scopes";
+import { useMyEmployee } from "@/lib/auth/use-my-employee";
 import { getBadgeColor } from "@/lib/status-helper";
 
-import { 
-
-  MembershipQueryServiceService,
+import {
   IncidentQueryServiceService,
   ServiceRequestQueryServiceService,
   AnnouncementQueryServiceService,
@@ -40,6 +40,7 @@ import {
   v1AnnouncementView,
   v1Category
 } from "@/lib/api-generated";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 
 const safeDate = (dateString?: string) => {
   if (!dateString) return "—";
@@ -50,47 +51,48 @@ const safeDate = (dateString?: string) => {
 
 export function DashboardView() {
   const { data: session } = useSession();
+  const { orgId, isResolving } = useActiveOrgId();
+  const { employee } = useMyEmployee();
 
   const user = session?.user as any;
+  const scopes: string[] = ((session as any)?.scopes ?? []) as string[];
+  const isSystemAdmin = scopes.includes(SCOPES.SYSTEM_ADMIN);
+
+  // Что писать в подзаголовке: должность из employee_card → fallback
+  // системный админ → fallback "Сотрудник".
+  const roleLabel = employee?.position
+    ? employee.position
+    : isSystemAdmin
+      ? "Системный администратор"
+      : "Сотрудник";
   const [events, setEvents] = useState<v1IncidentView[]>([]);
   const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
   const [announcements, setAnnouncements] = useState<v1AnnouncementView[]>([]);
   const [classifier, setClassifier] = useState<v1Category[]>([]);
-  
+
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (isResolving) return;
+    if (!orgId) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadData = async () => {
       try {
         setIsLoading(true);
-        
-        const userId = (session?.user as any)?.id;
-        if (userId) {
-          const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-          const orgId = empRes && "employee" in empRes ? empRes.employee?.organizationId : null;
+        const [eventsRes, reqsRes, annRes, classRes] = await Promise.all([
+          IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
+          ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequests(orgId, 50),
+          AnnouncementQueryServiceService.announcementQueryServiceListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
+          IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(orgId, 100),
+        ]);
 
-          if (orgId) {
-            const [eventsRes, reqsRes, annRes, classRes] = await Promise.all([
-              IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
-              ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequests(orgId, 50),
-              AnnouncementQueryServiceService.announcementQueryServiceListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
-              IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(orgId, 100)
-            ]);
-
-            if (eventsRes && "items" in eventsRes && eventsRes.items) {
-              setEvents(eventsRes.items);
-            }
-            if (reqsRes && "items" in reqsRes && reqsRes.items) {
-              setRequests(reqsRes.items);
-            }
-            if (annRes && "items" in annRes && annRes.items) {
-              setAnnouncements(annRes.items);
-            }
-            if (classRes && "items" in classRes && classRes.items) {
-              setClassifier(classRes.items);
-            }
-          }
-        }
+        if (eventsRes && "items" in eventsRes && eventsRes.items) setEvents(eventsRes.items);
+        if (reqsRes && "items" in reqsRes && reqsRes.items) setRequests(reqsRes.items);
+        if (annRes && "items" in annRes && annRes.items) setAnnouncements(annRes.items);
+        if (classRes && "items" in classRes && classRes.items) setClassifier(classRes.items);
       } catch (error) {
         console.error("Dashboard data load failed:", error);
       } finally {
@@ -99,15 +101,14 @@ export function DashboardView() {
     };
 
     loadData();
-  }, [session]);
+  }, [orgId, isResolving]);
   
-  const { typeNamesMap, categoryNamesMap } = useMemo(() => {
-    const types: Record<string, string> = {};
+  const categoryNamesMap = useMemo(() => {
     const cats: Record<string, string> = {};
-    classifier.forEach(cat => {
+    classifier.forEach((cat) => {
       if (cat.id && cat.name) cats[cat.id] = cat.name;
     });
-    return { typeNamesMap: types, categoryNamesMap: cats };
+    return cats;
   }, [classifier]);
 
   // FIXME: Active items logic based on actual status enums
@@ -136,7 +137,7 @@ export function DashboardView() {
             <span className="flex items-center gap-1 min-w-0">
               <Briefcase className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">
-                {isLoading ? <Skeleton className="h-4 w-24" /> : (user ? (user.role && user.role in ROLE_NAMES ? ROLE_NAMES[user.role as keyof typeof ROLE_NAMES] : (user.isAdmin ? "Администратор" : "Сотрудник")) : "Гость")}
+                {isLoading ? <Skeleton className="h-4 w-24" /> : (user ? roleLabel : "Гость")}
               </span>
             </span>
             <span className="text-border">|</span>
@@ -235,7 +236,6 @@ export function DashboardView() {
                     <EventItem
                       key={evt.id}
                       evt={evt}
-                      typeMap={typeNamesMap}
                       catMap={categoryNamesMap}
                     />
                   ))}
@@ -365,8 +365,8 @@ export function DashboardView() {
   );
 }
 
-function EventItem({ evt, typeMap, catMap }: { evt: v1IncidentView, typeMap: Record<string, string>, catMap: Record<string, string> }) {
-  const typeName = typeMap[evt.typeId || ""] || evt.typeId || "Неизвестный тип";
+function EventItem({ evt, catMap }: { evt: v1IncidentView; catMap: Record<string, string> }) {
+  const typeName = evt.typeId || "Неизвестный тип";
   const categoryName = catMap[evt.categoryId || ""] || evt.categoryId || "Неизвестная категория";
 
   return (

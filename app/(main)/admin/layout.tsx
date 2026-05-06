@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Shield, Building, Users, UserCheck, Network } from "lucide-react";
+import { Shield, Building, Users, UserCheck, Network, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -17,6 +17,7 @@ const adminTabs = [
   { href: "/admin/classifier", label: "Классификатор", icon: Shield },
   { href: "/admin/department", label: "Подразделение", icon: UserCheck },
   { href: "/admin/structure", label: "Структура", icon: Building },
+  { href: "/admin/announcements", label: "Объявления", icon: Megaphone },
   { href: "/admin/users", label: "Пользователи", icon: Users },
 ];
 

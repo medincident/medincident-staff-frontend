@@ -1,10 +1,6 @@
 services:
   nextjs:
-    build:
-      context: .
-      dockerfile: ./deployment/site.Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    image: ghcr.io/dreyndev/ilizarovnsproject_frontend:latest
     container_name: nextjs_app
     restart: unless-stopped
     expose:
@@ -13,6 +9,9 @@ services:
       - .env
     environment:
       NODE_ENV: production
+    labels:
+      # Watchtower следит только за контейнерами с этим лейблом.
+      com.centurylinklabs.watchtower.enable: "true"
 
   nginx:
     image: nginx:1.27-alpine
@@ -27,6 +26,22 @@ services:
       - ./deployment/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - nextjs
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Креды для GHCR: один раз `docker login ghcr.io` на хосте — Watchtower
+      # подхватит config.json для пулла приватных images.
+      - /root/.docker/config.json:/config.json:ro
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_POLL_INTERVAL: "60"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      TZ: "Europe/Moscow"
 
 networks:
   proxy-network:

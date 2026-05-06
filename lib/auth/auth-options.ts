@@ -4,13 +4,12 @@ import ZitadelProvider from "next-auth/providers/zitadel";
 async function refreshAccessToken(token: any) {
   try {
     const response = await fetch(
-      `${process.env.ZITADEL_ISSUER}/oauth/v2/token`,
+      `${process.env.NEXT_PUBLIC_ZITADEL_ISSUER}/oauth/v2/token`,
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           client_id: process.env.ZITADEL_CLIENT_ID as string,
-          client_secret: process.env.ZITADEL_CLIENT_SECRET as string,
           grant_type: "refresh_token",
           refresh_token: token.refreshToken,
         }),
@@ -18,10 +17,7 @@ async function refreshAccessToken(token: any) {
     );
 
     const refreshedTokens = await response.json();
-
-    if (!response.ok) {
-      throw refreshedTokens;
-    }
+    if (!response.ok) throw refreshedTokens;
 
     return {
       ...token,
@@ -32,10 +28,7 @@ async function refreshAccessToken(token: any) {
     };
   } catch (error) {
     console.error("Ошибка при обновлении токена", error);
-    return {
-      ...token,
-      error: "RefreshAccessTokenError",
-    };
+    return { ...token, error: "RefreshAccessTokenError" };
   }
 }
 
@@ -45,9 +38,13 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     ZitadelProvider({
-      issuer: process.env.ZITADEL_ISSUER as string,
+      issuer: process.env.NEXT_PUBLIC_ZITADEL_ISSUER as string,
       clientId: process.env.ZITADEL_CLIENT_ID as string,
-      clientSecret: process.env.ZITADEL_CLIENT_SECRET as string,
+      // Public-client + PKCE: secret в Zitadel выключен (Auth Method: None).
+      // NextAuth тип требует строку, а token_endpoint_auth_method=none
+      // отключает её передачу при обмене кода.
+      clientSecret: "",
+      client: { token_endpoint_auth_method: "none" },
       authorization: {
         params: {
           scope:
@@ -59,11 +56,49 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account, profile }) {
       if (account) {
-        const zitadelProfile = profile as Record<string, any>;
-        const rolesObj = zitadelProfile?.["urn:zitadel:iam:user:project:roles"];
+        const p = profile as Record<string, any> | undefined;
+        const rolesObj = p?.["urn:zitadel:iam:org:project:roles"];
+
+        // name/email/picture в id_token приходят только при включённом
+        // "Include user's profile info in the ID Token". Чтобы не зависеть
+        // от настроек проекта Zitadel, тянем userinfo руками.
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 10_000);
+        let info: Record<string, any> = {};
+        try {
+          const r = await fetch(
+            `${process.env.NEXT_PUBLIC_ZITADEL_ISSUER}/oidc/v1/userinfo`,
+            {
+              headers: { Authorization: `Bearer ${account.access_token}` },
+              signal: ac.signal,
+            },
+          );
+          if (r.ok) info = await r.json();
+        } catch (e) {
+          console.warn("[auth] userinfo fetch failed", e);
+        } finally {
+          clearTimeout(timer);
+        }
+
+        // Claim `name` у админских аккаунтов часто остаётся служебным
+        // ("ZITADEL Admin"), поэтому при наличии given/family собираем сами.
+        const givenName = info.given_name ?? p?.given_name;
+        const familyName = info.family_name ?? p?.family_name;
+        const composed = [givenName, familyName].filter(Boolean).join(" ");
+        const name =
+          composed ||
+          info.name ||
+          p?.name ||
+          info.preferred_username ||
+          p?.preferred_username ||
+          info.email ||
+          p?.email;
 
         return {
           ...token,
+          name,
+          email: info.email ?? p?.email,
+          picture: info.picture ?? p?.picture,
           accessToken: account.access_token,
           idToken: account.id_token,
           refreshToken: account.refresh_token,
@@ -74,10 +109,7 @@ export const authOptions: NextAuthOptions = {
         };
       }
 
-      if (Date.now() < (token.expiresAt as number) - 60 * 1000) {
-        return token;
-      }
-
+      if (Date.now() < (token.expiresAt as number) - 60 * 1000) return token;
       return await refreshAccessToken(token);
     },
 
@@ -85,11 +117,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.sub as string;
         (session as any).scopes = token.scopes;
-        // Бэк ожидает JWT-токен пользователя из PKCE-обмена. В Zitadel
-        // id_token всегда подписан как JWT и содержит claim'ы пользователя,
-        // а access_token может быть opaque (если в настройках проекта не
-        // включён JWT Auth Token Type) — отсюда "Invalid or expired token"
-        // при попытке валидировать его на бэке. Поэтому отдаём id_token.
+        // Шлём оба токена: бэк валидирует id_token (JWT), а access_token
+        // в Zitadel может прийти opaque.
         (session as any).idToken = token.idToken;
         (session as any).accessToken = token.accessToken;
         (session as any).error = token.error;

@@ -11,7 +11,8 @@ import {
     Clock,
     CheckCircle2,
     FileText,
-    MessageSquare
+    MessageSquare,
+    History as HistoryIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,13 +28,16 @@ import { RequestStatus } from "@/lib/types";
 import { STATUS_MAP } from "@/lib/constants";
 import { getBadgeColor } from "@/lib/status-helper";
 import { ChatContainer } from "@/components/chat/chat-container";
+import { EntityHistory } from "@/components/history/entity-history";
 
-import { 
+import {
     ServiceRequestQueryServiceService,
     ServiceRequestCommandServiceService,
     RequestClassifierQueryServiceService,
+    MembershipQueryServiceService,
     v1ServiceRequest,
-    v1RequestType
+    v1RequestType,
+    v1EmployeeCardView
 } from "@/lib/api-generated";
 
 interface RequestDetailsViewProps {
@@ -45,11 +49,19 @@ function DetailsSection({
     requestType,
     status,
     onStatusChange,
+    departmentEmployees,
+    isLoadingEmployees,
+    onAssignExecutors,
+    isAssigningExecutors,
 }: {
     request: v1ServiceRequest;
     requestType: v1RequestType | null;
     status: string;
     onStatusChange: (s: string) => void;
+    departmentEmployees: v1EmployeeCardView[];
+    isLoadingEmployees: boolean;
+    onAssignExecutors: (employeeIds: string[]) => Promise<void>;
+    isAssigningExecutors: boolean;
 }) {
     const router = useRouter();
 
@@ -140,21 +152,38 @@ function DetailsSection({
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-muted-foreground ml-1">Исполнитель</label>
-                            <div className="flex items-center h-10 px-3 rounded-md border border-primary/20 bg-background text-[11px] leading-tight text-foreground">
-                                {request.executors && request.executors.length > 0 
-                                    ? request.executors.map(e => (e as any).displayName || "Исполнитель").join(", ")
-                                    : "Не назначен"}
-                            </div>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-muted-foreground ml-1">Ответственный отдел</label>
-                            <div className="flex items-center h-10 px-3 rounded-md border border-primary/20 bg-background text-[11px] leading-tight text-muted-foreground">
-                                {request.departmentId || "Не определен"}
-                            </div>
-                        </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground ml-1">Исполнитель</label>
+                        <Select
+                            value={request.executors?.[0]?.employeeId ?? "__none__"}
+                            disabled={isLoadingEmployees || isAssigningExecutors}
+                            onValueChange={(v) => {
+                                const ids = v === "__none__" ? [] : [v];
+                                void onAssignExecutors(ids);
+                            }}
+                        >
+                            <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
+                                <SelectValue placeholder={isLoadingEmployees ? "Загрузка..." : "Не назначен"} />
+                            </SelectTrigger>
+                            <SelectContent className="border max-h-[40vh]">
+                                <SelectItem value="__none__">Не назначен</SelectItem>
+                                {departmentEmployees.map((emp) => (
+                                    <SelectItem key={emp.employeeId!} value={emp.employeeId!}>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm">{emp.displayName || `${emp.firstName ?? ""} ${emp.lastName ?? ""}`.trim() || emp.email}</span>
+                                            {emp.position && (
+                                                <span className="text-xs text-muted-foreground">{emp.position}</span>
+                                            )}
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {!isLoadingEmployees && departmentEmployees.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground">
+                                В отделе нет сотрудников для назначения.
+                            </p>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -169,6 +198,9 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
     const [requestType, setRequestType] = useState<v1RequestType | null>(null);
     const [status, setStatus] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
+    const [departmentEmployees, setDepartmentEmployees] = useState<v1EmployeeCardView[]>([]);
+    const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+    const [isAssigningExecutors, setIsAssigningExecutors] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -203,6 +235,62 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         };
         fetchData();
     }, [requestId]);
+
+    useEffect(() => {
+        if (!request?.departmentId) return;
+
+        let cancelled = false;
+        setIsLoadingEmployees(true);
+        (async () => {
+            try {
+                const res = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByDepartment(
+                    request.departmentId!,
+                    100,
+                );
+                if (cancelled) return;
+                if (res && "items" in res && Array.isArray(res.items)) {
+                    setDepartmentEmployees(res.items);
+                }
+            } catch (e) {
+                console.warn("Failed to load department employees", e);
+            } finally {
+                if (!cancelled) setIsLoadingEmployees(false);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [request?.departmentId]);
+
+    const handleAssignExecutors = async (employeeIds: string[]) => {
+        if (!request?.id) return;
+
+        setIsAssigningExecutors(true);
+        try {
+            await ServiceRequestCommandServiceService.serviceRequestCommandServiceAssignExecutors(request.id, {
+                executorEmployeeIds: employeeIds,
+            });
+
+            // Локально обновляем executors, чтобы UI среагировал сразу.
+            setRequest({
+                ...request,
+                executors: employeeIds.map((id) => ({ employeeId: id })),
+            });
+
+            notify.mutationSuccess(
+                "Исполнитель обновлён",
+                employeeIds.length === 0
+                    ? "Назначение снято."
+                    : "Заявка передана выбранному исполнителю.",
+            );
+        } catch (error) {
+            console.error(error);
+            notify.mutationError("Ошибка", "Не удалось обновить исполнителя.");
+        } finally {
+            setIsAssigningExecutors(false);
+        }
+    };
 
     const handleStatusChange = async (newStatus: string) => {
         if (!request || !request.id) return;
@@ -282,12 +370,25 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
 
             <div className="md:hidden flex-1 flex flex-col min-h-0">
                 <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
-                    <TabsList className="grid w-full grid-cols-2 h-12 p-1 mb-4 bg-muted rounded-lg border shrink-0">
-                        <TabsTrigger value="details" className="flex gap-2"><FileText className="h-4 w-4" /> <span>Детали</span></TabsTrigger>
-                        <TabsTrigger value="chat" className="flex gap-2"><MessageSquare className="h-4 w-4" /> <span>Чат</span></TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-3 h-12 p-1 mb-4 bg-muted rounded-lg border shrink-0">
+                        <TabsTrigger value="details" className="flex gap-1.5"><FileText className="h-4 w-4" /> <span>Детали</span></TabsTrigger>
+                        <TabsTrigger value="history" className="flex gap-1.5"><HistoryIcon className="h-4 w-4" /> <span>История</span></TabsTrigger>
+                        <TabsTrigger value="chat" className="flex gap-1.5"><MessageSquare className="h-4 w-4" /> <span>Чат</span></TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="flex-1 overflow-y-auto mt-0">
-                        <DetailsSection request={request} requestType={requestType} status={status} onStatusChange={handleStatusChange} />
+                        <DetailsSection
+                            request={request}
+                            requestType={requestType}
+                            status={status}
+                            onStatusChange={handleStatusChange}
+                            departmentEmployees={departmentEmployees}
+                            isLoadingEmployees={isLoadingEmployees}
+                            onAssignExecutors={handleAssignExecutors}
+                            isAssigningExecutors={isAssigningExecutors}
+                        />
+                    </TabsContent>
+                    <TabsContent value="history" className="flex-1 overflow-y-auto mt-0">
+                        <EntityHistory entityType="request" entityId={requestId} />
                     </TabsContent>
                     <TabsContent value="chat" className="flex-1 mt-0 h-full overflow-hidden">
                         <ChatContainer entityId={requestId} entityType="requests" className="h-full" />
@@ -297,7 +398,18 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
 
             <div className="hidden md:grid grid-cols-3 gap-6 items-start">
                 <div className="col-span-2 space-y-6">
-                    <DetailsSection request={request} requestType={requestType} status={status} onStatusChange={handleStatusChange} />
+                    <DetailsSection
+                            request={request}
+                            requestType={requestType}
+                            status={status}
+                            onStatusChange={handleStatusChange}
+                            departmentEmployees={departmentEmployees}
+                            isLoadingEmployees={isLoadingEmployees}
+                            onAssignExecutors={handleAssignExecutors}
+                            isAssigningExecutors={isAssigningExecutors}
+                        />
+
+                    <EntityHistory entityType="request" entityId={requestId} />
                 </div>
                 <div className="col-span-1 sticky top-24 h-[600px]">
                     <ChatContainer entityId={requestId} entityType="requests" />

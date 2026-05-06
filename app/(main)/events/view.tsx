@@ -39,17 +39,18 @@ import { getBadgeColor, getCardBorderColor } from "@/lib/status-helper";
 import { EventStatus } from "@/lib/types";
 import { SCOPES } from "@/lib/auth/scopes";
 
-import { 
-  IncidentQueryServiceService, 
+import {
+  IncidentQueryServiceService,
   IncidentClassifierQueryServiceService,
-  MembershipQueryServiceService,
   v1IncidentView,
   v1Category,
   classifierV1Type
 } from "@/lib/api-generated";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 
 export function EventsListView() {
   const { data: session } = useSession();
+  const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
   const [events, setEvents] = useState<v1IncidentView[]>([]);
   const [categories, setCategories] = useState<v1Category[]>([]);
   const [types, setTypes] = useState<classifierV1Type[]>([]);
@@ -59,23 +60,14 @@ export function EventsListView() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
+    if (isOrgResolving) return;
     const loadData = async () => {
       const userId = (session?.user as any)?.id;
       if (!userId) return;
 
       try {
         setIsLoading(true);
-        
-        // Получаем профиль сотрудника для получения organizationId
-        let orgId = "";
-        try {
-          const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-          if (empRes && "employee" in empRes && empRes.employee?.organizationId) {
-            orgId = empRes.employee.organizationId;
-          }
-        } catch (e) {
-          console.warn("Could not fetch employee profile, fallback to MyIncidents only", e);
-        }
+        const orgId = activeOrgId ?? "";
 
         // Загружаем инциденты на основе роли
         const isDispatcherOrAdmin = (session as any).scopes?.some((s: string) => 
@@ -114,7 +106,7 @@ export function EventsListView() {
       }
     };
     loadData();
-  }, [session]);
+  }, [session, activeOrgId, isOrgResolving]);
 
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const typeMap: Record<string, string> = {};

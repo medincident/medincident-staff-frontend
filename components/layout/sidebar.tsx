@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   BarChart3,
   LayoutDashboard,
+  Megaphone,
   Shield,
   Users,
   Building,
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
 import { useMiniApp } from "@/lib/miniapp";
+import { OrgScopePicker } from "@/components/layout/org-scope-picker";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -41,6 +43,7 @@ export function Sidebar() {
     { href: "/admin/structure", label: "Структура", icon: Building },
     { href: "/admin/department", label: "Подразделение", icon: UserCheck },
     { href: "/admin/classifier", label: "Классификатор", icon: Shield },
+    { href: "/admin/announcements", label: "Объявления", icon: Megaphone },
     { href: "/admin/users", label: "Пользователи", icon: Users },
   ];
 
@@ -53,6 +56,14 @@ export function Sidebar() {
             <MedIncidentLogo className="h-7 w-7 text-primary-foreground" />
         </div>
         <span className="font-bold text-lg text-foreground tracking-tight">{APP_CONFIG.name}</span>
+      </div>
+
+      {/* Активная организация (workspace switcher) */}
+      <div className="px-3 py-3 border-b">
+        <p className="px-1 mb-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          Организация
+        </p>
+        <OrgScopePicker />
       </div>
 
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-8">

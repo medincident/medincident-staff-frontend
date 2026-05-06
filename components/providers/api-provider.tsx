@@ -3,36 +3,38 @@
 import { useEffect, ReactNode } from "react";
 import { useSession, signOut, getSession } from "next-auth/react";
 import axios from "axios";
-import type { AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
+import type { AxiosRequestConfig } from "axios";
 import { OpenAPI } from "@/lib/api-generated";
 
-// Достаём подписанный JWT-токен пользователя из NextAuth-сессии. Используем
-// id_token, потому что бэк валидирует именно подпись JWT — а access_token в
-// Zitadel может быть opaque, если в настройках проекта не включён JWT Auth
-// Token Type.
 function pickToken(session: any): string {
-  return (session?.idToken as string | undefined) ?? "";
+  const accessToken = session?.accessToken as string | undefined;
+  if (accessToken) return accessToken;
+  const idToken = session?.idToken as string | undefined;
+  if (idToken) return idToken;
+  return "";
+}
+
+// Конфигурируем клиент на уровне модуля: useEffect срабатывает уже после
+// первого commit'а, и ранние запросы успевают уйти без Authorization.
+if (typeof window !== "undefined") {
+  OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
+  OpenAPI.WITH_CREDENTIALS = true;
+  // ⚠️ ВРЕМЕННЫЙ ХАК — medincident-backend#145.
+  // Бэк-middleware дважды срезает префикс "Bearer ": один раз в
+  // bearerTokenFromMD, второй — внутри zitadel-go SDK. Чтобы токен дошёл,
+  // подсовываем его уже с префиксом — клиент допишет свой "Bearer " сверху
+  // и получится `Bearer Bearer <jwt>`, что бэк после двух срезов поймёт.
+  // После фикса бэка заменить тело резолвера на `pickToken(await getSession())`.
+  OpenAPI.TOKEN = async () => {
+    const t = pickToken(await getSession());
+    return t ? `Bearer ${t}` : "";
+  };
 }
 
 export function ApiProvider({ children }: { children: ReactNode }) {
-  const { data: session } = useSession();
+  useSession();
 
   useEffect(() => {
-    OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
-    OpenAPI.WITH_CREDENTIALS = true;
-
-    OpenAPI.TOKEN = async () => pickToken(await getSession());
-
-    const requestInterceptor = axios.interceptors.request.use(
-      async (config: InternalAxiosRequestConfig) => {
-        const token = pickToken(await getSession());
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      }
-    );
-
     const responseInterceptor = axios.interceptors.response.use(
       (response) => response,
       async (error) => {
@@ -42,9 +44,6 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
           originalRequest._retry = true;
-
-          // Сессия могла обновиться (refresh-token flow в auth-options),
-          // попробуем перезапросить с новым токеном один раз.
           const refreshedToken = pickToken(await getSession());
           if (refreshedToken) {
             originalRequest.headers = {
@@ -53,21 +52,19 @@ export function ApiProvider({ children }: { children: ReactNode }) {
             };
             return axios.request(originalRequest);
           }
-
           await signOut({ callbackUrl: "/login" });
         } else if (error.response?.status === 401) {
           await signOut({ callbackUrl: "/login" });
         }
 
         return Promise.reject(error);
-      }
+      },
     );
 
     return () => {
-      axios.interceptors.request.eject(requestInterceptor);
       axios.interceptors.response.eject(responseInterceptor);
     };
-  }, [session]);
+  }, []);
 
   return <>{children}</>;
 }

@@ -7,7 +7,11 @@ import {
   MapPin,
   MoreVertical,
   Pencil,
-  Plus
+  Plus,
+  Users,
+  Hospital,
+  Stethoscope,
+  Palmtree,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,7 +38,9 @@ import {
   OrgStructureCommandServiceService,
   MembershipQueryServiceService,
   MembershipCommandServiceService,
+  StatsQueryServiceService,
 } from "@/lib/api-generated";
+import { cleanText } from "@/lib/text";
 import { useSession } from "next-auth/react";
 
 export function OrganizationsView() {
@@ -56,23 +62,21 @@ export function OrganizationsView() {
       const res = await OrgStructureQueryServiceService.orgStructureQueryServiceListOrganizations(100);
       const items = (res as any).items || [];
 
-      // Фильтрация по поиску на клиенте
       const filtered = search
         ? items.filter((o: any) => o.name?.toLowerCase().includes(search.toLowerCase()))
         : items;
 
-      // Для каждой организации получаем руководителя
-      const orgsWithHeads = await Promise.all(filtered.map(async (org: any) => {
-        try {
-          const headRes = await MembershipQueryServiceService.membershipQueryServiceListOrgHeads(org.id, 1);
-          const head = (headRes as any).items?.[0];
-          return { ...org, head };
-        } catch {
-          return { ...org, head: null };
-        }
+      const orgsWithDetails = await Promise.all(filtered.map(async (org: any) => {
+        const [headRes, statsRes] = await Promise.all([
+          MembershipQueryServiceService.membershipQueryServiceListOrgHeads(org.id, 1).catch(() => null),
+          StatsQueryServiceService.statsQueryServiceGetOrganizationStats(org.id).catch(() => null),
+        ]);
+        const head = (headRes as any)?.items?.[0] ?? null;
+        const stats = (statsRes as any)?.stats ?? null;
+        return { ...org, head, stats };
       }));
 
-      setOrganizations(orgsWithHeads);
+      setOrganizations(orgsWithDetails);
     } catch (error) {
       notify.error("Ошибка", "Не удалось загрузить список организаций.");
     } finally {
@@ -100,23 +104,36 @@ export function OrganizationsView() {
   };
 
   const saveOrganization = async () => {
-    if (!orgName.trim() || !orgAddress.trim()) return;
+    // Бэк-валидация: name min=2/max=256, legalAddress.text min=4/max=128,
+    // description omitnil min=8/max=2048 — пустую строку не шлём, иначе
+    // omitnil не сработает.
+    const name = cleanText(orgName) ?? "";
+    const addressText = cleanText(orgAddress) ?? "";
+    const description = cleanText(orgDescription);
+    if (name.length < 2 || addressText.length < 4) {
+      notify.error("Проверьте поля", "Название (≥ 2 символа) и адрес (≥ 4 символа) обязательны.");
+      return;
+    }
+    if (description !== undefined && description.length < 8) {
+      notify.error("Проверьте описание", "Описание должно быть ≥ 8 символов либо пустым.");
+      return;
+    }
     setIsSaving(true);
     try {
       if (editingOrg) {
         await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateOrganizationDetails(editingOrg.id, {
-          name: orgName,
-          description: orgDescription || ""
+          name,
+          ...(description !== undefined ? { description } : {}),
         });
         await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateOrganizationLegalAddress(editingOrg.id, {
-          legalAddress: { text: orgAddress }
+          legalAddress: { text: addressText },
         });
         notify.mutationSuccess("Организация обновлена", "Данные организации успешно сохранены.");
       } else {
         await OrgStructureCommandServiceService.orgStructureCommandServiceCreateOrganization({
-          name: orgName,
-          description: orgDescription || "",
-          legalAddress: { text: orgAddress }
+          name,
+          ...(description !== undefined ? { description } : {}),
+          legalAddress: { text: addressText },
         });
         notify.mutationSuccess("Организация создана", "Новая организация добавлена в систему.");
       }
@@ -209,6 +226,15 @@ export function OrganizationsView() {
                       </p>
                     </div>
                   </div>
+
+                  {org.stats && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <StatTile icon={Hospital} label="Клиник" value={org.stats.clinicsTotal} />
+                      <StatTile icon={Stethoscope} label="Отделений" value={org.stats.departmentsTotal} />
+                      <StatTile icon={Users} label="Сотрудников" value={org.stats.employeesTotal} />
+                      <StatTile icon={Palmtree} label="В отпуске" value={org.stats.employeesOnVacation} />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -243,6 +269,29 @@ export function OrganizationsView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: any;
+  label: string;
+  value?: string | number | null;
+}) {
+  const display = value === undefined || value === null || value === "" ? "—" : value;
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-md border bg-background">
+      <div className="p-1.5 rounded-md bg-muted text-muted-foreground shrink-0">
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <div className="min-w-0 leading-tight">
+        <p className="text-sm font-bold text-foreground truncate">{display}</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider truncate">{label}</p>
+      </div>
     </div>
   );
 }

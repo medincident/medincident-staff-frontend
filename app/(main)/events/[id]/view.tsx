@@ -15,6 +15,10 @@ import {
   Plus,
   ChevronRight,
   Link2,
+  Ban,
+  RotateCcw,
+  Flag,
+  History as HistoryIcon,
 } from "lucide-react";
 import { notify } from "@/lib/toast";
 
@@ -26,8 +30,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatContainer } from "@/components/chat/chat-container";
+import { EntityHistory } from "@/components/history/entity-history";
 
-import { EVENT_STATUS_MAP, STATUS_MAP, SERVICE_TYPE_CONFIG } from "@/lib/constants";
+import { EVENT_STATUS_MAP, INCIDENT_PRIORITY_MAP, STATUS_MAP } from "@/lib/constants";
 import { EventStatus } from "@/lib/types";
 import { getBadgeColor } from "@/lib/status-helper";
 import { SCOPES } from "@/lib/auth/scopes";
@@ -54,6 +59,11 @@ function DetailsSection({
   displayCategoryName,
   status,
   onStatusChange,
+  priority,
+  onPriorityChange,
+  onCancel,
+  onReopen,
+  isMutating,
   linkedRequests,
 }: {
   event: v1IncidentView;
@@ -61,8 +71,14 @@ function DetailsSection({
   displayCategoryName: string;
   status: EventStatus;
   onStatusChange: (s: EventStatus) => void;
+  priority: string;
+  onPriorityChange: (p: string) => void;
+  onCancel: () => void;
+  onReopen: () => void;
+  isMutating: boolean;
   linkedRequests: v1ServiceRequest[];
 }) {
+  const isCancelled = status === "cancelled";
   return (
     <div className="space-y-6">
       <Card className="gap-3 bg-card border">
@@ -97,19 +113,79 @@ function DetailsSection({
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
-            <Select value={status} onValueChange={(v) => onStatusChange(v as EventStatus)}>
-              <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="border">
-                {Object.entries(EVENT_STATUS_MAP).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
+              <Select
+                value={status}
+                onValueChange={(v) => onStatusChange(v as EventStatus)}
+                disabled={isCancelled || isMutating}
+              >
+                <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border">
+                  {Object.entries(EVENT_STATUS_MAP).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground ml-1 flex items-center gap-1">
+                <Flag className="h-3 w-3" /> Приоритет
+              </label>
+              <Select
+                value={priority}
+                onValueChange={onPriorityChange}
+                disabled={isCancelled || isMutating}
+              >
+                <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
+                  <SelectValue placeholder="Не задан" />
+                </SelectTrigger>
+                <SelectContent className="border">
+                  {Object.entries(INCIDENT_PRIORITY_MAP).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          <Separator className="bg-primary/10" />
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            {isCancelled ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 border-primary/20 text-primary hover:bg-primary/10"
+                onClick={onReopen}
+                disabled={isMutating}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Возобновить событие
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={onCancel}
+                disabled={isMutating}
+              >
+                <Ban className="mr-2 h-4 w-4" />
+                Отменить событие
+              </Button>
+            )}
+          </div>
+
+          {isCancelled && (
+            <p className="text-[11px] text-muted-foreground bg-muted/40 border rounded px-2 py-1.5">
+              Событие отменено. Чтобы менять статус и приоритет — сначала возобновите его.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -151,7 +227,7 @@ function DetailsSection({
                           </Badge>
                         </div>
                         <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2 break-words">
-                          {SERVICE_TYPE_CONFIG[req.typeId as any]?.label || req.typeId}
+                          {req.typeId}
                         </p>
                         <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                           {req.description}
@@ -192,9 +268,11 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const [types, setTypes] = useState<classifierV1Type[]>([]);
   const [linkedRequests, setLinkedRequests] = useState<v1ServiceRequest[]>([]);
   const [status, setStatus] = useState<EventStatus>("created");
+  const [priority, setPriority] = useState<string>("normal");
 
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [isMutating, setIsMutating] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -216,6 +294,9 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         
         const evtStatus = (foundEvent.status || "").toLowerCase().replace("incident_status_", "") as EventStatus;
         setStatus(evtStatus || "created");
+
+        const evtPriority = (foundEvent.priority || "").toLowerCase().replace("incident_priority_", "");
+        setPriority(evtPriority || "normal");
 
         // Загружаем связанные заявки
         try {
@@ -280,6 +361,65 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
       console.error(error);
       setStatus(prevStatus);
       notify.mutationError("Ошибка", "Не удалось обновить статус события.");
+    }
+  };
+
+  const handlePriorityChange = async (newPriority: string) => {
+    if (!event?.id) return;
+    const prev = priority;
+    setPriority(newPriority);
+    setIsMutating(true);
+    try {
+      const apiPriority = `INCIDENT_PRIORITY_${newPriority.toUpperCase()}`;
+      await IncidentCommandServiceService.incidentCommandServiceUpdateIncidentPriority(event.id, {
+        priority: apiPriority as any,
+      });
+      setEvent({ ...event, priority: apiPriority as any });
+      notify.mutationSuccess(
+        "Приоритет обновлён",
+        `Установлен приоритет «${INCIDENT_PRIORITY_MAP[newPriority] ?? newPriority}».`,
+      );
+    } catch (error) {
+      console.error(error);
+      setPriority(prev);
+      notify.mutationError("Ошибка", "Не удалось обновить приоритет.");
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!event?.id) return;
+    if (!confirm("Отменить событие? Статус и приоритет станут недоступны для изменения, пока вы не возобновите событие.")) {
+      return;
+    }
+    setIsMutating(true);
+    try {
+      await IncidentCommandServiceService.incidentCommandServiceCancelIncident(event.id);
+      setStatus("cancelled" as EventStatus);
+      setEvent({ ...event, status: "INCIDENT_STATUS_CANCELLED" as any });
+      notify.mutationSuccess("Событие отменено", "Запись помечена как отменённая.");
+    } catch (error) {
+      console.error(error);
+      notify.mutationError("Ошибка", "Не удалось отменить событие.");
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!event?.id) return;
+    setIsMutating(true);
+    try {
+      await IncidentCommandServiceService.incidentCommandServiceReopenIncident(event.id);
+      setStatus("created" as EventStatus);
+      setEvent({ ...event, status: "INCIDENT_STATUS_PENDING" as any });
+      notify.mutationSuccess("Событие возобновлено", "Можно снова менять статус и приоритет.");
+    } catch (error) {
+      console.error(error);
+      notify.mutationError("Ошибка", "Не удалось возобновить событие.");
+    } finally {
+      setIsMutating(false);
     }
   };
 
@@ -407,11 +547,14 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
 
       <div className="xl:hidden flex-1 flex flex-col min-h-0">
         <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-2 h-12 p-1 mb-4 bg-muted rounded-lg border shrink-0">
-            <TabsTrigger value="details" className="flex gap-2 data-[state=active]:bg-background">
+          <TabsList className="grid w-full grid-cols-3 h-12 p-1 mb-4 bg-muted rounded-lg border shrink-0">
+            <TabsTrigger value="details" className="flex gap-1.5 data-[state=active]:bg-background">
               <FileText className="h-4 w-4" /> <span>Детали</span>
             </TabsTrigger>
-            <TabsTrigger value="chat" className="flex gap-2 data-[state=active]:bg-background">
+            <TabsTrigger value="history" className="flex gap-1.5 data-[state=active]:bg-background">
+              <HistoryIcon className="h-4 w-4" /> <span>История</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex gap-1.5 data-[state=active]:bg-background">
               <MessageSquare className="h-4 w-4" /> <span>Чат</span>
             </TabsTrigger>
           </TabsList>
@@ -423,8 +566,16 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
               displayCategoryName={displayCategoryName}
               status={status}
               onStatusChange={handleStatusChange}
+              priority={priority}
+              onPriorityChange={handlePriorityChange}
+              onCancel={handleCancel}
+              onReopen={handleReopen}
+              isMutating={isMutating}
               linkedRequests={linkedRequests}
             />
+          </TabsContent>
+          <TabsContent value="history" className="flex-1 overflow-y-auto mt-0">
+            <EntityHistory entityType="incident" entityId={eventId} />
           </TabsContent>
           <TabsContent value="chat" className="flex-1 h-full mt-0 overflow-hidden">
             <ChatContainer entityId={eventId} entityType="events" />
@@ -440,8 +591,15 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
             displayCategoryName={displayCategoryName}
             status={status}
             onStatusChange={handleStatusChange}
+            priority={priority}
+            onPriorityChange={handlePriorityChange}
+            onCancel={handleCancel}
+            onReopen={handleReopen}
+            isMutating={isMutating}
             linkedRequests={linkedRequests}
           />
+
+          <EntityHistory entityType="incident" entityId={eventId} />
         </div>
         <div className="col-span-1 sticky top-24 h-[600px]">
           <ChatContainer entityId={eventId} entityType="events" />

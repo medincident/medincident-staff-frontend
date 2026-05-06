@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   Settings,
   HelpCircle,
+  ExternalLink,
+  UserCog,
   LogOut,
   ChevronRight,
   Moon,
@@ -20,7 +21,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -28,24 +29,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/constants";
 import { useSession } from "next-auth/react";
+import { LogoutDialog } from "@/components/auth/logout-dialog";
+import { useMyEmployee } from "@/lib/auth/use-my-employee";
+import { SCOPES } from "@/lib/auth/scopes";
 
 export function ProfileView() {
-  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { data: session } = useSession();
-  const [isLoading, setIsLoading] = useState(true);
+  const { employee, isLoading } = useMyEmployee();
 
   useEffect(() => {
     setMounted(true);
-    setIsLoading(false);
   }, []);
 
   const user = session?.user as any;
+  const scopes: string[] = ((session as any)?.scopes ?? []) as string[];
+  const isAdmin = scopes.some((s) =>
+    [SCOPES.SYSTEM_ADMIN, SCOPES.ORG_ADMIN].includes(s as any),
+  );
 
-  const handleLogout = () => {
-    router.push("/login");
-  };
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const handleLogout = () => setIsLogoutDialogOpen(true);
 
   const getInitials = (name: string) => {
     if (!name) return "U";
@@ -148,11 +153,18 @@ export function ProfileView() {
 
   if (!user) return null;
 
-  const displayName = user.name || `${user.givenName || ""} ${user.familyName || ""}`.trim() || "Пользователь";
-  const roleName = user.isAdmin ? "Администратор" : "Сотрудник";
-  const positionName = user.employment?.position || "Сотрудник";
-  const clinicName = user.employment?.clinic?.name || "Клиника не указана";
-  const departmentName = user.employment?.department?.name || "Отделение не указано";
+  // ФИО / должность / клиника / отделение — с бэка (employee_cards).
+  // Аватар — из Zitadel (в нашей доменной модели его нет).
+  const displayName =
+    employee?.displayName ||
+    [employee?.firstName, employee?.lastName].filter(Boolean).join(" ") ||
+    user.name ||
+    "Пользователь";
+  const displayEmail = employee?.email || user.email;
+  const roleName = isAdmin ? "Администратор" : "Сотрудник";
+  const positionName = employee?.position || "Сотрудник";
+  const clinicName = employee?.clinicName || "Клиника не указана";
+  const departmentName = employee?.departmentName || "Отделение не указано";
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -178,11 +190,12 @@ export function ProfileView() {
             <CardContent className="px-6 pb-6 relative">
               <div className="-mt-28 mb-4 flex justify-between items-end">
                 <Avatar className="h-24 w-24 border-4 border-card bg-background">
+                  {user.image ? <AvatarImage src={user.image} alt={displayName} /> : null}
                   <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
                     {getInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
-                <Badge variant={user.isAdmin ? "default" : "secondary"} className="mb-2">
+                <Badge variant={isAdmin ? "default" : "secondary"} className="mb-2">
                   {roleName}
                 </Badge>
               </div>
@@ -200,7 +213,7 @@ export function ProfileView() {
                     <Briefcase className="h-4 w-4 shrink-0 opacity-70" />
                     <span className="text-foreground">{positionName}</span>
                   </div>
-                  {!user.isAdmin && (
+                  {!isAdmin && (
                     <div className="flex items-start gap-3 text-muted-foreground">
                       <Building className="h-4 w-4 shrink-0 opacity-70 mt-0.5" />
                       <div className="flex flex-col">
@@ -211,7 +224,7 @@ export function ProfileView() {
                   )}
                   <div className="flex items-center gap-3 text-muted-foreground">
                     <Mail className="h-4 w-4 shrink-0 opacity-70" />
-                    <span className="text-foreground">{user.email || "Email не указан"}</span>
+                    <span className="text-foreground">{displayEmail || "Email не указан"}</span>
                   </div>
                 </div>
               </div>
@@ -265,6 +278,14 @@ export function ProfileView() {
                 <Separator className="my-1 opacity-50" />
 
                 <ProfileLink
+                  href={`${process.env.NEXT_PUBLIC_ZITADEL_ISSUER}/profile/details`}
+                  icon={UserCog}
+                  title="Полный профиль"
+                  desc="Управление данными аккаунта"
+                  external
+                />
+
+                <ProfileLink
                   href="/profile/settings"
                   icon={Settings}
                   title="Общие настройки"
@@ -302,28 +323,60 @@ export function ProfileView() {
           </div>
         </div>
       </div>
+
+      <LogoutDialog
+        open={isLogoutDialogOpen}
+        onOpenChange={setIsLogoutDialogOpen}
+        idToken={(session as any)?.idToken}
+      />
     </div>
   );
 }
 
-const ProfileLink = ({ href, icon: Icon, title, desc, colorClass = "bg-muted text-muted-foreground" }: any) => (
-  <Link
-    href={href}
-    className={cn(
-      "flex items-center justify-between p-4 rounded-xl transition-all duration-200 group border border-transparent"
-    )}
-  >
-    <div className="flex items-center gap-4">
-      <div className={cn("p-2.5 rounded-lg transition-colors", colorClass)}>
-        <Icon className="h-5 w-5" />
+const ProfileLink = ({
+  href,
+  icon: Icon,
+  title,
+  desc,
+  colorClass = "bg-muted text-muted-foreground",
+  external = false,
+}: any) => {
+  const className = cn(
+    "flex items-center justify-between p-4 rounded-xl transition-all duration-200 group border border-transparent",
+  );
+
+  const content = (
+    <>
+      <div className="flex items-center gap-4">
+        <div className={cn("p-2.5 rounded-lg transition-colors", colorClass)}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+            {title}
+          </p>
+          {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
+        </div>
       </div>
-      <div>
-        <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-          {title}
-        </p>
-        {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
-      </div>
-    </div>
-    <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-  </Link>
-);
+      {external ? (
+        <ExternalLink className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+      ) : (
+        <ChevronRight className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+      )}
+    </>
+  );
+
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={href} className={className}>
+      {content}
+    </Link>
+  );
+};

@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { useMyEmployee } from "@/lib/auth/use-my-employee";
+import { OrgScopePicker } from "@/components/layout/org-scope-picker";
+import { LogoutDialog } from "@/components/auth/logout-dialog";
 import {
   Bell, User as UserIcon, Settings, LogOut, Check, Info, AlertTriangle, CheckCheck, Shield, Loader2
 } from "lucide-react";
@@ -16,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
@@ -32,8 +35,10 @@ const NOTIFICATION_ICONS: Record<string, any> = {
 
 export function Header() {
   const { data: session } = useSession();
+  const { employee, isLoading: isEmpLoading } = useMyEmployee();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // Уведомления пока замоканы — реального эндпоинта нет.
+  const isLoading = false;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -49,7 +54,7 @@ export function Header() {
   };
 
   useEffect(() => {
-    // TODO: Replace with real API call when notification endpoint is added
+    // TODO: NotificationQueryService.ListMyNotifications — medincident-backend#149
     setNotifications([]);
   }, []);
 
@@ -58,12 +63,18 @@ export function Header() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
-  };
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const openLogoutDialog = () => setIsLogoutDialogOpen(true);
 
   const user = session?.user as any;
-  const displayName = user?.name || `${user?.givenName || ""} ${user?.familyName || ""}`.trim() || "Пользователь";
+  // ФИО / e-mail берём с бэка (employee_cards). Аватарку — из Zitadel,
+  // в нашей доменной модели её нет.
+  const displayName =
+    employee?.displayName ||
+    [employee?.firstName, employee?.lastName].filter(Boolean).join(" ") ||
+    user?.name ||
+    "Пользователь";
+  const displayEmail = employee?.email || user?.email;
 
   return (
     <header className="bg-card border-b sticky top-0 z-30 h-14 px-4 flex justify-between items-center transition-colors duration-300">
@@ -152,8 +163,9 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-muted transition-colors">
               <Avatar className="h-8 w-8 border border-border">
+                {user?.image ? <AvatarImage src={user.image} alt={displayName} /> : null}
                 <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
-                  {isLoading
+                  {isEmpLoading
                     ? <Loader2 className="h-3 w-3 animate-spin" />
                     : (getUserInitials(displayName))
                   }
@@ -164,7 +176,7 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56 bg-card border-border">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                {isLoading ? (
+                {isEmpLoading ? (
                   <div className="space-y-2">
                     <div className="h-4 w-24 bg-muted animate-pulse rounded" />
                     <div className="h-3 w-32 bg-muted animate-pulse rounded" />
@@ -172,12 +184,21 @@ export function Header() {
                 ) : (
                   <>
                     <p className="text-sm font-medium leading-none text-foreground">{displayName}</p>
-                    <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email || "Email не указан"}</p>
+                    <p className="text-xs leading-none text-muted-foreground mt-1">{displayEmail || "Email не указан"}</p>
                   </>
                 )}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {/* Workspace switcher на мобиле — на десктопе он живёт в сайдбаре,
+                здесь не дублируем. */}
+            <div className="md:hidden px-2 pt-1.5 pb-2">
+              <p className="px-1 mb-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Организация
+              </p>
+              <OrgScopePicker />
+            </div>
+            <DropdownMenuSeparator className="md:hidden" />
             <Link href="/profile">
               <DropdownMenuItem className="cursor-pointer">
                 <UserIcon className="mr-2 h-4 w-4" />
@@ -193,7 +214,7 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-              onClick={handleLogout}
+              onClick={openLogoutDialog}
             >
               <LogOut className="mr-2 h-4 w-4" />
               <span>Выйти</span>
@@ -202,6 +223,12 @@ export function Header() {
         </DropdownMenu>
 
       </div>
+
+      <LogoutDialog
+        open={isLogoutDialogOpen}
+        onOpenChange={setIsLogoutDialogOpen}
+        idToken={(session as any)?.idToken}
+      />
     </header>
   );
 }

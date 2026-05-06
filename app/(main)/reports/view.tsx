@@ -48,10 +48,10 @@ import {
 } from "@/lib/constants";
 import type { EventStatus, Priority, RequestStatus } from "@/lib/types";
 import { useSession } from "next-auth/react";
-import { 
-  AnalyticsQueryServiceService,
-  MembershipQueryServiceService
+import {
+  AnalyticsQueryServiceService
 } from "@/lib/api-generated";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { forecastHolt, type ForecastResult } from "@/lib/analytics/forecast";
 import {
   detectChangePoints,
@@ -123,6 +123,7 @@ function stdDev(arr: number[]): number {
 
 export function ReportsView() {
   const { data: session } = useSession();
+  const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodValue>("30d");
   const [forecastMethod, setForecastMethod] = useState<"holt" | "lstm">("holt");
@@ -150,14 +151,12 @@ export function ReportsView() {
   const [seedData, setSeedData] = useState<{ events: any[], requests: any[] }>({ events: [], requests: [] });
 
   useEffect(() => {
+    if (isOrgResolving) return;
     const loadData = async () => {
       try {
         setIsLoading(true);
         const userId = (session?.user as any)?.id;
         if (!userId) return;
-
-        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-        const orgId = empRes && "employee" in empRes ? empRes.employee?.organizationId : null;
 
         if (orgId) {
           // Fetch the full historical snapshot without date limits to support LSTM
@@ -188,7 +187,7 @@ export function ReportsView() {
     };
     
     loadData();
-  }, [session]);
+  }, [session, orgId, isOrgResolving]);
 
   const { startMs, endMs, prevStartMs, prevEndMs, effectiveDays } = useMemo(() => {
     const now = Date.now();

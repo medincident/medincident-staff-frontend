@@ -1,4 +1,4 @@
-import { EventStatus, Priority, UserRole } from "./types";
+import { EventStatus, Priority } from "./types";
 
 export const APP_CONFIG = {
   name: "МедИнцидент",
@@ -11,61 +11,6 @@ export const THEME_COLORS = {
   light: "#ffffff",
   dark: "#1f1f23",
 } as const;
-
-export const ROLE_NAMES: Record<UserRole, string> = {
-  admin_system: "Системный администратор",
-  admin_org: "Администратор организации",
-  head_clinic: "Главный врач",
-  head_dept: "Зав. отделением",
-  dispatcher_ns: "Диспетчер НС",
-  dispatcher_req: "Диспетчер АХО",
-  manager_ns: "Ответственный за НС",
-  manager_req: "Ответственный за заявки",
-  worker: "Сотрудник",
-  guest: "Гость",
-};
-
-export const SERVICE_TYPE_CONFIG: Record<
-  string,
-  { label: string; dept: string }
-> = {
-  med_equip: {
-    label: "Медицинское оборудование",
-    dept: "Служба главного инженера",
-  },
-  it_equip: {
-    label: "Компьютерное оборудование",
-    dept: "Отдел ИТ и ИБ",
-  },
-  energy: {
-    label: "Энергетическая и лифтовая служба",
-    dept: "Энергетическая и лифтовая служба",
-  },
-  ventilation: {
-    label: "Вентиляция",
-    dept: "Служба вентиляции и газоснабжения",
-  },
-  plumbing: {
-    label: "Сантехники",
-    dept: "Служба текущего ремонта и обслуживания водоканализационной и отопительной системы",
-  },
-  housekeeping: {
-    label: "Хозяйственная служба",
-    dept: "Хозяйственная служба",
-  },
-  territory: {
-    label: "Служба содержания территории",
-    dept: "Служба текущего содержания и благоустройства территории",
-  },
-  buildings: {
-    label: "Служба эксплуатации зданий и сооружений",
-    dept: "Служба эксплуатации зданий и сооружений",
-  },
-  control: {
-    label: "Контрольно-инспекционный отдел",
-    dept: "Контрольно-инспекционный отдел",
-  },
-};
 
 export const STATUS_MAP: Record<string, string> = {
   created: "Принята",
@@ -80,6 +25,14 @@ export const STATUS_MAP: Record<string, string> = {
 export const PRIORITY_MAP: Record<Priority, string> = {
   normal: "Обычный",
   high: "Срочный",
+  critical: "Критический",
+};
+
+// Приоритет НС — отдельная шкала (есть `low`, в отличие от заявок).
+export const INCIDENT_PRIORITY_MAP: Record<string, string> = {
+  low: "Низкий",
+  normal: "Обычный",
+  high: "Высокий",
   critical: "Критический",
 };
 

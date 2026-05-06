@@ -23,10 +23,13 @@ import {
   OrgStructureQueryServiceService,
   v1EmployeeCardView,
 } from "@/lib/api-generated";
+import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useSession } from "next-auth/react";
 
 export function DepartmentView() {
   const { data: session } = useSession();
+  const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
 
   const [headId, setHeadId] = useState("");
   const [isActingEnabled, setIsActingEnabled] = useState(false);
@@ -35,10 +38,15 @@ export function DepartmentView() {
   const [staff, setStaff] = useState<v1EmployeeCardView[]>([]);
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
+  // Сохраняем оригинальные значения, чтобы корректно вычислять diff при сохранении.
+  const [origHeadId, setOrigHeadId] = useState("");
+  const [origDeputyId, setOrigDeputyId] = useState("");
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    if (isOrgResolving) return;
     const loadData = async () => {
       if (!session) return;
 
@@ -48,11 +56,12 @@ export function DepartmentView() {
         const userId = (session.user as any)?.id;
         if (!userId) return;
 
-        // Получаем employeeId текущего пользователя
-        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-        const emp = (empRes as any).employee as v1EmployeeCardView | undefined;
+        // Берём employee именно для активной организации — у мульти-орг
+        // юзера в каждой орге своё отделение.
+        const emp = await getMyEmployeeInOrg(userId, orgId);
         if (!emp?.departmentId) {
-          notify.error("Ошибка", "У вас не указано отделение.");
+          // Не показываем тост — для sysadmin / неработающих в этой орге
+          // это нормальное состояние, отрендерим заглушку ниже.
           setIsLoading(false);
           return;
         }
@@ -69,12 +78,19 @@ export function DepartmentView() {
         const staffItems = (staffRes as any).items as v1EmployeeCardView[] || [];
         setStaff(staffItems);
 
-        // Загружаем ответственного за отделение
+        // Загружаем ответственного за отделение и его заместителя
         try {
           const headRes = await MembershipQueryServiceService.membershipQueryServiceGetDepartmentResponsible(emp.departmentId);
-          const deptHead = (headRes as any).employee as v1EmployeeCardView | undefined;
-          if (deptHead?.employeeId) {
-            setHeadId(deptHead.employeeId);
+          const assignment = (headRes as any).assignment;
+          const holderId = assignment?.holder?.employeeId ?? "";
+          const deputyId = assignment?.deputy?.employeeId ?? "";
+
+          setHeadId(holderId);
+          setOrigHeadId(holderId);
+          setOrigDeputyId(deputyId);
+          if (deputyId) {
+            setIsActingEnabled(true);
+            setActingId(deputyId);
           }
         } catch {
           // Руководитель не назначен — ок
@@ -87,28 +103,48 @@ export function DepartmentView() {
     };
 
     loadData();
-  }, [session]);
+  }, [session, orgId, isOrgResolving]);
 
   const handleSave = async () => {
     if (!departmentId) return;
     try {
       setIsSaving(true);
 
-      // Обновляем ответственного
-      if (headId) {
-        try {
-          await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsible(departmentId, {
-            employeeId: headId
-          });
-        } catch {
-          // Уже назначен — игнорируем
+      const finalHead = headId || undefined;
+      const finalDeputy = isActingEnabled && actingId ? actingId : undefined;
+
+      const headChanged = origHeadId !== (finalHead ?? "");
+      const deputyChanged = origDeputyId !== (finalDeputy ?? "");
+
+      const cmd = MembershipCommandServiceService;
+
+      // Старого депутата убираем, если меняется head или сам депутат
+      if (origDeputyId && origHeadId && (headChanged || deputyChanged)) {
+        await cmd.membershipCommandServiceRemoveDepartmentResponsibleDeputy(departmentId, origHeadId).catch(() => {});
+      }
+
+      if (headChanged) {
+        if (origHeadId) {
+          await cmd.membershipCommandServiceRevokeDepartmentResponsible(departmentId, origHeadId).catch(() => {});
+        }
+        if (finalHead) {
+          await cmd.membershipCommandServiceAssignDepartmentResponsible(departmentId, { employeeId: finalHead });
         }
       }
 
-      // Примечание: управление заместителем (И.О.) временно недоступно — эндпоинт отсутствует в API.
+      if (finalHead && finalDeputy && (headChanged || deputyChanged)) {
+        await cmd.membershipCommandServiceAssignDepartmentResponsibleDeputy(departmentId, finalHead, {
+          deputyEmployeeId: finalDeputy,
+        });
+      }
+
+      // Обновляем оригиналы — чтобы повторное сохранение без изменений не вызывало запросов.
+      setOrigHeadId(finalHead ?? "");
+      setOrigDeputyId(finalDeputy ?? "");
 
       notify.mutationSuccess("Изменения сохранены", "Структура управления отделения обновлена.");
     } catch (error) {
+      console.error(error);
       notify.mutationError("Ошибка сохранения", "Проверьте соединение с сервером и попробуйте ещё раз.");
     } finally {
       setIsSaving(false);
@@ -152,6 +188,12 @@ export function DepartmentView() {
         <div className="max-w-4xl space-y-6">
           <Skeleton className="h-[200px] w-full rounded-xl" />
           <Skeleton className="h-[400px] w-full rounded-xl" />
+        </div>
+      ) : !departmentId ? (
+        <div className="max-w-4xl rounded-lg border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+          {orgId
+            ? "В выбранной организации у вас нет привязки к отделению."
+            : "Сначала выберите активную организацию."}
         </div>
       ) : (
         <div className="max-w-4xl space-y-6">

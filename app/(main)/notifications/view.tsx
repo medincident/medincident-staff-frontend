@@ -36,7 +36,7 @@ export function NotificationsView() {
         
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // TODO: Replace with real API call when notification endpoint is added
+        // TODO: NotificationQueryService.ListMyNotifications — medincident-backend#149
         setNotifications([]);
       } catch (error) {
         console.error("Failed to load notifications:", error);

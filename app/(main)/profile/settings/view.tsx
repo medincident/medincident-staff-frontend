@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { UserSettings } from "@/lib/types";
+import { PushNotificationManager } from "@/components/pwa/push-manager";
 
 const WEEKDAYS = [
   { id: 0, label: "Пн" },
@@ -282,6 +283,8 @@ export function SettingsView() {
           ) : null}
         </CardContent>
       </Card>
+
+      <PushNotificationManager />
     </div>
   );
 }

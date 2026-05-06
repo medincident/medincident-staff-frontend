@@ -22,15 +22,17 @@ import {
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
 
-import { 
-  IncidentQueryServiceService, 
-  IncidentCommandServiceService, 
+import {
+  IncidentQueryServiceService,
+  IncidentCommandServiceService,
   IncidentClassifierQueryServiceService,
-  MembershipQueryServiceService,
   v1Category,
   classifierV1Type,
   v1IncidentView
 } from "@/lib/api-generated";
+import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { cleanText } from "@/lib/text";
 
 const formSchema = z.object({
   categoryId: z.string().min(1, { message: "Пожалуйста, выберите категорию" }),
@@ -47,12 +49,12 @@ interface EventFormProps {
 export function EventForm({ eventId }: EventFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
+  const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
   const isEditMode = !!eventId;
 
   const [categories, setCategories] = useState<v1Category[]>([]);
   const [types, setTypes] = useState<classifierV1Type[]>([]);
   const [existingEvent, setExistingEvent] = useState<v1IncidentView | null>(null);
-  const [orgId, setOrgId] = useState<string>("");
   const [employeeDeptId, setEmployeeDeptId] = useState<string>("");
 
   const [isLoading, setIsLoading] = useState(true);
@@ -69,25 +71,19 @@ export function EventForm({ eventId }: EventFormProps) {
   });
 
   useEffect(() => {
+    if (isOrgResolving) return;
     const loadData = async () => {
       const userId = (session?.user as any)?.id;
       if (!userId) return;
 
       try {
         setIsLoading(true);
-        
-        let currentOrgId = "";
+
+        let currentOrgId = activeOrgId ?? "";
         try {
-          const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-          if (empRes && "employee" in empRes) {
-            if (empRes.employee?.organizationId) {
-              currentOrgId = empRes.employee.organizationId;
-              setOrgId(currentOrgId);
-            }
-            if (empRes.employee?.departmentId) {
-              setEmployeeDeptId(empRes.employee.departmentId);
-            }
-          }
+          const emp = await getMyEmployeeInOrg(userId, activeOrgId);
+          if (emp?.organizationId) currentOrgId = emp.organizationId;
+          setEmployeeDeptId(emp?.departmentId ?? "");
         } catch (e) {
           console.warn("Could not fetch employee profile", e);
         }
@@ -128,7 +124,7 @@ export function EventForm({ eventId }: EventFormProps) {
     };
 
     loadData();
-  }, [eventId, isEditMode, form, session]);
+  }, [eventId, isEditMode, form, session, activeOrgId, isOrgResolving]);
 
   const selectedCategoryId = form.watch("categoryId");
 
@@ -140,23 +136,28 @@ export function EventForm({ eventId }: EventFormProps) {
   async function onSubmit(values: EventFormValues) {
     setIsSubmitting(true);
     try {
+      const description = cleanText(values.description);
       if (isEditMode && existingEvent && existingEvent.id) {
-        // В режиме редактирования можно обновить только описание
+        // Бэк-валидация UpdateIncidentDescription: required, min=1, max=10000.
+        if (!description) {
+          notify.error("Заполните описание", "Описание события обязательно.");
+          setIsSubmitting(false);
+          return;
+        }
         await IncidentCommandServiceService.incidentCommandServiceUpdateIncidentDescription(existingEvent.id, {
-          description: values.description || ""
+          description,
         });
         notify.mutationSuccess("Изменения сохранены", "Данные события обновлены.");
       } else {
-        // Создание нового события
-        const res = await IncidentCommandServiceService.incidentCommandServiceCreateIncident({
+        // Бэк-валидация CreateIncident.description: omitnil, min=1, max=10000.
+        // Пустую строку НЕ шлём — иначе omitnil не сработает и упадёт на min=1.
+        await IncidentCommandServiceService.incidentCommandServiceCreateIncident({
           departmentId: employeeDeptId,
           categoryId: values.categoryId,
           typeId: values.typeId,
-          description: values.description || "",
-          occurredAt: new Date().toISOString()
+          ...(description ? { description } : {}),
+          occurredAt: new Date().toISOString(),
         });
-        
-        const newId = (res as any)?.id || "Новое событие";
         notify.mutationSuccess("Событие зарегистрировано", `Ответственные будут уведомлены.`);
       }
 

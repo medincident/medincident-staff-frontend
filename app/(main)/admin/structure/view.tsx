@@ -11,9 +11,12 @@ import {
   Pencil,
   Trash2,
   User as UserIcon,
+  Users,
+  UserCog,
   Loader2,
   Power,
-  PowerOff
+  PowerOff,
+  Palmtree,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -48,13 +51,14 @@ import {
   MembershipCommandServiceService,
   OrgStructureQueryServiceService,
   OrgStructureCommandServiceService,
+  StatsQueryServiceService,
 } from "@/lib/api-generated";
 import type { v1EmployeeCardView } from "@/lib/api-generated";
+import { cleanText } from "@/lib/text";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 
 export function StructureView() {
-  const [organizations, setOrganizations] = useState<any[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
-  const [isOrgsLoading, setIsOrgsLoading] = useState(true);
+  const { orgId: selectedOrgId, isResolving: isOrgsLoading } = useActiveOrgId();
 
   const [clinics, setClinics] = useState<any[]>([]);
   const [users, setUsers] = useState<v1EmployeeCardView[]>([]);
@@ -66,30 +70,18 @@ export function StructureView() {
   const [isClinicDialogOpen, setIsClinicDialogOpen] = useState(false);
   const [isDeptDialogOpen, setIsDeptDialogOpen] = useState(false);
 
-  const [editingItem, setEditingItem] = useState<{ id?: string, parentId?: string, oldHeadId?: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{
+    id?: string;
+    parentId?: string;
+    oldHeadId?: string;
+    oldDeputyId?: string;
+  } | null>(null);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newHeadId, setNewHeadId] = useState<string>("none");
+  const [newDeputyId, setNewDeputyId] = useState<string>("none");
   const [targetClinicId, setTargetClinicId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadOrgs = async () => {
-      try {
-        const res = await OrgStructureQueryServiceService.orgStructureQueryServiceListOrganizations(100);
-        const items = (res as any).items || [];
-        setOrganizations(items);
-        if (items.length > 0) {
-          setSelectedOrgId(items[0].id);
-        }
-      } catch (error) {
-        notify.error("Ошибка", "Не удалось загрузить список организаций.");
-      } finally {
-        setIsOrgsLoading(false);
-      }
-    };
-    loadOrgs();
-  }, []);
 
   const loadData = async () => {
     if (!selectedOrgId) return;
@@ -97,39 +89,46 @@ export function StructureView() {
     try {
       setIsLoading(true);
 
-      // Загружаем сотрудников организации (для выбора руководителей)
       const usersRes = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByOrganization(selectedOrgId, 100);
       setUsers((usersRes as any).items || []);
 
-      // Загружаем клиники
       const clinicsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListClinicsByOrganization(selectedOrgId, 100);
       const clinicsItems = (clinicsRes as any).items || [];
 
-      // Фильтрация по поиску (клиентская)
       const filteredClinics = search
         ? clinicsItems.filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()))
         : clinicsItems;
 
       const builtClinics = await Promise.all(filteredClinics.map(async (clinic: any) => {
-        const deptsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListDepartmentsByClinic(clinic.id, 100);
-        const deptsItems = (deptsRes as any).items || [];
+        const [deptsRes, cHeadRes, statsRes] = await Promise.all([
+          OrgStructureQueryServiceService.orgStructureQueryServiceListDepartmentsByClinic(clinic.id, 100),
+          MembershipQueryServiceService.membershipQueryServiceGetClinicHead(clinic.id).catch(() => null),
+          StatsQueryServiceService.statsQueryServiceGetClinicStats(clinic.id).catch(() => null),
+        ]);
 
-        let clinicHeadId: string | undefined;
-        try {
-          const cHeadRes = await MembershipQueryServiceService.membershipQueryServiceGetClinicHead(clinic.id);
-          clinicHeadId = (cHeadRes as any).employee?.employeeId;
-        } catch { /* нет руководителя */ }
+        const deptsItems = (deptsRes as any).items || [];
+        const cHeadAssignment = (cHeadRes as any)?.assignment;
+        const clinicHeadId = cHeadAssignment?.holder?.employeeId;
+        const clinicDeputyId = cHeadAssignment?.deputy?.employeeId;
+        const stats = (statsRes as any)?.stats ?? null;
 
         const builtDepts = await Promise.all(deptsItems.map(async (dept: any) => {
-          let deptHeadId: string | undefined;
-          try {
-            const dHeadRes = await MembershipQueryServiceService.membershipQueryServiceGetDepartmentResponsible(dept.id);
-            deptHeadId = (dHeadRes as any).employee?.employeeId;
-          } catch { /* нет заведующего */ }
-          return { ...dept, headId: deptHeadId };
+          const dHeadRes = await MembershipQueryServiceService.membershipQueryServiceGetDepartmentResponsible(dept.id).catch(() => null);
+          const dHeadAssignment = (dHeadRes as any)?.assignment;
+          return {
+            ...dept,
+            headId: dHeadAssignment?.holder?.employeeId,
+            deputyId: dHeadAssignment?.deputy?.employeeId,
+          };
         }));
 
-        return { ...clinic, headId: clinicHeadId, departments: builtDepts };
+        return {
+          ...clinic,
+          headId: clinicHeadId,
+          deputyId: clinicDeputyId,
+          stats,
+          departments: builtDepts,
+        };
       }));
 
       setClinics(builtClinics);
@@ -155,59 +154,115 @@ export function StructureView() {
     targetId: string,
     oldHeadId: string | undefined,
     newHeadId: string,
-    type: "clinic" | "department"
+    oldDeputyId: string | undefined,
+    newDeputyId: string,
+    type: "clinic" | "department",
   ) => {
-    const finalNewId = newHeadId === "none" ? undefined : newHeadId;
-    if (oldHeadId === finalNewId) return;
+    const finalHead = newHeadId === "none" ? undefined : newHeadId;
+    const finalDeputy = newDeputyId === "none" ? undefined : newDeputyId;
 
-    if (type === "clinic") {
-      if (oldHeadId) await MembershipCommandServiceService.membershipCommandServiceRevokeClinicHead(targetId, oldHeadId).catch(() => {});
-      if (finalNewId) await MembershipCommandServiceService.membershipCommandServiceAssignClinicHead(targetId, { employeeId: finalNewId }).catch(() => {});
-    } else {
-      if (oldHeadId) await MembershipCommandServiceService.membershipCommandServiceRevokeDepartmentResponsible(targetId, oldHeadId).catch(() => {});
-      if (finalNewId) await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsible(targetId, { employeeId: finalNewId }).catch(() => {});
+    const cmd = MembershipCommandServiceService;
+
+    // Если меняется head или нужно очистить депутата — сначала снимаем старого депутата
+    // (он привязан к ID старого head: /heads/{oldHeadId}/deputy)
+    const headChanged = oldHeadId !== finalHead;
+    const deputyChanged = oldDeputyId !== finalDeputy;
+
+    if (oldDeputyId && oldHeadId && (headChanged || deputyChanged)) {
+      if (type === "clinic") {
+        await cmd.membershipCommandServiceRemoveClinicHeadDeputy(targetId, oldHeadId).catch(() => {});
+      } else {
+        await cmd.membershipCommandServiceRemoveDepartmentResponsibleDeputy(targetId, oldHeadId).catch(() => {});
+      }
+    }
+
+    if (headChanged) {
+      if (type === "clinic") {
+        if (oldHeadId) await cmd.membershipCommandServiceRevokeClinicHead(targetId, oldHeadId).catch(() => {});
+        if (finalHead) await cmd.membershipCommandServiceAssignClinicHead(targetId, { employeeId: finalHead }).catch(() => {});
+      } else {
+        if (oldHeadId) await cmd.membershipCommandServiceRevokeDepartmentResponsible(targetId, oldHeadId).catch(() => {});
+        if (finalHead) await cmd.membershipCommandServiceAssignDepartmentResponsible(targetId, { employeeId: finalHead }).catch(() => {});
+      }
+    }
+
+    // Назначаем нового депутата только если есть head и депутат, и состояние изменилось
+    if (finalHead && finalDeputy && (headChanged || deputyChanged)) {
+      if (type === "clinic") {
+        await cmd.membershipCommandServiceAssignClinicHeadDeputy(targetId, finalHead, { deputyEmployeeId: finalDeputy }).catch(() => {});
+      } else {
+        await cmd.membershipCommandServiceAssignDepartmentResponsibleDeputy(targetId, finalHead, { deputyEmployeeId: finalDeputy }).catch(() => {});
+      }
     }
   };
 
   const openClinicModal = (clinic?: any) => {
     if (clinic) {
-      setEditingItem({ id: clinic.id, oldHeadId: clinic.headId });
+      setEditingItem({ id: clinic.id, oldHeadId: clinic.headId, oldDeputyId: clinic.deputyId });
       setNewName(clinic.name);
       setNewDescription(clinic.description || "");
       setNewAddress(clinic.physicalAddress || "");
       setNewHeadId(clinic.headId || "none");
+      setNewDeputyId(clinic.deputyId || "none");
     } else {
       setEditingItem(null);
       setNewName("");
       setNewDescription("");
       setNewAddress("");
       setNewHeadId("none");
+      setNewDeputyId("none");
     }
     setIsClinicDialogOpen(true);
   };
 
   const saveClinic = async () => {
-    if (!newName.trim() || !newAddress.trim() || !selectedOrgId) return;
+    // Бэк-валидация: name min=2/max=256, address.text min=4/max=128,
+    // description omitnil min=8/max=2048, всё no_extra_ws → триммим.
+    const name = cleanText(newName) ?? "";
+    const address = cleanText(newAddress) ?? "";
+    const description = cleanText(newDescription);
+    if (name.length < 2 || address.length < 4 || !selectedOrgId) {
+      if (selectedOrgId) {
+        notify.error("Проверьте поля", "Название (≥ 2) и адрес (≥ 4) обязательны.");
+      }
+      return;
+    }
+    if (description !== undefined && description.length < 8) {
+      notify.error("Проверьте описание", "Описание должно быть ≥ 8 символов либо пустым.");
+      return;
+    }
     setIsSaving(true);
     try {
       if (editingItem?.id) {
         await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateClinicDetails(editingItem.id, {
-          name: newName,
-          description: newDescription || ""
+          name,
+          ...(description !== undefined ? { description } : {}),
         });
         await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateClinicPhysicalAddress(editingItem.id, {
-          physicalAddress: { text: newAddress }
+          physicalAddress: { text: address },
         });
-        await syncResponsible(editingItem.id, editingItem.oldHeadId, newHeadId, "clinic");
+        await syncResponsible(
+          editingItem.id,
+          editingItem.oldHeadId,
+          newHeadId,
+          editingItem.oldDeputyId,
+          newDeputyId,
+          "clinic",
+        );
       } else {
         const newClinicRes = await OrgStructureCommandServiceService.orgStructureCommandServiceCreateClinic(selectedOrgId, {
-          name: newName,
-          description: newDescription || "",
-          physicalAddress: { text: newAddress }
+          name,
+          ...(description !== undefined ? { description } : {}),
+          physicalAddress: { text: address },
         });
         const newClinicId = (newClinicRes as any).id;
         if (newHeadId !== "none" && newClinicId) {
           await MembershipCommandServiceService.membershipCommandServiceAssignClinicHead(newClinicId, { employeeId: newHeadId });
+          if (newDeputyId !== "none") {
+            await MembershipCommandServiceService.membershipCommandServiceAssignClinicHeadDeputy(newClinicId, newHeadId, {
+              deputyEmployeeId: newDeputyId,
+            }).catch(() => {});
+          }
         }
       }
       notify.mutationSuccess("Успешно", "Клиника сохранена.");
@@ -231,37 +286,61 @@ export function StructureView() {
   const openDeptModal = (clinicId: string, dept?: any) => {
     setTargetClinicId(clinicId);
     if (dept) {
-      setEditingItem({ id: dept.id, parentId: clinicId, oldHeadId: dept.headId });
+      setEditingItem({ id: dept.id, parentId: clinicId, oldHeadId: dept.headId, oldDeputyId: dept.deputyId });
       setNewName(dept.name);
       setNewDescription(dept.description || "");
       setNewHeadId(dept.headId || "none");
+      setNewDeputyId(dept.deputyId || "none");
     } else {
       setEditingItem(null);
       setNewName("");
       setNewDescription("");
       setNewHeadId("none");
+      setNewDeputyId("none");
     }
     setIsDeptDialogOpen(true);
   };
 
   const saveDept = async () => {
-    if (!newName.trim() || !targetClinicId) return;
+    // Бэк-валидация: name min=2/max=256, description omitnil min=8/max=2048.
+    const name = cleanText(newName) ?? "";
+    const description = cleanText(newDescription);
+    if (name.length < 2 || !targetClinicId) {
+      if (targetClinicId) notify.error("Проверьте поля", "Название обязательно (≥ 2 символов).");
+      return;
+    }
+    if (description !== undefined && description.length < 8) {
+      notify.error("Проверьте описание", "Описание должно быть ≥ 8 символов либо пустым.");
+      return;
+    }
     setIsSaving(true);
     try {
       if (editingItem?.id) {
         await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateDepartmentDetails(editingItem.id, {
-          name: newName,
-          description: newDescription || ""
+          name,
+          ...(description !== undefined ? { description } : {}),
         });
-        await syncResponsible(editingItem.id, editingItem.oldHeadId, newHeadId, "department");
+        await syncResponsible(
+          editingItem.id,
+          editingItem.oldHeadId,
+          newHeadId,
+          editingItem.oldDeputyId,
+          newDeputyId,
+          "department",
+        );
       } else {
         const newDeptRes = await OrgStructureCommandServiceService.orgStructureCommandServiceCreateDepartment(targetClinicId, {
-          name: newName,
-          description: newDescription || ""
+          name,
+          ...(description !== undefined ? { description } : {}),
         });
         const newDeptId = (newDeptRes as any).id;
         if (newHeadId !== "none" && newDeptId) {
           await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsible(newDeptId, { employeeId: newHeadId });
+          if (newDeputyId !== "none") {
+            await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsibleDeputy(newDeptId, newHeadId, {
+              deputyEmployeeId: newDeputyId,
+            }).catch(() => {});
+          }
         }
       }
       notify.mutationSuccess("Успешно", "Отделение сохранено.");
@@ -291,24 +370,6 @@ export function StructureView() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
-          {isOrgsLoading ? (
-            <Skeleton className="h-10 w-full sm:w-48 rounded-md shrink-0" />
-          ) : (
-            <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-              <SelectTrigger className="w-full sm:w-48 bg-background shrink-0">
-                <SelectValue placeholder="Выберите организацию" />
-              </SelectTrigger>
-              <SelectContent>
-                {organizations.length === 0 && (
-                  <SelectItem value="none" disabled>Нет организаций</SelectItem>
-                )}
-                {organizations.map(org => (
-                  <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
           {isLoading && !clinics.length ? (
             <Skeleton className="h-10 flex-1 w-full sm:w-48 lg:w-64 rounded-md" />
           ) : (
@@ -335,11 +396,9 @@ export function StructureView() {
         </div>
       </div>
 
-      {!isOrgsLoading && organizations.length === 0 && (
-        <div className="py-16 text-center border rounded-xl bg-card">
-          <Building className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-          <h3 className="text-lg font-medium">Нет организаций</h3>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">Сначала создайте медицинскую сеть (организацию).</p>
+      {!isOrgsLoading && !selectedOrgId && (
+        <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+          Сначала выберите активную организацию, чтобы увидеть её структуру.
         </div>
       )}
 
@@ -367,6 +426,7 @@ export function StructureView() {
 
           {!isLoading && clinics.map((clinic) => {
             const clinicHeadName = getUserName(clinic.headId);
+            const clinicDeputyName = getUserName(clinic.deputyId);
 
             return (
               <Card key={clinic.id} className="flex flex-col overflow-hidden gap-0 p-0 border">
@@ -392,7 +452,27 @@ export function StructureView() {
                             ? <span className="truncate">Главврач: {clinicHeadName}</span>
                             : <span className="text-muted-foreground italic font-normal">Нет руководителя</span>}
                         </div>
+                        {clinicDeputyName && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate">
+                            <UserCog className="h-3 w-3 shrink-0" />
+                            <span className="truncate">И.о.: {clinicDeputyName}</span>
+                          </div>
+                        )}
                       </div>
+                      {clinic.stats && (
+                        <div className="flex flex-wrap gap-1.5 pt-1.5 text-[10px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-background border">
+                            <Users className="h-3 w-3" />
+                            <b className="text-foreground">{clinic.stats.employeesTotal ?? "0"}</b> сотр.
+                          </span>
+                          {clinic.stats.employeesOnVacation && Number(clinic.stats.employeesOnVacation) > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-background border">
+                              <Palmtree className="h-3 w-3" />
+                              <b className="text-foreground">{clinic.stats.employeesOnVacation}</b> в отпуске
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <DropdownMenu>
@@ -424,6 +504,7 @@ export function StructureView() {
                     {clinic.departments?.length > 0 ? (
                       clinic.departments.map((dept: any) => {
                         const deptHeadName = getUserName(dept.headId);
+                        const deptDeputyName = getUserName(dept.deputyId);
                         return (
                           <div key={dept.id} className="group flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-sm">
                             <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
@@ -437,6 +518,12 @@ export function StructureView() {
                                 <span className="text-xs text-muted-foreground truncate block w-full opacity-80">
                                   {deptHeadName || "Руководитель не назначен"}
                                 </span>
+                                {deptDeputyName && (
+                                  <span className="text-[10px] text-muted-foreground truncate block w-full inline-flex items-center gap-1">
+                                    <UserCog className="h-2.5 w-2.5" />
+                                    И.о.: {deptDeputyName}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
@@ -505,7 +592,13 @@ export function StructureView() {
             </div>
             <div className="grid gap-2">
               <Label>Главный врач</Label>
-              <Select value={newHeadId} onValueChange={setNewHeadId}>
+              <Select
+                value={newHeadId}
+                onValueChange={(v) => {
+                  setNewHeadId(v);
+                  if (v === "none") setNewDeputyId("none");
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите руководителя" />
                 </SelectTrigger>
@@ -518,6 +611,34 @@ export function StructureView() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-1.5">
+                <UserCog className="h-3.5 w-3.5" />
+                Заместитель
+              </Label>
+              <Select
+                value={newDeputyId}
+                onValueChange={setNewDeputyId}
+                disabled={newHeadId === "none"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={newHeadId === "none" ? "Сначала назначьте главврача" : "Выберите заместителя"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Не назначен</SelectItem>
+                  {users
+                    .filter((u) => u.employeeId !== newHeadId)
+                    .map((u) => (
+                      <SelectItem key={u.employeeId} value={u.employeeId as string}>
+                        {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Замещает главврача на время отпуска или болезни.
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -546,7 +667,13 @@ export function StructureView() {
             </div>
             <div className="grid gap-2">
               <Label>Заведующий отделением</Label>
-              <Select value={newHeadId} onValueChange={setNewHeadId}>
+              <Select
+                value={newHeadId}
+                onValueChange={(v) => {
+                  setNewHeadId(v);
+                  if (v === "none") setNewDeputyId("none");
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите заведующего" />
                 </SelectTrigger>
@@ -559,6 +686,34 @@ export function StructureView() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-1.5">
+                <UserCog className="h-3.5 w-3.5" />
+                Заместитель
+              </Label>
+              <Select
+                value={newDeputyId}
+                onValueChange={setNewDeputyId}
+                disabled={newHeadId === "none"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={newHeadId === "none" ? "Сначала назначьте заведующего" : "Выберите заместителя"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Не назначен</SelectItem>
+                  {users
+                    .filter((u) => u.employeeId !== newHeadId)
+                    .map((u) => (
+                      <SelectItem key={u.employeeId} value={u.employeeId as string}>
+                        {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Замещает заведующего на время отпуска или болезни.
+              </p>
             </div>
           </div>
           <DialogFooter>

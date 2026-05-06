@@ -37,16 +37,17 @@ import {
 import { getBadgeColor } from "@/lib/status-helper";
 import { STATUS_MAP } from "@/lib/constants";
 
-import { 
+import {
   ServiceRequestQueryServiceService,
   RequestClassifierQueryServiceService,
-  MembershipQueryServiceService,
   v1ServiceRequest,
   v1RequestType
 } from "@/lib/api-generated";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 
 export function RequestsListView() {
   const { data: session } = useSession();
+  const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
   
   const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
   const [requestTypes, setRequestTypes] = useState<v1RequestType[]>([]);
@@ -56,29 +57,25 @@ export function RequestsListView() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
+    if (isOrgResolving) return;
     const fetchRequests = async () => {
       const userId = (session?.user as any)?.id;
       if (!userId) return;
 
       try {
         setIsLoading(true);
-        
-        const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-        const orgId = empRes && "employee" in empRes ? empRes.employee?.organizationId : null;
-
-        if (orgId) {
-          const [reqRes, typeRes] = await Promise.all([
-            ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequests(orgId, 100),
-            RequestClassifierQueryServiceService.requestClassifierQueryServiceListActiveRequestTypesByOrganization(orgId, 100)
-          ]);
-
-          if (reqRes && "items" in reqRes && reqRes.items) {
-            setRequests(reqRes.items);
-          }
-          if (typeRes && "items" in typeRes && typeRes.items) {
-            setRequestTypes(typeRes.items);
-          }
+        if (!orgId) {
+          setRequests([]);
+          setRequestTypes([]);
+          return;
         }
+        const [reqRes, typeRes] = await Promise.all([
+          ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequests(orgId, 100),
+          RequestClassifierQueryServiceService.requestClassifierQueryServiceListActiveRequestTypesByOrganization(orgId, 100),
+        ]);
+
+        if (reqRes && "items" in reqRes && reqRes.items) setRequests(reqRes.items);
+        if (typeRes && "items" in typeRes && typeRes.items) setRequestTypes(typeRes.items);
       } catch (error) {
         console.error("Failed to load requests:", error);
       } finally {
@@ -87,7 +84,7 @@ export function RequestsListView() {
     };
 
     fetchRequests();
-  }, [session]);
+  }, [session, orgId, isOrgResolving]);
 
   const filteredData = useMemo(() => {
     return requests.filter((req) => {

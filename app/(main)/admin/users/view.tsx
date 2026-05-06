@@ -12,7 +12,9 @@ import {
   Briefcase,
   Ban,
   Power,
-  PowerOff
+  PowerOff,
+  UserPlus,
+  CalendarRange,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { notify } from "@/lib/toast";
 import {
   MembershipQueryServiceService,
@@ -37,15 +40,19 @@ import {
   OrgStructureQueryServiceService,
 } from "@/lib/api-generated";
 import type { v1EmployeeCardView } from "@/lib/api-generated";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { getBadgeColor } from "@/lib/status-helper";
 import { useSession } from "next-auth/react";
+import { VacationsDialog } from "./vacations-dialog";
 
 export function UsersView() {
   const { data: session } = useSession();
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const { orgId: organizationId, isResolving: isOrgResolving } = useActiveOrgId();
 
   const [users, setUsers] = useState<v1EmployeeCardView[]>([]);
   const [admins, setAdmins] = useState<string[]>([]);
+  const [orgHeads, setOrgHeads] = useState<string[]>([]);
+  const [orgDispatchers, setOrgDispatchers] = useState<string[]>([]);
   const [clinics, setClinics] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -61,31 +68,45 @@ export function UsersView() {
     clinicId: "",
     departmentId: "",
     isActive: true,
-    isAdmin: false
+    isAdmin: false,
+    isOrgHead: false,
+    isOrgDispatcher: false,
   });
 
   const [isSaving, setIsSaving] = useState(false);
+
+  // Vacations dialog
+  const [vacationsTarget, setVacationsTarget] = useState<v1EmployeeCardView | null>(null);
+
+  // Hire-сотрудника
+  const [isHireDialogOpen, setIsHireDialogOpen] = useState(false);
+  const [hireForm, setHireForm] = useState({
+    zitadelUserId: "",
+    clinicId: "",
+    departmentId: "",
+    position: "",
+  });
+  const [isHiring, setIsHiring] = useState(false);
 
   const loadData = async () => {
     try {
       setIsLoading(true);
 
-      const userId = (session?.user as any)?.id;
-      if (!userId) return;
-
-      // Получаем organizationId из профиля текущего сотрудника
-      const empRes = await MembershipQueryServiceService.membershipQueryServiceGetEmployee(userId);
-      const emp = (empRes as any).employee as v1EmployeeCardView | undefined;
-      const orgId = emp?.organizationId;
-      if (!orgId) {
-        notify.error("Ошибка", "Не удалось определить организацию.");
+      if (!organizationId) {
+        // Sysadmin без выбранной орги — оставляем пустую заглушку, без тоста.
+        setUsers([]);
+        setAdmins([]);
+        setOrgHeads([]);
+        setOrgDispatchers([]);
         return;
       }
-      setOrganizationId(orgId);
+      const orgId = organizationId;
 
-      const [usersListRes, adminsRes] = await Promise.all([
+      const [usersListRes, adminsRes, headsRes, dispatchersRes] = await Promise.all([
         MembershipQueryServiceService.membershipQueryServiceSearchEmployeesByOrganization(orgId, search || undefined, 50),
-        MembershipQueryServiceService.membershipQueryServiceListOrgAdmins(orgId, 100)
+        MembershipQueryServiceService.membershipQueryServiceListOrgAdmins(orgId, 100),
+        MembershipQueryServiceService.membershipQueryServiceListOrgHeads(orgId, 100),
+        MembershipQueryServiceService.membershipQueryServiceListOrgDispatchers(orgId, 100),
       ]);
 
       if (usersListRes && "items" in usersListRes && usersListRes.items) {
@@ -94,6 +115,14 @@ export function UsersView() {
 
       if (adminsRes && "items" in adminsRes && adminsRes.items) {
         setAdmins((adminsRes.items as any[]).map((a: any) => a.employeeId));
+      }
+
+      if (headsRes && "items" in headsRes && headsRes.items) {
+        setOrgHeads((headsRes.items as any[]).map((a: any) => a.employeeId));
+      }
+
+      if (dispatchersRes && "items" in dispatchersRes && dispatchersRes.items) {
+        setOrgDispatchers((dispatchersRes.items as any[]).map((a: any) => a.employeeId));
       }
 
       if (clinics.length === 0) {
@@ -115,8 +144,9 @@ export function UsersView() {
   };
 
   useEffect(() => {
+    if (isOrgResolving) return;
     loadData();
-  }, [search, session]);
+  }, [search, organizationId, isOrgResolving]);
 
   const handleEditUser = (user: v1EmployeeCardView) => {
     setEditingUserId(user.employeeId || null);
@@ -128,7 +158,9 @@ export function UsersView() {
       clinicId: user.clinicId || "",
       departmentId: user.departmentId || "",
       isActive: !user.terminatedAt,
-      isAdmin: admins.includes(user.employeeId || "")
+      isAdmin: admins.includes(user.employeeId || ""),
+      isOrgHead: orgHeads.includes(user.employeeId || ""),
+      isOrgDispatcher: orgDispatchers.includes(user.employeeId || ""),
     });
     setIsDialogOpen(true);
   };
@@ -153,14 +185,33 @@ export function UsersView() {
         });
       }
 
-      const wasAdmin = admins.includes(editingUserId);
       if (organizationId) {
+        const wasAdmin = admins.includes(editingUserId);
+        const wasHead = orgHeads.includes(editingUserId);
+        const wasDispatcher = orgDispatchers.includes(editingUserId);
+
         if (formData.isAdmin && !wasAdmin) {
           await MembershipCommandServiceService.membershipCommandServiceAssignOrganizationAdmin(organizationId, {
-            employeeId: editingUserId
+            employeeId: editingUserId,
           });
         } else if (!formData.isAdmin && wasAdmin) {
           await MembershipCommandServiceService.membershipCommandServiceRevokeOrganizationAdmin(organizationId, editingUserId);
+        }
+
+        if (formData.isOrgHead && !wasHead) {
+          await MembershipCommandServiceService.membershipCommandServiceAssignOrganizationHead(organizationId, {
+            employeeId: editingUserId,
+          });
+        } else if (!formData.isOrgHead && wasHead) {
+          await MembershipCommandServiceService.membershipCommandServiceRevokeOrganizationHead(organizationId, editingUserId);
+        }
+
+        if (formData.isOrgDispatcher && !wasDispatcher) {
+          await MembershipCommandServiceService.membershipCommandServiceAssignOrganizationDispatcher(organizationId, {
+            employeeId: editingUserId,
+          });
+        } else if (!formData.isOrgDispatcher && wasDispatcher) {
+          await MembershipCommandServiceService.membershipCommandServiceRevokeOrganizationDispatcher(organizationId, editingUserId);
         }
       }
 
@@ -209,12 +260,56 @@ export function UsersView() {
     return clinics.find(c => c.id === formData.clinicId)?.departments || [];
   }, [clinics, formData.clinicId]);
 
+  const hireAvailableDepts = useMemo(() => {
+    return clinics.find(c => c.id === hireForm.clinicId)?.departments || [];
+  }, [clinics, hireForm.clinicId]);
+
+  const openHireDialog = () => {
+    setHireForm({ zitadelUserId: "", clinicId: "", departmentId: "", position: "" });
+    setIsHireDialogOpen(true);
+  };
+
+  const handleHire = async () => {
+    if (!hireForm.zitadelUserId.trim() || !hireForm.departmentId) {
+      notify.error("Заполните поля", "Нужны Zitadel ID пользователя и отделение.");
+      return;
+    }
+    setIsHiring(true);
+    try {
+      await MembershipCommandServiceService.membershipCommandServiceHireEmployee({
+        zitadelUserId: hireForm.zitadelUserId.trim(),
+        departmentId: hireForm.departmentId,
+        position: hireForm.position.trim() || undefined,
+      });
+      notify.mutationSuccess("Сотрудник принят", "Учётная запись связана с отделением.");
+      setIsHireDialogOpen(false);
+      loadData();
+    } catch (e) {
+      console.error(e);
+      notify.mutationError("Ошибка", "Не удалось принять сотрудника. Проверьте Zitadel ID.");
+    } finally {
+      setIsHiring(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Пользователи</h1>
-        <p className="text-sm text-muted-foreground">Управление доступом и сотрудниками</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Пользователи</h1>
+          <p className="text-sm text-muted-foreground">Управление доступом и сотрудниками</p>
+        </div>
+        <Button onClick={openHireDialog} disabled={!organizationId} className="shrink-0">
+          <UserPlus className="mr-2 h-4 w-4" />
+          Принять сотрудника
+        </Button>
       </div>
+
+      {!isOrgResolving && !organizationId && (
+        <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+          Сначала выберите активную организацию, чтобы управлять её сотрудниками.
+        </div>
+      )}
 
       <div className="relative h-10">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
@@ -251,7 +346,11 @@ export function UsersView() {
 
             {!isLoading && users.map(user => {
               const isActive = !user.terminatedAt;
-              const isAdmin = admins.includes(user.employeeId || "");
+              const empId = user.employeeId || "";
+              const userRoles: string[] = [];
+              if (orgHeads.includes(empId)) userRoles.push("Главврач");
+              if (admins.includes(empId)) userRoles.push("Администратор");
+              if (orgDispatchers.includes(empId)) userRoles.push("Диспетчер");
 
               return (
                 <TableRow key={user.employeeId} className={`border-b ${!isActive ? "opacity-60 bg-muted/20" : ""}`}>
@@ -268,10 +367,18 @@ export function UsersView() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className={`font-medium text-sm ${isAdmin ? "text-primary font-bold" : "text-foreground"}`}>
-                        {isAdmin ? "Администратор" : "Сотрудник"}
-                      </span>
+                    <div className="flex flex-col gap-1">
+                      {userRoles.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {userRoles.map((r) => (
+                            <Badge key={r} variant="secondary" className="text-[10px] h-5 px-1.5">
+                              {r}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Сотрудник</span>
+                      )}
                       <span className="text-xs text-muted-foreground">{user.position || "Должность не указана"}</span>
                     </div>
                   </TableCell>
@@ -281,6 +388,15 @@ export function UsersView() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        title="Отпуска"
+                        onClick={() => setVacationsTarget(user)}
+                      >
+                        <CalendarRange className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => handleEditUser(user)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -312,7 +428,11 @@ export function UsersView() {
 
         {!isLoading && users.map(user => {
           const isActive = !user.terminatedAt;
-          const isAdmin = admins.includes(user.employeeId || "");
+          const empId = user.employeeId || "";
+          const userRoles: string[] = [];
+          if (orgHeads.includes(empId)) userRoles.push("Главврач");
+          if (admins.includes(empId)) userRoles.push("Администратор");
+          if (orgDispatchers.includes(empId)) userRoles.push("Диспетчер");
 
           return (
             <Card key={user.employeeId} className={`overflow-hidden p-0 border ${!isActive ? "opacity-60 bg-muted/20" : "bg-card"}`}>
@@ -327,27 +447,38 @@ export function UsersView() {
                 </div>
 
                 <div className="space-y-2 text-sm mb-4">
+                  {userRoles.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {userRoles.map((r) => (
+                        <Badge key={r} variant="secondary" className="text-[10px] h-5 px-1.5">
+                          {r}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Briefcase className="h-3.5 w-3.5" />
                     <div className="flex flex-col leading-tight">
-                      <span className="font-medium text-foreground text-xs">{isAdmin ? "Администратор" : "Сотрудник"}</span>
-                      <span className="text-[10px]">{user.position || "Должность не указана"}</span>
+                      <span className="font-medium text-foreground text-xs">
+                        {user.position || "Должность не указана"}
+                      </span>
                     </div>
                   </div>
-                  {!isAdmin && (
-                    <div className="flex items-start gap-2 text-muted-foreground">
-                      <Building className="h-3.5 w-3.5 mt-0.5" />
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-xs">{user.clinicName || "Не назначено"}</span>
-                        {user.departmentName && <span className="text-[10px] text-muted-foreground">{user.departmentName}</span>}
-                      </div>
+                  <div className="flex items-start gap-2 text-muted-foreground">
+                    <Building className="h-3.5 w-3.5 mt-0.5" />
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-xs">{user.clinicName || "Не назначено"}</span>
+                      {user.departmentName && <span className="text-[10px] text-muted-foreground">{user.departmentName}</span>}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-2 border-t border-border/50">
                   <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => handleEditUser(user)}>
                     <Pencil className="h-3 w-3 mr-2" /> Редактировать
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={() => setVacationsTarget(user)}>
+                    <CalendarRange className="h-3 w-3 mr-2" /> Отпуска
                   </Button>
                 </div>
               </CardContent>
@@ -360,9 +491,11 @@ export function UsersView() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Настройка сотрудника</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="flex items-center gap-2 flex-wrap">
               {formData.email ? <b>{formData.email}</b> : "Email не указан"}
-              {formData.isAdmin && <Badge variant="secondary" className="ml-2">Администратор</Badge>}
+              {formData.isOrgHead && <Badge variant="secondary">Главврач</Badge>}
+              {formData.isAdmin && <Badge variant="secondary">Администратор</Badge>}
+              {formData.isOrgDispatcher && <Badge variant="secondary">Диспетчер</Badge>}
             </DialogDescription>
           </DialogHeader>
 
@@ -403,35 +536,73 @@ export function UsersView() {
               />
             </div>
 
-            {!formData.isAdmin && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                <div className="grid gap-2">
-                  <Label>Клиника</Label>
-                  <Select
-                    value={formData.clinicId}
-                    onValueChange={(v) => setFormData({ ...formData, clinicId: v, departmentId: "" })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Выберите клинику" /></SelectTrigger>
-                    <SelectContent>
-                      {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+            <div className="grid gap-3 border-t pt-4">
+              <Label className="text-muted-foreground">Роли в организации</Label>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Можно назначать несколько одновременно. Каждая роль даёт свои права в системе.
+              </p>
+
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
+                <div className="space-y-0.5">
+                  <span className="text-sm font-medium text-foreground">Главврач</span>
+                  <p className="text-[11px] text-muted-foreground">Руководитель медицинской организации.</p>
                 </div>
-                <div className="grid gap-2">
-                  <Label>Отделение</Label>
-                  <Select
-                    value={formData.departmentId}
-                    onValueChange={(v) => setFormData({ ...formData, departmentId: v })}
-                    disabled={!formData.clinicId}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Выберите отделение" /></SelectTrigger>
-                    <SelectContent>
-                      {availableDepts.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                <Switch
+                  checked={formData.isOrgHead}
+                  onCheckedChange={(v) => setFormData({ ...formData, isOrgHead: v })}
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
+                <div className="space-y-0.5">
+                  <span className="text-sm font-medium text-foreground">Администратор</span>
+                  <p className="text-[11px] text-muted-foreground">Управление пользователями, структурой и справочниками.</p>
                 </div>
+                <Switch
+                  checked={formData.isAdmin}
+                  onCheckedChange={(v) => setFormData({ ...formData, isAdmin: v })}
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
+                <div className="space-y-0.5">
+                  <span className="text-sm font-medium text-foreground">Диспетчер</span>
+                  <p className="text-[11px] text-muted-foreground">Распределяет заявки и инциденты на исполнителей.</p>
+                </div>
+                <Switch
+                  checked={formData.isOrgDispatcher}
+                  onCheckedChange={(v) => setFormData({ ...formData, isOrgDispatcher: v })}
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+              <div className="grid gap-2">
+                <Label>Клиника</Label>
+                <Select
+                  value={formData.clinicId}
+                  onValueChange={(v) => setFormData({ ...formData, clinicId: v, departmentId: "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Выберите клинику" /></SelectTrigger>
+                  <SelectContent>
+                    {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              <div className="grid gap-2">
+                <Label>Отделение</Label>
+                <Select
+                  value={formData.departmentId}
+                  onValueChange={(v) => setFormData({ ...formData, departmentId: v })}
+                  disabled={!formData.clinicId}
+                >
+                  <SelectTrigger><SelectValue placeholder="Выберите отделение" /></SelectTrigger>
+                  <SelectContent>
+                    {availableDepts.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
@@ -442,6 +613,91 @@ export function UsersView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isHireDialogOpen} onOpenChange={setIsHireDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Принять сотрудника</DialogTitle>
+            <DialogDescription>
+              Свяжите учётную запись Zitadel с отделением. Пользователь должен быть уже создан в Zitadel — здесь только привязка.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="hire-zitadel">Zitadel User ID</Label>
+              <Input
+                id="hire-zitadel"
+                value={hireForm.zitadelUserId}
+                onChange={(e) => setHireForm({ ...hireForm, zitadelUserId: e.target.value })}
+                placeholder="например: 366537916405055493"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Найти ID можно в админке Zitadel — раздел Users.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Клиника</Label>
+                <Select
+                  value={hireForm.clinicId}
+                  onValueChange={(v) => setHireForm({ ...hireForm, clinicId: v, departmentId: "" })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Выберите клинику" /></SelectTrigger>
+                  <SelectContent>
+                    {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Отделение</Label>
+                <Select
+                  value={hireForm.departmentId}
+                  onValueChange={(v) => setHireForm({ ...hireForm, departmentId: v })}
+                  disabled={!hireForm.clinicId}
+                >
+                  <SelectTrigger><SelectValue placeholder="Выберите отделение" /></SelectTrigger>
+                  <SelectContent>
+                    {hireAvailableDepts.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Должность (необязательно)</Label>
+              <Input
+                value={hireForm.position}
+                onChange={(e) => setHireForm({ ...hireForm, position: e.target.value })}
+                placeholder="Например: Медбрат"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsHireDialogOpen(false)}>Отмена</Button>
+            <Button
+              onClick={handleHire}
+              disabled={isHiring || !hireForm.zitadelUserId.trim() || !hireForm.departmentId}
+            >
+              {isHiring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+              Принять
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <VacationsDialog
+        open={!!vacationsTarget}
+        onOpenChange={(open) => !open && setVacationsTarget(null)}
+        employeeId={vacationsTarget?.employeeId ?? null}
+        employeeName={
+          vacationsTarget?.displayName ||
+          `${vacationsTarget?.firstName ?? ""} ${vacationsTarget?.lastName ?? ""}`.trim() ||
+          undefined
+        }
+      />
     </div>
   );
 }
