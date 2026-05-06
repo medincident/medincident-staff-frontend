@@ -1,5 +1,4 @@
 import { Geist } from "next/font/google";
-// @ts-ignore
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";

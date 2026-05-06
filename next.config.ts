@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import withPWAInit from "@ducanh2912/next-pwa";
 
 const ZITADEL_ORIGIN = (() => {
   const issuer = process.env.NEXT_PUBLIC_ZITADEL_ISSUER;
@@ -10,13 +11,12 @@ const ZITADEL_ORIGIN = (() => {
   }
 })();
 
-const withPWA = require("@ducanh2912/next-pwa").default({
+const withPWA = withPWAInit({
   dest: "public",
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
-  swcMinify: true,
   // SW не кэширует /api/auth/*: повторный fetch одного и того же
   // auth-кода в Zitadel ловит Errors.AuthRequest.NoCode.
   extendDefaultRuntimeCaching: true,
