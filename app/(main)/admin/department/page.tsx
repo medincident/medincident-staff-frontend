@@ -1,7 +1,5 @@
 import { Metadata } from "next";
 import { DepartmentView } from "@/app/(main)/admin/department/view";
-import { RoleGate } from "@/components/auth/role-gate";
-import { SCOPES } from "@/lib/auth/scopes";
 
 export const metadata: Metadata = {
   title: "Настройки отделения",
@@ -9,9 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function DepartmentSettingsPage() {
-  return (
-    <RoleGate allowedScopes={[SCOPES.SYSTEM_ADMIN, SCOPES.ORG_ADMIN]} fallback={<div className="p-8 text-center text-muted-foreground">Доступ запрещен</div>}>
-      <DepartmentView />
-    </RoleGate>
-  );
+  return <DepartmentView />;
 }

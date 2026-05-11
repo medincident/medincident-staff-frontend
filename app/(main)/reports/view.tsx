@@ -49,9 +49,10 @@ import {
 import type { EventStatus, Priority, RequestStatus } from "@/lib/types";
 import { useSession } from "next-auth/react";
 import {
-  AnalyticsQueryServiceService
+  AnalyticsQueryService
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { useRequirePermission } from "@/lib/auth/use-require-permission";
 import { forecastHolt, type ForecastResult } from "@/lib/analytics/forecast";
 import {
   detectChangePoints,
@@ -124,6 +125,7 @@ function stdDev(arr: number[]): number {
 export function ReportsView() {
   const { data: session } = useSession();
   const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
+  useRequirePermission("canViewReports");
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodValue>("30d");
   const [forecastMethod, setForecastMethod] = useState<"holt" | "lstm">("holt");
@@ -160,7 +162,7 @@ export function ReportsView() {
 
         if (orgId) {
           // Fetch the full historical snapshot without date limits to support LSTM
-          const snapshotRes = await AnalyticsQueryServiceService.analyticsQueryServiceGetSnapshot(orgId);
+          const snapshotRes = await AnalyticsQueryService.analyticsQueryGetSnapshot(orgId);
           if (snapshotRes && !("code" in snapshotRes)) {
             const snap = snapshotRes as any;
             const mappedEvents = (snap.incidents || []).map((i: any) => ({

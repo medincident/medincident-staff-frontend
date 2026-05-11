@@ -15,8 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { INCIDENT_PRIORITY_MAP } from "@/lib/constants";
 import {
-  IncidentQueryServiceService,
-  ServiceRequestQueryServiceService,
+  IncidentQueryService,
+  ServiceRequestQueryService,
 } from "@/lib/api-generated";
 
 type EntityType = "incident" | "request";
@@ -97,7 +97,7 @@ export function EntityHistory({
     (async () => {
       try {
         if (entityType === "incident") {
-          const res = await IncidentQueryServiceService.incidentQueryServiceGetIncidentHistory(entityId);
+          const res = await IncidentQueryService.incidentQueryGetIncidentHistory(entityId);
           if (cancelled) return;
 
           const collected: HistoryItem[] = [];
@@ -146,7 +146,7 @@ export function EntityHistory({
 
           if (!cancelled) setItems(collected);
         } else {
-          const res = await ServiceRequestQueryServiceService.serviceRequestQueryServiceGetServiceRequestHistory(entityId);
+          const res = await ServiceRequestQueryService.serviceRequestQueryGetServiceRequestHistory(entityId);
           if (cancelled) return;
 
           const collected: HistoryItem[] = [];

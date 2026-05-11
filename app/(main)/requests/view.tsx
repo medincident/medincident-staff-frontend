@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import {
   Table,
   TableBody,
@@ -38,8 +39,8 @@ import { getBadgeColor } from "@/lib/status-helper";
 import { STATUS_MAP } from "@/lib/constants";
 
 import {
-  ServiceRequestQueryServiceService,
-  RequestClassifierQueryServiceService,
+  ServiceRequestQueryService,
+  RequestClassifierQueryService,
   v1ServiceRequest,
   v1RequestType
 } from "@/lib/api-generated";
@@ -70,8 +71,8 @@ export function RequestsListView() {
           return;
         }
         const [reqRes, typeRes] = await Promise.all([
-          ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequests(orgId, 100),
-          RequestClassifierQueryServiceService.requestClassifierQueryServiceListActiveRequestTypesByOrganization(orgId, 100),
+          ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 100),
+          RequestClassifierQueryService.requestClassifierQueryListActiveRequestTypesByOrganization(orgId, 100),
         ]);
 
         if (reqRes && "items" in reqRes && reqRes.items) setRequests(reqRes.items);
@@ -118,12 +119,14 @@ export function RequestsListView() {
           <p className="text-sm text-muted-foreground">АХО, ИТ, Медтехника и другие службы</p>
         </div>
         
-        <Link href="/requests/new" className={isLoading ? "pointer-events-none" : ""}>
-          <Button className="font-semibold" disabled={isLoading}>
-            <Plus className="mr-2 h-4 w-4" />
-            Создать заявку
-          </Button>
-        </Link>
+        <PermissionGate can="canCreateRequest">
+          <Link href="/requests/new" className={isLoading ? "pointer-events-none" : ""}>
+            <Button className="font-semibold" disabled={isLoading}>
+              <Plus className="mr-2 h-4 w-4" />
+              Создать заявку
+            </Button>
+          </Link>
+        </PermissionGate>
       </div>
 
       {/* FILTERS */}
@@ -223,15 +226,17 @@ export function RequestsListView() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <Link href={`/requests/${req.id}/edit`}>
-                          <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                          >
-                              <Edit className="h-4 w-4" />
-                          </Button>
-                      </Link>
+                      <PermissionGate can="canAssignRequestExecutor">
+                        <Link href={`/requests/${req.id}/edit`}>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                            >
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                      </PermissionGate>
                     </TableCell>
                   </TableRow>
                 );
@@ -312,16 +317,18 @@ export function RequestsListView() {
 
                 {/* EDIT ICON FOR MOBILE */}
                 <div className="absolute top-2 right-2">
-                   <Link href={`/requests/${req.id}/edit`}>
-                      <Button 
-                         variant="ghost" 
-                         size="icon" 
-                         className="h-9 w-9 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
-                         onClick={(e) => e.stopPropagation()}
-                      >
-                         <Edit className="h-4 w-4" />
-                      </Button>
-                   </Link>
+                   <PermissionGate can="canAssignRequestExecutor">
+                     <Link href={`/requests/${req.id}/edit`}>
+                        <Button
+                           variant="ghost"
+                           size="icon"
+                           className="h-9 w-9 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
+                           onClick={(e) => e.stopPropagation()}
+                        >
+                           <Edit className="h-4 w-4" />
+                        </Button>
+                     </Link>
+                   </PermissionGate>
                 </div>
               </div>
             );

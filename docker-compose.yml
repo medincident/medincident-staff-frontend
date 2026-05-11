@@ -10,8 +10,8 @@ services:
     environment:
       NODE_ENV: production
     labels:
-      # Watchtower следит только за контейнерами с этим лейблом.
       com.centurylinklabs.watchtower.enable: "true"
+      com.centurylinklabs.watchtower.scope: "medincident-staff-frontend"
 
   nginx:
     image: nginx:1.27-alpine
@@ -33,10 +33,10 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      # Креды для GHCR: один раз `docker login ghcr.io` на хосте — Watchtower
-      # подхватит config.json для пулла приватных images.
       - /root/.docker/config.json:/config.json:ro
     environment:
+      DOCKER_API_VERSION: "1.40"
+      WATCHTOWER_SCOPE: "medincident-staff-frontend"
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_POLL_INTERVAL: "60"

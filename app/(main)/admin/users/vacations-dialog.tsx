@@ -29,8 +29,8 @@ import {
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
-  MembershipQueryServiceService,
-  MembershipCommandServiceService,
+  MembershipQueryService,
+  MembershipCommandService,
   v1VacationView,
 } from "@/lib/api-generated";
 
@@ -108,7 +108,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
   const loadVacations = async (empId: string) => {
     setIsLoading(true);
     try {
-      const res = await MembershipQueryServiceService.membershipQueryServiceListVacationsByEmployee(
+      const res = await MembershipQueryService.membershipQueryListVacationsByEmployee(
         empId,
         undefined, // state — все
         100,
@@ -151,7 +151,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     if (!employeeId || !scheduleStart) return;
     setIsMutating(true);
     try {
-      await MembershipCommandServiceService.membershipCommandServiceScheduleVacation(employeeId, {
+      await MembershipCommandService.membershipCommandScheduleVacation(employeeId, {
         startsAt: dateInputToIso(scheduleStart)!,
         endsAt: dateInputToIso(scheduleEnd),
       });
@@ -161,7 +161,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
       void loadVacations(employeeId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось запланировать отпуск.");
+      notify.apiError(e, "Не удалось запланировать отпуск");
     } finally {
       setIsMutating(false);
     }
@@ -172,7 +172,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     if (!confirm("Начать отпуск прямо сейчас? Сотрудник станет недоступен сразу.")) return;
     setIsMutating(true);
     try {
-      await MembershipCommandServiceService.membershipCommandServiceStartVacationNow(employeeId, {
+      await MembershipCommandService.membershipCommandStartVacationNow(employeeId, {
         endsAt: dateInputToIso(startNowEnd),
       });
       notify.mutationSuccess("Отпуск начат", "");
@@ -180,7 +180,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
       void loadVacations(employeeId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось начать отпуск.");
+      notify.apiError(e, "Не удалось начать отпуск");
     } finally {
       setIsMutating(false);
     }
@@ -191,12 +191,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     if (!confirm("Отменить запланированный отпуск?")) return;
     setIsMutating(true);
     try {
-      await MembershipCommandServiceService.membershipCommandServiceCancelScheduledVacation(v.id);
+      await MembershipCommandService.membershipCommandCancelScheduledVacation(v.id);
       notify.mutationSuccess("Отпуск отменён", "");
       void loadVacations(employeeId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось отменить отпуск.");
+      notify.apiError(e, "Не удалось отменить отпуск");
     } finally {
       setIsMutating(false);
     }
@@ -207,12 +207,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     if (!confirm("Завершить отпуск досрочно? Сотрудник снова станет доступен.")) return;
     setIsMutating(true);
     try {
-      await MembershipCommandServiceService.membershipCommandServiceForceEndVacation(v.id);
+      await MembershipCommandService.membershipCommandForceEndVacation(v.id);
       notify.mutationSuccess("Отпуск завершён", "Сотрудник снова в строю.");
       void loadVacations(employeeId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось завершить отпуск.");
+      notify.apiError(e, "Не удалось завершить отпуск");
     } finally {
       setIsMutating(false);
     }
@@ -227,7 +227,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     if (!editingVacation?.id || !employeeId || !editEndDate) return;
     setIsMutating(true);
     try {
-      await MembershipCommandServiceService.membershipCommandServiceUpdateVacationEndDate(editingVacation.id, {
+      await MembershipCommandService.membershipCommandUpdateVacationEndDate(editingVacation.id, {
         endsAt: dateInputToIso(editEndDate)!,
       });
       notify.mutationSuccess("Дата обновлена", "Новая дата окончания сохранена.");
@@ -235,7 +235,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
       void loadVacations(employeeId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось изменить дату.");
+      notify.apiError(e, "Не удалось изменить дату");
     } finally {
       setIsMutating(false);
     }

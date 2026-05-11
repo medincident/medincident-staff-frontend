@@ -9,11 +9,13 @@ import {
 } from "react";
 import { useSession } from "next-auth/react";
 import { getMyEmployees } from "./get-my-employee";
+import { OrgStructureQueryService } from "@/lib/api-generated";
 
-// Активная организация для админ-страниц и дашборда.
-//   - 0 employee-карточек → sysadmin: picker со всеми орг.
-//   - 1 карточка → locked, переключать нельзя.
-//   - 2+ → мульти-орг: picker ограничен `myOrgs`.
+// Активная организация для админ-страниц и дашборда. Переключатель
+// доступен всем — сотруднику с несколькими employments он показывает
+// только его орги, sysadmin'у без employments — все организации
+// (ListOrganizations). В обоих случаях провайдер автоматически
+// выбирает первую доступную, если в sessionStorage ничего нет.
 
 const STORAGE_KEY = "activeOrgId";
 
@@ -26,8 +28,12 @@ interface ActiveOrgContextValue {
   orgId: string | null;
   setOrgId: (id: string | null) => void;
   isResolving: boolean;
-  isLocked: boolean;
-  myOrgs: ActiveOrg[];
+  // Орги, доступные текущему юзеру для переключения. Для сотрудника —
+  // только его employments; для sysadmin'а без employments — все орги.
+  availableOrgs: ActiveOrg[];
+  // true, если юзер не привязан ни к одной организации (sysadmin) —
+  // используется для UI-подсказок и контроля доступа в setOrgId.
+  isUnscoped: boolean;
 }
 
 const Ctx = createContext<ActiveOrgContextValue | null>(null);
@@ -35,17 +41,17 @@ const Ctx = createContext<ActiveOrgContextValue | null>(null);
 export function ActiveOrgProvider({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
   const [orgId, setOrgIdState] = useState<string | null>(null);
-  const [isLocked, setIsLocked] = useState(false);
   const [isResolving, setIsResolving] = useState(true);
-  const [myOrgs, setMyOrgs] = useState<ActiveOrg[]>([]);
+  const [availableOrgs, setAvailableOrgs] = useState<ActiveOrg[]>([]);
+  const [isUnscoped, setIsUnscoped] = useState(false);
 
   useEffect(() => {
     if (status === "loading") return;
     if (status !== "authenticated") {
       setIsResolving(false);
       setOrgIdState(null);
-      setIsLocked(false);
-      setMyOrgs([]);
+      setAvailableOrgs([]);
+      setIsUnscoped(false);
       return;
     }
     const userId = (session?.user as any)?.id;
@@ -60,37 +66,44 @@ export function ActiveOrgProvider({ children }: { children: ReactNode }) {
         const employees = await getMyEmployees(userId);
         if (cancelled) return;
 
-        const orgs: ActiveOrg[] = employees
+        const myOrgs: ActiveOrg[] = employees
           .filter((e) => e.organizationId)
           .map((e) => ({
             id: e.organizationId as string,
             name: e.organizationName,
           }));
 
-        setMyOrgs(orgs);
-
-        if (orgs.length === 1) {
-          setIsLocked(true);
-          setOrgIdState(orgs[0].id);
-          return;
+        let orgs = myOrgs;
+        const unscoped = myOrgs.length === 0;
+        if (unscoped) {
+          // Sysadmin без employments — даём весь список орг, чтобы он
+          // мог переключаться между ними.
+          try {
+            const res = await OrgStructureQueryService.orgStructureQueryListOrganizations(100);
+            if (cancelled) return;
+            const items = ((res as any)?.items ?? []) as Array<{ id?: string; name?: string }>;
+            orgs = items
+              .filter((o) => o.id)
+              .map((o) => ({ id: o.id as string, name: o.name }));
+          } catch {
+            orgs = [];
+          }
         }
 
-        setIsLocked(false);
+        if (cancelled) return;
+        setAvailableOrgs(orgs);
+        setIsUnscoped(unscoped);
+
         const stored =
           typeof window !== "undefined"
             ? sessionStorage.getItem(STORAGE_KEY)
             : null;
 
-        if (orgs.length >= 2) {
-          if (stored && orgs.some((o) => o.id === stored)) {
-            setOrgIdState(stored);
-          } else {
-            setOrgIdState(orgs[0].id);
-          }
-          return;
+        if (stored && orgs.some((o) => o.id === stored)) {
+          setOrgIdState(stored);
+        } else if (orgs.length > 0) {
+          setOrgIdState(orgs[0].id);
         }
-
-        if (stored) setOrgIdState(stored);
       } finally {
         if (!cancelled) setIsResolving(false);
       }
@@ -102,8 +115,8 @@ export function ActiveOrgProvider({ children }: { children: ReactNode }) {
   }, [session, status]);
 
   const setOrgId = (id: string | null) => {
-    if (isLocked) return;
-    if (myOrgs.length > 0 && id && !myOrgs.some((o) => o.id === id)) return;
+    // Разрешаем выбирать только из доступного списка.
+    if (id && !availableOrgs.some((o) => o.id === id)) return;
 
     setOrgIdState(id);
     if (typeof window !== "undefined") {
@@ -113,7 +126,7 @@ export function ActiveOrgProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ orgId, setOrgId, isResolving, isLocked, myOrgs }}>
+    <Ctx.Provider value={{ orgId, setOrgId, isResolving, availableOrgs, isUnscoped }}>
       {children}
     </Ctx.Provider>
   );

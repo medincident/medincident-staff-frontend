@@ -17,18 +17,9 @@ function pickToken(session: any): string {
 // Конфигурируем клиент на уровне модуля: useEffect срабатывает уже после
 // первого commit'а, и ранние запросы успевают уйти без Authorization.
 if (typeof window !== "undefined") {
-  OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
+  OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
   OpenAPI.WITH_CREDENTIALS = true;
-  // ⚠️ ВРЕМЕННЫЙ ХАК — medincident-backend#145.
-  // Бэк-middleware дважды срезает префикс "Bearer ": один раз в
-  // bearerTokenFromMD, второй — внутри zitadel-go SDK. Чтобы токен дошёл,
-  // подсовываем его уже с префиксом — клиент допишет свой "Bearer " сверху
-  // и получится `Bearer Bearer <jwt>`, что бэк после двух срезов поймёт.
-  // После фикса бэка заменить тело резолвера на `pickToken(await getSession())`.
-  OpenAPI.TOKEN = async () => {
-    const t = pickToken(await getSession());
-    return t ? `Bearer ${t}` : "";
-  };
+  OpenAPI.TOKEN = async () => pickToken(await getSession());
 }
 
 export function ApiProvider({ children }: { children: ReactNode }) {

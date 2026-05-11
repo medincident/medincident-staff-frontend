@@ -9,11 +9,11 @@ import type { OrgStructureCommandServiceUpdateClinicPhysicalAddressBody } from '
 import type { OrgStructureCommandServiceUpdateDepartmentDetailsBody } from '../models/OrgStructureCommandServiceUpdateDepartmentDetailsBody';
 import type { OrgStructureCommandServiceUpdateOrganizationDetailsBody } from '../models/OrgStructureCommandServiceUpdateOrganizationDetailsBody';
 import type { OrgStructureCommandServiceUpdateOrganizationLegalAddressBody } from '../models/OrgStructureCommandServiceUpdateOrganizationLegalAddressBody';
-import type { rpcStatus } from '../models/rpcStatus';
 import type { v1CreateClinicResponse } from '../models/v1CreateClinicResponse';
 import type { v1CreateDepartmentResponse } from '../models/v1CreateDepartmentResponse';
 import type { v1CreateOrganizationRequest } from '../models/v1CreateOrganizationRequest';
 import type { v1CreateOrganizationResponse } from '../models/v1CreateOrganizationResponse';
+import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1UpdateClinicDetailsResponse } from '../models/v1UpdateClinicDetailsResponse';
 import type { v1UpdateClinicPhysicalAddressResponse } from '../models/v1UpdateClinicPhysicalAddressResponse';
 import type { v1UpdateDepartmentDetailsResponse } from '../models/v1UpdateDepartmentDetailsResponse';
@@ -22,18 +22,18 @@ import type { v1UpdateOrganizationLegalAddressResponse } from '../models/v1Updat
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
-export class OrgStructureCommandServiceService {
+export class OrgStructureCommandService {
     /**
      * @param clinicId
      * @param body
      * @returns v1CreateDepartmentResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceCreateDepartment(
+    public static orgStructureCommandCreateDepartment(
         clinicId: string,
         body: OrgStructureCommandServiceCreateDepartmentBody,
-    ): CancelablePromise<v1CreateDepartmentResponse | rpcStatus> {
+    ): CancelablePromise<v1CreateDepartmentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/v1/clinics/{clinicId}/departments',
@@ -41,19 +41,27 @@ export class OrgStructureCommandServiceService {
                 'clinicId': clinicId,
             },
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`department_clinic_not_found\` — clinic with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param clinicId
      * @param body
      * @returns v1UpdateClinicDetailsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceUpdateClinicDetails(
+    public static orgStructureCommandUpdateClinicDetails(
         clinicId: string,
         body: OrgStructureCommandServiceUpdateClinicDetailsBody,
-    ): CancelablePromise<v1UpdateClinicDetailsResponse | rpcStatus> {
+    ): CancelablePromise<v1UpdateClinicDetailsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/v1/clinics/{clinicId}/details',
@@ -61,19 +69,27 @@ export class OrgStructureCommandServiceService {
                 'clinicId': clinicId,
             },
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`clinic_not_found\` — clinic with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param clinicId
      * @param body
      * @returns v1UpdateClinicPhysicalAddressResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceUpdateClinicPhysicalAddress(
+    public static orgStructureCommandUpdateClinicPhysicalAddress(
         clinicId: string,
         body: OrgStructureCommandServiceUpdateClinicPhysicalAddressBody,
-    ): CancelablePromise<v1UpdateClinicPhysicalAddressResponse | rpcStatus> {
+    ): CancelablePromise<v1UpdateClinicPhysicalAddressResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/v1/clinics/{clinicId}/physical-address',
@@ -81,19 +97,27 @@ export class OrgStructureCommandServiceService {
                 'clinicId': clinicId,
             },
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`clinic_not_found\` — clinic with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param departmentId
      * @param body
      * @returns v1UpdateDepartmentDetailsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceUpdateDepartmentDetails(
+    public static orgStructureCommandUpdateDepartmentDetails(
         departmentId: string,
         body: OrgStructureCommandServiceUpdateDepartmentDetailsBody,
-    ): CancelablePromise<v1UpdateDepartmentDetailsResponse | rpcStatus> {
+    ): CancelablePromise<v1UpdateDepartmentDetailsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/v1/departments/{departmentId}/details',
@@ -101,34 +125,48 @@ export class OrgStructureCommandServiceService {
                 'departmentId': departmentId,
             },
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`department_not_found\` — department with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param body
      * @returns v1CreateOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceCreateOrganization(
+    public static orgStructureCommandCreateOrganization(
         body: v1CreateOrganizationRequest,
-    ): CancelablePromise<v1CreateOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1CreateOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/v1/organizations',
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param organizationId
      * @param body
      * @returns v1CreateClinicResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceCreateClinic(
+    public static orgStructureCommandCreateClinic(
         organizationId: string,
         body: OrgStructureCommandServiceCreateClinicBody,
-    ): CancelablePromise<v1CreateClinicResponse | rpcStatus> {
+    ): CancelablePromise<v1CreateClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/v1/organizations/{organizationId}/clinics',
@@ -136,19 +174,27 @@ export class OrgStructureCommandServiceService {
                 'organizationId': organizationId,
             },
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`clinic_organization_not_found\` — organization with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param organizationId
      * @param body
      * @returns v1UpdateOrganizationDetailsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceUpdateOrganizationDetails(
+    public static orgStructureCommandUpdateOrganizationDetails(
         organizationId: string,
         body: OrgStructureCommandServiceUpdateOrganizationDetailsBody,
-    ): CancelablePromise<v1UpdateOrganizationDetailsResponse | rpcStatus> {
+    ): CancelablePromise<v1UpdateOrganizationDetailsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/v1/organizations/{organizationId}/details',
@@ -156,19 +202,27 @@ export class OrgStructureCommandServiceService {
                 'organizationId': organizationId,
             },
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`organization_not_found\` — organization with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param organizationId
      * @param body
      * @returns v1UpdateOrganizationLegalAddressResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureCommandServiceUpdateOrganizationLegalAddress(
+    public static orgStructureCommandUpdateOrganizationLegalAddress(
         organizationId: string,
         body: OrgStructureCommandServiceUpdateOrganizationLegalAddressBody,
-    ): CancelablePromise<v1UpdateOrganizationLegalAddressResponse | rpcStatus> {
+    ): CancelablePromise<v1UpdateOrganizationLegalAddressResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/v1/organizations/{organizationId}/legal-address',
@@ -176,6 +230,14 @@ export class OrgStructureCommandServiceService {
                 'organizationId': organizationId,
             },
             body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`organization_not_found\` — organization with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
 }

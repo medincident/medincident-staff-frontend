@@ -31,18 +31,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatContainer } from "@/components/chat/chat-container";
 import { EntityHistory } from "@/components/history/entity-history";
+import { usePermissions } from "@/lib/auth/use-permissions";
 
 import { EVENT_STATUS_MAP, INCIDENT_PRIORITY_MAP, STATUS_MAP } from "@/lib/constants";
 import { EventStatus } from "@/lib/types";
 import { getBadgeColor } from "@/lib/status-helper";
-import { SCOPES } from "@/lib/auth/scopes";
 
 import {
-  IncidentQueryServiceService,
-  IncidentCommandServiceService,
-  IncidentClassifierQueryServiceService,
-  MembershipQueryServiceService,
-  ServiceRequestQueryServiceService,
+  IncidentQueryService,
+  IncidentCommandService,
+  IncidentClassifierQueryService,
+  MembershipQueryService,
+  ServiceRequestQueryService,
   v1IncidentView,
   v1Category,
   classifierV1Type,
@@ -65,6 +65,7 @@ function DetailsSection({
   onReopen,
   isMutating,
   linkedRequests,
+  canManage,
 }: {
   event: v1IncidentView;
   displayTypeName: string;
@@ -77,6 +78,7 @@ function DetailsSection({
   onReopen: () => void;
   isMutating: boolean;
   linkedRequests: v1ServiceRequest[];
+  canManage: boolean;
 }) {
   const isCancelled = status === "cancelled";
   return (
@@ -105,6 +107,7 @@ function DetailsSection({
         </CardContent>
       </Card>
 
+      {canManage && (
       <Card className="border-primary/20 bg-primary/5 gap-1">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
@@ -188,6 +191,7 @@ function DetailsSection({
           )}
         </CardContent>
       </Card>
+      )}
 
       <Card className="gap-3 bg-card border">
         <CardHeader className="pb-2">
@@ -261,6 +265,8 @@ function DetailsSection({
 
 export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const router = useRouter();
+  const perms = usePermissions();
+  const canManage = perms.canAssignIncidentResponsible;
   const { data: session } = useSession();
 
   const [event, setEvent] = useState<v1IncidentView | null>(null);
@@ -282,7 +288,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
       try {
         setIsLoading(true);
 
-        const incidentRes = await IncidentQueryServiceService.incidentQueryServiceGetIncident(eventId);
+        const incidentRes = await IncidentQueryService.incidentQueryGetIncident(eventId);
         
         if (!incidentRes || !("incident" in incidentRes) || !incidentRes.incident) {
           setNotFound(true);
@@ -300,7 +306,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
 
         // Загружаем связанные заявки
         try {
-          const reqs = await ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequestsByIncident(eventId, 100);
+          const reqs = await ServiceRequestQueryService.serviceRequestQueryListServiceRequestsByIncident(eventId, 100);
           if (reqs && "items" in reqs && reqs.items) {
             setLinkedRequests(reqs.items);
           }
@@ -311,8 +317,8 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         // Получаем организацию для загрузки классификаторов (если есть organizationId в событии)
         if (foundEvent.organizationId) {
           const [catsRes, typesRes] = await Promise.all([
-            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(foundEvent.organizationId, 100),
-            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListActiveTypesByOrganization(foundEvent.organizationId, 100)
+            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(foundEvent.organizationId, 100),
+            IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(foundEvent.organizationId, 100)
           ]);
 
           if (catsRes && "items" in catsRes && catsRes.items) {
@@ -346,7 +352,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         apiStatus = `INCIDENT_STATUS_${apiStatus}`;
       }
       
-      await IncidentCommandServiceService.incidentCommandServiceUpdateIncidentStatus(event.id, {
+      await IncidentCommandService.incidentCommandUpdateIncidentStatus(event.id, {
         newStatus: apiStatus as any
       });
 
@@ -371,7 +377,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
     setIsMutating(true);
     try {
       const apiPriority = `INCIDENT_PRIORITY_${newPriority.toUpperCase()}`;
-      await IncidentCommandServiceService.incidentCommandServiceUpdateIncidentPriority(event.id, {
+      await IncidentCommandService.incidentCommandUpdateIncidentPriority(event.id, {
         priority: apiPriority as any,
       });
       setEvent({ ...event, priority: apiPriority as any });
@@ -395,7 +401,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
     }
     setIsMutating(true);
     try {
-      await IncidentCommandServiceService.incidentCommandServiceCancelIncident(event.id);
+      await IncidentCommandService.incidentCommandCancelIncident(event.id);
       setStatus("cancelled" as EventStatus);
       setEvent({ ...event, status: "INCIDENT_STATUS_CANCELLED" as any });
       notify.mutationSuccess("Событие отменено", "Запись помечена как отменённая.");
@@ -411,7 +417,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
     if (!event?.id) return;
     setIsMutating(true);
     try {
-      await IncidentCommandServiceService.incidentCommandServiceReopenIncident(event.id);
+      await IncidentCommandService.incidentCommandReopenIncident(event.id);
       setStatus("created" as EventStatus);
       setEvent({ ...event, status: "INCIDENT_STATUS_PENDING" as any });
       notify.mutationSuccess("Событие возобновлено", "Можно снова менять статус и приоритет.");
@@ -572,6 +578,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
               onReopen={handleReopen}
               isMutating={isMutating}
               linkedRequests={linkedRequests}
+              canManage={canManage}
             />
           </TabsContent>
           <TabsContent value="history" className="flex-1 overflow-y-auto mt-0">
@@ -597,6 +604,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
             onReopen={handleReopen}
             isMutating={isMutating}
             linkedRequests={linkedRequests}
+            canManage={canManage}
           />
 
           <EntityHistory entityType="incident" entityId={eventId} />

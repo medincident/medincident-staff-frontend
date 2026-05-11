@@ -33,24 +33,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PermissionGate } from "@/components/auth/permission-gate";
 
 import { EVENT_STATUS_MAP } from "@/lib/constants";
 import { getBadgeColor, getCardBorderColor } from "@/lib/status-helper";
 import { EventStatus } from "@/lib/types";
-import { SCOPES } from "@/lib/auth/scopes";
 
 import {
-  IncidentQueryServiceService,
-  IncidentClassifierQueryServiceService,
+  IncidentQueryService,
+  IncidentClassifierQueryService,
   v1IncidentView,
   v1Category,
   classifierV1Type
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { useMyIdentity } from "@/lib/auth/use-my-identity";
+import { useMyOrgRole } from "@/lib/auth/use-my-org-role";
 
 export function EventsListView() {
   const { data: session } = useSession();
   const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
+  const { identity } = useMyIdentity();
+  const { role } = useMyOrgRole();
   const [events, setEvents] = useState<v1IncidentView[]>([]);
   const [categories, setCategories] = useState<v1Category[]>([]);
   const [types, setTypes] = useState<classifierV1Type[]>([]);
@@ -69,16 +73,16 @@ export function EventsListView() {
         setIsLoading(true);
         const orgId = activeOrgId ?? "";
 
-        // Загружаем инциденты на основе роли
-        const isDispatcherOrAdmin = (session as any).scopes?.some((s: string) => 
-          [SCOPES.SYSTEM_ADMIN, SCOPES.ORG_ADMIN, SCOPES.ORG_DISPATCHER].includes(s as any)
-        );
+        // Загружаем инциденты на основе роли. SystemAdmin/OrgAdmin/Dispatcher
+        // видят все инциденты орги, остальные — только свои (ListMyIncidents).
+        const isDispatcherOrAdmin =
+          !!identity?.isSystemAdmin || role.isOrgAdmin || role.isOrgDispatcher;
 
         let incidentsRes;
         if (isDispatcherOrAdmin && orgId) {
-          incidentsRes = await IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100);
+          incidentsRes = await IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100);
         } else {
-          incidentsRes = await IncidentQueryServiceService.incidentQueryServiceListMyIncidents(100);
+          incidentsRes = await IncidentQueryService.incidentQueryListMyIncidents(100);
         }
 
         if (incidentsRes && "items" in incidentsRes && incidentsRes.items) {
@@ -88,8 +92,8 @@ export function EventsListView() {
         // Загружаем классификаторы
         if (orgId) {
           const [catsRes, typesRes] = await Promise.all([
-            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(orgId, 100),
-            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListActiveTypesByOrganization(orgId, 100)
+            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 100),
+            IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(orgId, 100)
           ]);
 
           if (catsRes && "items" in catsRes && catsRes.items) {
@@ -106,7 +110,7 @@ export function EventsListView() {
       }
     };
     loadData();
-  }, [session, activeOrgId, isOrgResolving]);
+  }, [session, activeOrgId, isOrgResolving, identity, role]);
 
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const typeMap: Record<string, string> = {};
@@ -152,12 +156,14 @@ export function EventsListView() {
             Список всех зарегистрированных инцидентов и НС
           </p>
         </div>
-        <Link href="/events/new">
-          <Button className="font-semibold" disabled={isLoading}>
-            <Plus className="mr-2 h-4 w-4" />
-            Новое событие
-          </Button>
-        </Link>
+        <PermissionGate can="canCreateIncident">
+          <Link href="/events/new">
+            <Button className="font-semibold" disabled={isLoading}>
+              <Plus className="mr-2 h-4 w-4" />
+              Новое событие
+            </Button>
+          </Link>
+        </PermissionGate>
       </div>
 
       {/* FILTERS TOOLBAR */}
@@ -269,15 +275,17 @@ export function EventsListView() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <Link href={`/events/${event.id}/edit`}>
-                          <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                          >
-                              <Edit className="h-4 w-4" />
-                          </Button>
-                      </Link>
+                      <PermissionGate can="canAssignIncidentResponsible">
+                        <Link href={`/events/${event.id}/edit`}>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                            >
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                      </PermissionGate>
                     </TableCell>
                   </TableRow>
                 );
@@ -375,15 +383,17 @@ export function EventsListView() {
                 </Link>
 
                 <div className="absolute top-3 right-3">
-                  <Link href={`/events/${event.id}/edit`}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                  <PermissionGate can="canAssignIncidentResponsible">
+                    <Link href={`/events/${event.id}/edit`}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </PermissionGate>
                 </div>
               </div>
             );

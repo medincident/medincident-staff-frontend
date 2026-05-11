@@ -26,15 +26,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
 import { STATUS_MAP } from "@/lib/constants";
-import { SCOPES } from "@/lib/auth/scopes";
 import { useMyEmployee } from "@/lib/auth/use-my-employee";
+import { useMyIdentity } from "@/lib/auth/use-my-identity";
 import { getBadgeColor } from "@/lib/status-helper";
 
 import {
-  IncidentQueryServiceService,
-  ServiceRequestQueryServiceService,
-  AnnouncementQueryServiceService,
-  IncidentClassifierQueryServiceService,
+  IncidentQueryService,
+  ServiceRequestQueryService,
+  AnnouncementQueryService,
+  IncidentClassifierQueryService,
   v1IncidentView,
   v1ServiceRequest,
   v1AnnouncementView,
@@ -55,8 +55,8 @@ export function DashboardView() {
   const { employee } = useMyEmployee();
 
   const user = session?.user as any;
-  const scopes: string[] = ((session as any)?.scopes ?? []) as string[];
-  const isSystemAdmin = scopes.includes(SCOPES.SYSTEM_ADMIN);
+  const { identity } = useMyIdentity();
+  const isSystemAdmin = !!identity?.isSystemAdmin;
 
   // Что писать в подзаголовке: должность из employee_card → fallback
   // системный админ → fallback "Сотрудник".
@@ -83,10 +83,10 @@ export function DashboardView() {
       try {
         setIsLoading(true);
         const [eventsRes, reqsRes, annRes, classRes] = await Promise.all([
-          IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
-          ServiceRequestQueryServiceService.serviceRequestQueryServiceListServiceRequests(orgId, 50),
-          AnnouncementQueryServiceService.announcementQueryServiceListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
-          IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(orgId, 100),
+          IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
+          ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 50),
+          AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
+          IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 100),
         ]);
 
         if (eventsRes && "items" in eventsRes && eventsRes.items) setEvents(eventsRes.items);

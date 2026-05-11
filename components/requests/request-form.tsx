@@ -37,17 +37,18 @@ import { cn } from "@/lib/utils";
 import { notify } from "@/lib/toast";
 
 import {
-  ServiceRequestCommandServiceService,
-  RequestClassifierQueryServiceService,
-  IncidentQueryServiceService,
-  MembershipQueryServiceService,
+  ServiceRequestCommandService,
+  RequestClassifierQueryService,
+  IncidentQueryService,
+  MembershipQueryService,
   v1RequestType,
   v1IncidentView,
   v1EmployeeCardView,
-  ServiceRequestQueryServiceService
+  ServiceRequestQueryService
 } from "@/lib/api-generated";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { useRequirePermission } from "@/lib/auth/use-require-permission";
 import { cleanText } from "@/lib/text";
 
 const formSchema = z.object({
@@ -69,6 +70,9 @@ function RequestFormContent({ requestId }: RequestFormProps) {
   const linkedEventIdParam = searchParams.get("linkedEventId");
   const { data: session } = useSession();
   const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
+  // Гард: создавать заявку может только сотрудник орги. Редактировать —
+  // отдельный кейс, пока пускаем тех же, у кого есть `canCreateRequest`.
+  useRequirePermission("canCreateRequest");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestTypes, setRequestTypes] = useState<v1RequestType[]>([]);
@@ -107,12 +111,12 @@ function RequestFormContent({ requestId }: RequestFormProps) {
 
         if (orgId) {
           const [typeRes, incRes, staffRes] = await Promise.all([
-            RequestClassifierQueryServiceService.requestClassifierQueryServiceListActiveRequestTypesByOrganization(orgId, 100),
-            IncidentQueryServiceService.incidentQueryServiceListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100),
+            RequestClassifierQueryService.requestClassifierQueryListActiveRequestTypesByOrganization(orgId, 100),
+            IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100),
             // Кандидаты на исполнение — сотрудники того же отделения, в котором
             // создаётся заявка. Так же сделано в [id]/view.tsx для AssignExecutors.
             deptId
-              ? MembershipQueryServiceService.membershipQueryServiceListEmployeesByDepartment(deptId, 200)
+              ? MembershipQueryService.membershipQueryListEmployeesByDepartment(deptId, 200)
               : Promise.resolve(null),
           ]);
 
@@ -128,7 +132,7 @@ function RequestFormContent({ requestId }: RequestFormProps) {
         }
         
         if (requestId) {
-            const reqRes = await ServiceRequestQueryServiceService.serviceRequestQueryServiceGetServiceRequest(requestId);
+            const reqRes = await ServiceRequestQueryService.serviceRequestQueryGetServiceRequest(requestId);
             if (reqRes && "serviceRequest" in reqRes && reqRes.serviceRequest) {
                 form.reset({
                     typeId: reqRes.serviceRequest.typeId || "",
@@ -173,7 +177,7 @@ function RequestFormContent({ requestId }: RequestFormProps) {
       const incidentId = values.incidentId?.trim() || undefined;
 
       if (isEditMode && requestId) {
-        await ServiceRequestCommandServiceService.serviceRequestCommandServiceUpdateServiceRequestDescription(
+        await ServiceRequestCommandService.serviceRequestCommandUpdateServiceRequestDescription(
           requestId,
           { description }
         );
@@ -185,7 +189,7 @@ function RequestFormContent({ requestId }: RequestFormProps) {
           setIsSubmitting(false);
           return;
         }
-        await ServiceRequestCommandServiceService.serviceRequestCommandServiceCreateServiceRequest({
+        await ServiceRequestCommandService.serviceRequestCommandCreateServiceRequest({
             departmentId: employeeDeptId,
             typeId: values.typeId,
             description,

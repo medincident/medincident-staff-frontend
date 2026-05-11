@@ -76,7 +76,7 @@ export function ChatContainer({
       await new Promise((resolve) => setTimeout(resolve, 400));
       
     } catch (error) {
-      notify.mutationError("Ошибка", "Не удалось отправить сообщение.");
+      notify.apiError(error, "Не удалось отправить сообщение.");
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };

@@ -29,12 +29,13 @@ import { STATUS_MAP } from "@/lib/constants";
 import { getBadgeColor } from "@/lib/status-helper";
 import { ChatContainer } from "@/components/chat/chat-container";
 import { EntityHistory } from "@/components/history/entity-history";
+import { usePermissions } from "@/lib/auth/use-permissions";
 
 import {
-    ServiceRequestQueryServiceService,
-    ServiceRequestCommandServiceService,
-    RequestClassifierQueryServiceService,
-    MembershipQueryServiceService,
+    ServiceRequestQueryService,
+    ServiceRequestCommandService,
+    RequestClassifierQueryService,
+    MembershipQueryService,
     v1ServiceRequest,
     v1RequestType,
     v1EmployeeCardView
@@ -53,6 +54,7 @@ function DetailsSection({
     isLoadingEmployees,
     onAssignExecutors,
     isAssigningExecutors,
+    canManage,
 }: {
     request: v1ServiceRequest;
     requestType: v1RequestType | null;
@@ -62,6 +64,7 @@ function DetailsSection({
     isLoadingEmployees: boolean;
     onAssignExecutors: (employeeIds: string[]) => Promise<void>;
     isAssigningExecutors: boolean;
+    canManage: boolean;
 }) {
     const router = useRouter();
 
@@ -124,6 +127,7 @@ function DetailsSection({
                 </CardContent>
             </Card>
 
+            {canManage && (
             <Card className="border-primary/20 bg-primary/5 gap-1">
                 <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
@@ -187,12 +191,15 @@ function DetailsSection({
                     </div>
                 </CardContent>
             </Card>
+            )}
         </div>
     );
 }
 
 export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
     const router = useRouter();
+    const perms = usePermissions();
+    const canManage = perms.canAssignRequestExecutor;
 
     const [request, setRequest] = useState<v1ServiceRequest | null>(null);
     const [requestType, setRequestType] = useState<v1RequestType | null>(null);
@@ -207,7 +214,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
             try {
                 setIsLoading(true);
                 
-                const reqRes = await ServiceRequestQueryServiceService.serviceRequestQueryServiceGetServiceRequest(requestId);
+                const reqRes = await ServiceRequestQueryService.serviceRequestQueryGetServiceRequest(requestId);
                 if (reqRes && "serviceRequest" in reqRes && reqRes.serviceRequest) {
                     const foundRequest = reqRes.serviceRequest;
                     setRequest(foundRequest);
@@ -217,7 +224,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
 
                     if (foundRequest.typeId) {
                         try {
-                            const typeRes = await RequestClassifierQueryServiceService.requestClassifierQueryServiceGetRequestType(foundRequest.typeId);
+                            const typeRes = await RequestClassifierQueryService.requestClassifierQueryGetRequestType(foundRequest.typeId);
                             if (typeRes && "requestType" in typeRes && typeRes.requestType) {
                                 setRequestType(typeRes.requestType);
                             }
@@ -243,7 +250,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         setIsLoadingEmployees(true);
         (async () => {
             try {
-                const res = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByDepartment(
+                const res = await MembershipQueryService.membershipQueryListEmployeesByDepartment(
                     request.departmentId!,
                     100,
                 );
@@ -268,7 +275,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
 
         setIsAssigningExecutors(true);
         try {
-            await ServiceRequestCommandServiceService.serviceRequestCommandServiceAssignExecutors(request.id, {
+            await ServiceRequestCommandService.serviceRequestCommandAssignExecutors(request.id, {
                 executorEmployeeIds: employeeIds,
             });
 
@@ -286,7 +293,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
             );
         } catch (error) {
             console.error(error);
-            notify.mutationError("Ошибка", "Не удалось обновить исполнителя.");
+            notify.apiError(error, "Не удалось обновить исполнителя.");
         } finally {
             setIsAssigningExecutors(false);
         }
@@ -304,7 +311,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                 apiStatus = `SERVICE_REQUEST_STATUS_${apiStatus}`;
             }
 
-            await ServiceRequestCommandServiceService.serviceRequestCommandServiceUpdateServiceRequestStatus(request.id, {
+            await ServiceRequestCommandService.serviceRequestCommandUpdateServiceRequestStatus(request.id, {
                 newStatus: apiStatus as any
             });
 
@@ -318,7 +325,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         } catch (error) {
             console.error(error);
             setStatus(prevStatus);
-            notify.mutationError("Ошибка", "Не удалось обновить статус заявки.");
+            notify.apiError(error, "Не удалось обновить статус заявки.");
         }
     };
 
@@ -385,6 +392,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                             isLoadingEmployees={isLoadingEmployees}
                             onAssignExecutors={handleAssignExecutors}
                             isAssigningExecutors={isAssigningExecutors}
+                            canManage={canManage}
                         />
                     </TabsContent>
                     <TabsContent value="history" className="flex-1 overflow-y-auto mt-0">
@@ -407,6 +415,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                             isLoadingEmployees={isLoadingEmployees}
                             onAssignExecutors={handleAssignExecutors}
                             isAssigningExecutors={isAssigningExecutors}
+                            canManage={canManage}
                         />
 
                     <EntityHistory entityType="request" entityId={requestId} />

@@ -1,9 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Shield, Building, Users, UserCheck, Network, Megaphone } from "lucide-react";
+import { Shield, Building, Users, UserCheck, Network, Megaphone, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -11,14 +11,22 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { usePermissions, type PermissionKey } from "@/lib/auth/use-permissions";
 
-const adminTabs = [
-  { href: "/admin/organizations", label: "Организации", icon: Network },
-  { href: "/admin/classifier", label: "Классификатор", icon: Shield },
-  { href: "/admin/department", label: "Подразделение", icon: UserCheck },
-  { href: "/admin/structure", label: "Структура", icon: Building },
-  { href: "/admin/announcements", label: "Объявления", icon: Megaphone },
-  { href: "/admin/users", label: "Пользователи", icon: Users },
+interface AdminTab {
+  href: string;
+  label: string;
+  icon: typeof Shield;
+  can: PermissionKey;
+}
+
+const adminTabs: AdminTab[] = [
+  { href: "/admin/organizations", label: "Организации", icon: Network, can: "canManageOrganizations" },
+  { href: "/admin/classifier", label: "Классификатор", icon: Shield, can: "canManageClassifiers" },
+  { href: "/admin/department", label: "Подразделение", icon: UserCheck, can: "canManageDepartmentSettings" },
+  { href: "/admin/structure", label: "Структура", icon: Building, can: "canManageOrgStructure" },
+  { href: "/admin/announcements", label: "Объявления", icon: Megaphone, can: "canManageAnnouncements" },
+  { href: "/admin/users", label: "Пользователи", icon: Users, can: "canManageOrgUsers" },
 ];
 
 export default function AdminLayout({
@@ -28,8 +36,43 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const perms = usePermissions();
 
-  const currentTab = adminTabs.find((t) => t.href === pathname) ?? adminTabs[0];
+  const visibleTabs = useMemo(
+    () => adminTabs.filter((t) => !!perms[t.can]),
+    [perms],
+  );
+
+  // Если юзер на admin-маршруте, на который у него нет прав, или вообще
+  // не имеет ни одной admin-роли — отправляем на дашборд. Префетч-ссылки
+  // ниже всё равно отрисуются, но навигация заблокирована.
+  useEffect(() => {
+    if (perms.isLoading) return;
+    const currentTab = adminTabs.find((t) => t.href === pathname);
+    if (currentTab && !perms[currentTab.can]) {
+      router.replace("/dashboard");
+      return;
+    }
+    if (!currentTab && visibleTabs.length === 0) {
+      router.replace("/dashboard");
+    }
+  }, [perms, pathname, router, visibleTabs.length]);
+
+  if (perms.isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const currentTab =
+    adminTabs.find((t) => t.href === pathname) ?? visibleTabs[0];
+  if (!currentTab) {
+    // У юзера нет прав ни на одну admin-страницу — редирект сработает в
+    // useEffect выше; пока показываем пустой блок, чтобы не упасть.
+    return null;
+  }
   const CurrentIcon = currentTab.icon;
 
   return (
@@ -46,7 +89,7 @@ export default function AdminLayout({
             </span>
           </SelectTrigger>
           <SelectContent className="w-[var(--radix-select-trigger-width)]">
-            {adminTabs.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = pathname === tab.href;
               return (
@@ -76,7 +119,7 @@ export default function AdminLayout({
       {/* Скрытые ссылки для префетча — Next.js подтягивает чанки страниц,
           чтобы переключение через Select было мгновенным. */}
       <div className="hidden">
-        {adminTabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <Link key={tab.href} href={tab.href} prefetch />
         ))}
       </div>

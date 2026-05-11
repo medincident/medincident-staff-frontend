@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { rpcStatus } from '../models/rpcStatus';
+import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetAnnouncementResponse } from '../models/v1GetAnnouncementResponse';
 import type { v1ListAnnouncementsForClinicResponse } from '../models/v1ListAnnouncementsForClinicResponse';
 import type { v1ListAnnouncementsForDepartmentResponse } from '../models/v1ListAnnouncementsForDepartmentResponse';
@@ -10,21 +10,29 @@ import type { v1ListAnnouncementsForOrganizationResponse } from '../models/v1Lis
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
-export class AnnouncementQueryServiceService {
+export class AnnouncementQueryService {
     /**
      * @param id
      * @returns v1GetAnnouncementResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static announcementQueryServiceGetAnnouncement(
+    public static announcementQueryGetAnnouncement(
         id: string,
-    ): CancelablePromise<v1GetAnnouncementResponse | rpcStatus> {
+    ): CancelablePromise<v1GetAnnouncementResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/announcements/{id}',
             path: {
                 'id': id,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`announcement_query_not_found\` — announcement with the given ID does not exist.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -35,16 +43,16 @@ export class AnnouncementQueryServiceService {
      * @param limit
      * @param cursor
      * @returns v1ListAnnouncementsForClinicResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static announcementQueryServiceListAnnouncementsForClinic(
+    public static announcementQueryListAnnouncementsForClinic(
         clinicId: string,
         includeArchived?: boolean,
         priority: 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED' | 'ANNOUNCEMENT_PRIORITY_NORMAL' | 'ANNOUNCEMENT_PRIORITY_HIGH' = 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED',
         limit?: number,
         cursor?: string,
-    ): CancelablePromise<v1ListAnnouncementsForClinicResponse | rpcStatus> {
+    ): CancelablePromise<v1ListAnnouncementsForClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/clinics/{clinicId}/announcements',
@@ -57,6 +65,12 @@ export class AnnouncementQueryServiceService {
                 'limit': limit,
                 'cursor': cursor,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -66,16 +80,16 @@ export class AnnouncementQueryServiceService {
      * @param limit
      * @param cursor
      * @returns v1ListAnnouncementsForDepartmentResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static announcementQueryServiceListAnnouncementsForDepartment(
+    public static announcementQueryListAnnouncementsForDepartment(
         departmentId: string,
         includeArchived?: boolean,
         priority: 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED' | 'ANNOUNCEMENT_PRIORITY_NORMAL' | 'ANNOUNCEMENT_PRIORITY_HIGH' = 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED',
         limit?: number,
         cursor?: string,
-    ): CancelablePromise<v1ListAnnouncementsForDepartmentResponse | rpcStatus> {
+    ): CancelablePromise<v1ListAnnouncementsForDepartmentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/departments/{departmentId}/announcements',
@@ -88,6 +102,12 @@ export class AnnouncementQueryServiceService {
                 'limit': limit,
                 'cursor': cursor,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -97,16 +117,16 @@ export class AnnouncementQueryServiceService {
      * @param limit
      * @param cursor
      * @returns v1ListAnnouncementsForOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static announcementQueryServiceListAnnouncementsForOrganization(
+    public static announcementQueryListAnnouncementsForOrganization(
         organizationId: string,
         includeArchived?: boolean,
         priority: 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED' | 'ANNOUNCEMENT_PRIORITY_NORMAL' | 'ANNOUNCEMENT_PRIORITY_HIGH' = 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED',
         limit?: number,
         cursor?: string,
-    ): CancelablePromise<v1ListAnnouncementsForOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1ListAnnouncementsForOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/organizations/{organizationId}/announcements',
@@ -118,6 +138,12 @@ export class AnnouncementQueryServiceService {
                 'priority': priority,
                 'limit': limit,
                 'cursor': cursor,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }

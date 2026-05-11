@@ -2,27 +2,27 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { rpcStatus } from '../models/rpcStatus';
+import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetRequestTypeResponse } from '../models/v1GetRequestTypeResponse';
 import type { v1ListActiveRequestTypesByOrganizationResponse } from '../models/v1ListActiveRequestTypesByOrganizationResponse';
 import type { v1ListRequestTypesByOrganizationResponse } from '../models/v1ListRequestTypesByOrganizationResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
-export class RequestClassifierQueryServiceService {
+export class RequestClassifierQueryService {
     /**
      * @param organizationId
      * @param limit
      * @param offset
      * @returns v1ListRequestTypesByOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static requestClassifierQueryServiceListRequestTypesByOrganization(
+    public static requestClassifierQueryListRequestTypesByOrganization(
         organizationId: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListRequestTypesByOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1ListRequestTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/request-types',
@@ -33,6 +33,12 @@ export class RequestClassifierQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -40,14 +46,14 @@ export class RequestClassifierQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListActiveRequestTypesByOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static requestClassifierQueryServiceListActiveRequestTypesByOrganization(
+    public static requestClassifierQueryListActiveRequestTypesByOrganization(
         organizationId: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListActiveRequestTypesByOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1ListActiveRequestTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/request-types:active',
@@ -58,22 +64,36 @@ export class RequestClassifierQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param id
      * @returns v1GetRequestTypeResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static requestClassifierQueryServiceGetRequestType(
+    public static requestClassifierQueryGetRequestType(
         id: string,
-    ): CancelablePromise<v1GetRequestTypeResponse | rpcStatus> {
+    ): CancelablePromise<v1GetRequestTypeResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/request-types/{id}',
             path: {
                 'id': id,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`request_type_not_found\` — request type with the given ID does not exist.`,
+                500: `Unexpected server error.`,
             },
         });
     }

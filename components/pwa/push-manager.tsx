@@ -45,8 +45,7 @@ async function authHeader(): Promise<Record<string, string>> {
   const session = await getSession();
   const t =
     (session as any)?.accessToken || (session as any)?.idToken || "";
-  // Двойной Bearer — тот же хак, что в api-provider (medincident-backend#145).
-  return t ? { Authorization: `Bearer Bearer ${t}` } : {};
+  return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
 export function PushNotificationManager() {

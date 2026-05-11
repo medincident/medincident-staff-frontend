@@ -47,11 +47,11 @@ import {
 } from "@/components/ui/select";
 import { notify } from "@/lib/toast";
 import {
-  MembershipQueryServiceService,
-  MembershipCommandServiceService,
-  OrgStructureQueryServiceService,
-  OrgStructureCommandServiceService,
-  StatsQueryServiceService,
+  MembershipQueryService,
+  MembershipCommandService,
+  OrgStructureQueryService,
+  OrgStructureCommandService,
+  StatsQueryService,
 } from "@/lib/api-generated";
 import type { v1EmployeeCardView } from "@/lib/api-generated";
 import { cleanText } from "@/lib/text";
@@ -89,10 +89,10 @@ export function StructureView() {
     try {
       setIsLoading(true);
 
-      const usersRes = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByOrganization(selectedOrgId, 100);
+      const usersRes = await MembershipQueryService.membershipQueryListEmployeesByOrganization(selectedOrgId, 100);
       setUsers((usersRes as any).items || []);
 
-      const clinicsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListClinicsByOrganization(selectedOrgId, 100);
+      const clinicsRes = await OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(selectedOrgId, 100);
       const clinicsItems = (clinicsRes as any).items || [];
 
       const filteredClinics = search
@@ -101,9 +101,9 @@ export function StructureView() {
 
       const builtClinics = await Promise.all(filteredClinics.map(async (clinic: any) => {
         const [deptsRes, cHeadRes, statsRes] = await Promise.all([
-          OrgStructureQueryServiceService.orgStructureQueryServiceListDepartmentsByClinic(clinic.id, 100),
-          MembershipQueryServiceService.membershipQueryServiceGetClinicHead(clinic.id).catch(() => null),
-          StatsQueryServiceService.statsQueryServiceGetClinicStats(clinic.id).catch(() => null),
+          OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 100),
+          MembershipQueryService.membershipQueryGetClinicHead(clinic.id).catch(() => null),
+          StatsQueryService.statsQueryGetClinicStats(clinic.id).catch(() => null),
         ]);
 
         const deptsItems = (deptsRes as any).items || [];
@@ -113,7 +113,7 @@ export function StructureView() {
         const stats = (statsRes as any)?.stats ?? null;
 
         const builtDepts = await Promise.all(deptsItems.map(async (dept: any) => {
-          const dHeadRes = await MembershipQueryServiceService.membershipQueryServiceGetDepartmentResponsible(dept.id).catch(() => null);
+          const dHeadRes = await MembershipQueryService.membershipQueryGetDepartmentResponsible(dept.id).catch(() => null);
           const dHeadAssignment = (dHeadRes as any)?.assignment;
           return {
             ...dept,
@@ -161,7 +161,7 @@ export function StructureView() {
     const finalHead = newHeadId === "none" ? undefined : newHeadId;
     const finalDeputy = newDeputyId === "none" ? undefined : newDeputyId;
 
-    const cmd = MembershipCommandServiceService;
+    const cmd = MembershipCommandService;
 
     // Если меняется head или нужно очистить депутата — сначала снимаем старого депутата
     // (он привязан к ID старого head: /heads/{oldHeadId}/deputy)
@@ -170,28 +170,28 @@ export function StructureView() {
 
     if (oldDeputyId && oldHeadId && (headChanged || deputyChanged)) {
       if (type === "clinic") {
-        await cmd.membershipCommandServiceRemoveClinicHeadDeputy(targetId, oldHeadId).catch(() => {});
+        await cmd.membershipCommandRemoveClinicHeadDeputy(targetId, oldHeadId).catch(() => {});
       } else {
-        await cmd.membershipCommandServiceRemoveDepartmentResponsibleDeputy(targetId, oldHeadId).catch(() => {});
+        await cmd.membershipCommandRemoveDepartmentResponsibleDeputy(targetId, oldHeadId).catch(() => {});
       }
     }
 
     if (headChanged) {
       if (type === "clinic") {
-        if (oldHeadId) await cmd.membershipCommandServiceRevokeClinicHead(targetId, oldHeadId).catch(() => {});
-        if (finalHead) await cmd.membershipCommandServiceAssignClinicHead(targetId, { employeeId: finalHead }).catch(() => {});
+        if (oldHeadId) await cmd.membershipCommandRevokeClinicHead(targetId, oldHeadId).catch(() => {});
+        if (finalHead) await cmd.membershipCommandAssignClinicHead(targetId, { employeeId: finalHead }).catch(() => {});
       } else {
-        if (oldHeadId) await cmd.membershipCommandServiceRevokeDepartmentResponsible(targetId, oldHeadId).catch(() => {});
-        if (finalHead) await cmd.membershipCommandServiceAssignDepartmentResponsible(targetId, { employeeId: finalHead }).catch(() => {});
+        if (oldHeadId) await cmd.membershipCommandRevokeDepartmentResponsible(targetId, oldHeadId).catch(() => {});
+        if (finalHead) await cmd.membershipCommandAssignDepartmentResponsible(targetId, { employeeId: finalHead }).catch(() => {});
       }
     }
 
     // Назначаем нового депутата только если есть head и депутат, и состояние изменилось
     if (finalHead && finalDeputy && (headChanged || deputyChanged)) {
       if (type === "clinic") {
-        await cmd.membershipCommandServiceAssignClinicHeadDeputy(targetId, finalHead, { deputyEmployeeId: finalDeputy }).catch(() => {});
+        await cmd.membershipCommandAssignClinicHeadDeputy(targetId, finalHead, { deputyEmployeeId: finalDeputy }).catch(() => {});
       } else {
-        await cmd.membershipCommandServiceAssignDepartmentResponsibleDeputy(targetId, finalHead, { deputyEmployeeId: finalDeputy }).catch(() => {});
+        await cmd.membershipCommandAssignDepartmentResponsibleDeputy(targetId, finalHead, { deputyEmployeeId: finalDeputy }).catch(() => {});
       }
     }
   };
@@ -234,11 +234,11 @@ export function StructureView() {
     setIsSaving(true);
     try {
       if (editingItem?.id) {
-        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateClinicDetails(editingItem.id, {
+        await OrgStructureCommandService.orgStructureCommandUpdateClinicDetails(editingItem.id, {
           name,
           ...(description !== undefined ? { description } : {}),
         });
-        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateClinicPhysicalAddress(editingItem.id, {
+        await OrgStructureCommandService.orgStructureCommandUpdateClinicPhysicalAddress(editingItem.id, {
           physicalAddress: { text: address },
         });
         await syncResponsible(
@@ -250,16 +250,16 @@ export function StructureView() {
           "clinic",
         );
       } else {
-        const newClinicRes = await OrgStructureCommandServiceService.orgStructureCommandServiceCreateClinic(selectedOrgId, {
+        const newClinicRes = await OrgStructureCommandService.orgStructureCommandCreateClinic(selectedOrgId, {
           name,
           ...(description !== undefined ? { description } : {}),
           physicalAddress: { text: address },
         });
         const newClinicId = (newClinicRes as any).id;
         if (newHeadId !== "none" && newClinicId) {
-          await MembershipCommandServiceService.membershipCommandServiceAssignClinicHead(newClinicId, { employeeId: newHeadId });
+          await MembershipCommandService.membershipCommandAssignClinicHead(newClinicId, { employeeId: newHeadId });
           if (newDeputyId !== "none") {
-            await MembershipCommandServiceService.membershipCommandServiceAssignClinicHeadDeputy(newClinicId, newHeadId, {
+            await MembershipCommandService.membershipCommandAssignClinicHeadDeputy(newClinicId, newHeadId, {
               deputyEmployeeId: newDeputyId,
             }).catch(() => {});
           }
@@ -269,7 +269,7 @@ export function StructureView() {
       setIsClinicDialogOpen(false);
       loadData();
     } catch (e) {
-      notify.mutationError("Ошибка", "Не удалось сохранить клинику.");
+      notify.apiError(e, "Не удалось сохранить клинику");
     } finally {
       setIsSaving(false);
     }
@@ -316,7 +316,7 @@ export function StructureView() {
     setIsSaving(true);
     try {
       if (editingItem?.id) {
-        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateDepartmentDetails(editingItem.id, {
+        await OrgStructureCommandService.orgStructureCommandUpdateDepartmentDetails(editingItem.id, {
           name,
           ...(description !== undefined ? { description } : {}),
         });
@@ -329,15 +329,15 @@ export function StructureView() {
           "department",
         );
       } else {
-        const newDeptRes = await OrgStructureCommandServiceService.orgStructureCommandServiceCreateDepartment(targetClinicId, {
+        const newDeptRes = await OrgStructureCommandService.orgStructureCommandCreateDepartment(targetClinicId, {
           name,
           ...(description !== undefined ? { description } : {}),
         });
         const newDeptId = (newDeptRes as any).id;
         if (newHeadId !== "none" && newDeptId) {
-          await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsible(newDeptId, { employeeId: newHeadId });
+          await MembershipCommandService.membershipCommandAssignDepartmentResponsible(newDeptId, { employeeId: newHeadId });
           if (newDeputyId !== "none") {
-            await MembershipCommandServiceService.membershipCommandServiceAssignDepartmentResponsibleDeputy(newDeptId, newHeadId, {
+            await MembershipCommandService.membershipCommandAssignDepartmentResponsibleDeputy(newDeptId, newHeadId, {
               deputyEmployeeId: newDeputyId,
             }).catch(() => {});
           }
@@ -347,7 +347,7 @@ export function StructureView() {
       setIsDeptDialogOpen(false);
       loadData();
     } catch (e) {
-      notify.mutationError("Ошибка", "Не удалось сохранить отделение.");
+      notify.apiError(e, "Не удалось сохранить отделение");
     } finally {
       setIsSaving(false);
     }

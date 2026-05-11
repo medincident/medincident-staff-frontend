@@ -34,11 +34,11 @@ import {
 } from "@/components/ui/dialog";
 import { notify } from "@/lib/toast";
 import {
-  OrgStructureQueryServiceService,
-  OrgStructureCommandServiceService,
-  MembershipQueryServiceService,
-  MembershipCommandServiceService,
-  StatsQueryServiceService,
+  OrgStructureQueryService,
+  OrgStructureCommandService,
+  MembershipQueryService,
+  MembershipCommandService,
+  StatsQueryService,
 } from "@/lib/api-generated";
 import { cleanText } from "@/lib/text";
 import { useSession } from "next-auth/react";
@@ -59,7 +59,7 @@ export function OrganizationsView() {
   const loadOrganizations = async () => {
     try {
       setIsLoading(true);
-      const res = await OrgStructureQueryServiceService.orgStructureQueryServiceListOrganizations(100);
+      const res = await OrgStructureQueryService.orgStructureQueryListOrganizations(100);
       const items = (res as any).items || [];
 
       const filtered = search
@@ -68,8 +68,8 @@ export function OrganizationsView() {
 
       const orgsWithDetails = await Promise.all(filtered.map(async (org: any) => {
         const [headRes, statsRes] = await Promise.all([
-          MembershipQueryServiceService.membershipQueryServiceListOrgHeads(org.id, 1).catch(() => null),
-          StatsQueryServiceService.statsQueryServiceGetOrganizationStats(org.id).catch(() => null),
+          MembershipQueryService.membershipQueryListOrgHeads(org.id, 1).catch(() => null),
+          StatsQueryService.statsQueryGetOrganizationStats(org.id).catch(() => null),
         ]);
         const head = (headRes as any)?.items?.[0] ?? null;
         const stats = (statsRes as any)?.stats ?? null;
@@ -121,16 +121,16 @@ export function OrganizationsView() {
     setIsSaving(true);
     try {
       if (editingOrg) {
-        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateOrganizationDetails(editingOrg.id, {
+        await OrgStructureCommandService.orgStructureCommandUpdateOrganizationDetails(editingOrg.id, {
           name,
           ...(description !== undefined ? { description } : {}),
         });
-        await OrgStructureCommandServiceService.orgStructureCommandServiceUpdateOrganizationLegalAddress(editingOrg.id, {
+        await OrgStructureCommandService.orgStructureCommandUpdateOrganizationLegalAddress(editingOrg.id, {
           legalAddress: { text: addressText },
         });
         notify.mutationSuccess("Организация обновлена", "Данные организации успешно сохранены.");
       } else {
-        await OrgStructureCommandServiceService.orgStructureCommandServiceCreateOrganization({
+        await OrgStructureCommandService.orgStructureCommandCreateOrganization({
           name,
           ...(description !== undefined ? { description } : {}),
           legalAddress: { text: addressText },
@@ -140,7 +140,7 @@ export function OrganizationsView() {
       setIsOrgDialogOpen(false);
       loadOrganizations();
     } catch (error) {
-      notify.mutationError("Ошибка сохранения", "Не удалось сохранить данные организации.");
+      notify.apiError(error, "Не удалось сохранить организацию");
     } finally {
       setIsSaving(false);
     }

@@ -18,9 +18,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { notify } from "@/lib/toast";
 import {
-  MembershipQueryServiceService,
-  MembershipCommandServiceService,
-  OrgStructureQueryServiceService,
+  MembershipQueryService,
+  MembershipCommandService,
+  OrgStructureQueryService,
   v1EmployeeCardView,
 } from "@/lib/api-generated";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
@@ -69,18 +69,18 @@ export function DepartmentView() {
         setDepartmentId(emp.departmentId);
 
         // Загружаем данные отделения
-        const deptRes = await OrgStructureQueryServiceService.orgStructureQueryServiceGetDepartment(emp.departmentId);
+        const deptRes = await OrgStructureQueryService.orgStructureQueryGetDepartment(emp.departmentId);
         const deptData = (deptRes as any).department;
         setDepartmentName(deptData?.name || "Настройки отделения");
 
         // Загружаем сотрудников отделения
-        const staffRes = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByDepartment(emp.departmentId, 100);
+        const staffRes = await MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId, 100);
         const staffItems = (staffRes as any).items as v1EmployeeCardView[] || [];
         setStaff(staffItems);
 
         // Загружаем ответственного за отделение и его заместителя
         try {
-          const headRes = await MembershipQueryServiceService.membershipQueryServiceGetDepartmentResponsible(emp.departmentId);
+          const headRes = await MembershipQueryService.membershipQueryGetDepartmentResponsible(emp.departmentId);
           const assignment = (headRes as any).assignment;
           const holderId = assignment?.holder?.employeeId ?? "";
           const deputyId = assignment?.deputy?.employeeId ?? "";
@@ -116,24 +116,24 @@ export function DepartmentView() {
       const headChanged = origHeadId !== (finalHead ?? "");
       const deputyChanged = origDeputyId !== (finalDeputy ?? "");
 
-      const cmd = MembershipCommandServiceService;
+      const cmd = MembershipCommandService;
 
       // Старого депутата убираем, если меняется head или сам депутат
       if (origDeputyId && origHeadId && (headChanged || deputyChanged)) {
-        await cmd.membershipCommandServiceRemoveDepartmentResponsibleDeputy(departmentId, origHeadId).catch(() => {});
+        await cmd.membershipCommandRemoveDepartmentResponsibleDeputy(departmentId, origHeadId).catch(() => {});
       }
 
       if (headChanged) {
         if (origHeadId) {
-          await cmd.membershipCommandServiceRevokeDepartmentResponsible(departmentId, origHeadId).catch(() => {});
+          await cmd.membershipCommandRevokeDepartmentResponsible(departmentId, origHeadId).catch(() => {});
         }
         if (finalHead) {
-          await cmd.membershipCommandServiceAssignDepartmentResponsible(departmentId, { employeeId: finalHead });
+          await cmd.membershipCommandAssignDepartmentResponsible(departmentId, { employeeId: finalHead });
         }
       }
 
       if (finalHead && finalDeputy && (headChanged || deputyChanged)) {
-        await cmd.membershipCommandServiceAssignDepartmentResponsibleDeputy(departmentId, finalHead, {
+        await cmd.membershipCommandAssignDepartmentResponsibleDeputy(departmentId, finalHead, {
           deputyEmployeeId: finalDeputy,
         });
       }
@@ -145,7 +145,7 @@ export function DepartmentView() {
       notify.mutationSuccess("Изменения сохранены", "Структура управления отделения обновлена.");
     } catch (error) {
       console.error(error);
-      notify.mutationError("Ошибка сохранения", "Проверьте соединение с сервером и попробуйте ещё раз.");
+      notify.apiError(error, "Ошибка сохранения", "Проверьте соединение с сервером и попробуйте ещё раз.");
     } finally {
       setIsSaving(false);
     }

@@ -37,8 +37,8 @@ import { Switch } from "@/components/ui/switch";
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
-  RequestClassifierQueryServiceService,
-  RequestClassifierCommandServiceService,
+  RequestClassifierQueryService,
+  RequestClassifierCommandService,
   v1RequestType,
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
@@ -73,8 +73,8 @@ export function RequestTypesView() {
     setIsLoading(true);
     try {
       const res = showInactive
-        ? await RequestClassifierQueryServiceService.requestClassifierQueryServiceListRequestTypesByOrganization(orgId, 200)
-        : await RequestClassifierQueryServiceService.requestClassifierQueryServiceListActiveRequestTypesByOrganization(orgId, 200);
+        ? await RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200)
+        : await RequestClassifierQueryService.requestClassifierQueryListActiveRequestTypesByOrganization(orgId, 200);
       if (res && "items" in res && Array.isArray(res.items)) {
         setTypes(res.items);
       } else {
@@ -142,17 +142,17 @@ export function RequestTypesView() {
         ...(description ? { description } : {}),
       };
       if (editingId) {
-        await RequestClassifierCommandServiceService.requestClassifierCommandServiceUpdateRequestTypeDetails(editingId, payload);
+        await RequestClassifierCommandService.requestClassifierCommandUpdateRequestTypeDetails(editingId, payload);
         notify.mutationSuccess("Тип обновлён", "Изменения сохранены.");
       } else {
-        await RequestClassifierCommandServiceService.requestClassifierCommandServiceCreateRequestType(organizationId, payload);
+        await RequestClassifierCommandService.requestClassifierCommandCreateRequestType(organizationId, payload);
         notify.mutationSuccess("Тип создан", `Добавлен тип «${payload.name}».`);
       }
       setIsDialogOpen(false);
       void loadTypes(organizationId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось сохранить тип.");
+      notify.apiError(e, "Не удалось сохранить тип");
     } finally {
       setIsSaving(false);
     }
@@ -161,24 +161,24 @@ export function RequestTypesView() {
   const handleDeactivate = async (t: v1RequestType) => {
     if (!t.id || !organizationId) return;
     try {
-      await RequestClassifierCommandServiceService.requestClassifierCommandServiceDeactivateRequestType(t.id);
+      await RequestClassifierCommandService.requestClassifierCommandDeactivateRequestType(t.id);
       notify.mutationSuccess("Тип деактивирован", "Сотрудники не смогут выбрать его в новых заявках.");
       void loadTypes(organizationId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось деактивировать тип.");
+      notify.apiError(e, "Не удалось деактивировать тип");
     }
   };
 
   const handleReactivate = async (t: v1RequestType) => {
     if (!t.id || !organizationId) return;
     try {
-      await RequestClassifierCommandServiceService.requestClassifierCommandServiceReactivateRequestType(t.id);
+      await RequestClassifierCommandService.requestClassifierCommandReactivateRequestType(t.id);
       notify.mutationSuccess("Тип возобновлён", "Снова доступен для выбора в форме.");
       void loadTypes(organizationId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось возобновить тип.");
+      notify.apiError(e, "Не удалось возобновить тип");
     }
   };
 
@@ -188,12 +188,12 @@ export function RequestTypesView() {
       return;
     }
     try {
-      await RequestClassifierCommandServiceService.requestClassifierCommandServiceDeleteRequestType(t.id);
+      await RequestClassifierCommandService.requestClassifierCommandDeleteRequestType(t.id);
       notify.mutationSuccess("Тип удалён", "");
       void loadTypes(organizationId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось удалить тип. Возможно, он уже используется в заявках.");
+      notify.apiError(e, "Не удалось удалить тип");
     }
   };
 

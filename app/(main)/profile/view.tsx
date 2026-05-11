@@ -31,7 +31,8 @@ import { APP_CONFIG } from "@/lib/constants";
 import { useSession } from "next-auth/react";
 import { LogoutDialog } from "@/components/auth/logout-dialog";
 import { useMyEmployee } from "@/lib/auth/use-my-employee";
-import { SCOPES } from "@/lib/auth/scopes";
+import { useMyIdentity } from "@/lib/auth/use-my-identity";
+import { useMyOrgRole } from "@/lib/auth/use-my-org-role";
 
 export function ProfileView() {
   const { theme, setTheme } = useTheme();
@@ -44,10 +45,9 @@ export function ProfileView() {
   }, []);
 
   const user = session?.user as any;
-  const scopes: string[] = ((session as any)?.scopes ?? []) as string[];
-  const isAdmin = scopes.some((s) =>
-    [SCOPES.SYSTEM_ADMIN, SCOPES.ORG_ADMIN].includes(s as any),
-  );
+  const { identity } = useMyIdentity();
+  const { role } = useMyOrgRole();
+  const isAdmin = !!identity?.isSystemAdmin || role.isOrgAdmin;
 
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const handleLogout = () => setIsLogoutDialogOpen(true);

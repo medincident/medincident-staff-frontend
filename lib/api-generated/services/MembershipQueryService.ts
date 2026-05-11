@@ -2,11 +2,11 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { rpcStatus } from '../models/rpcStatus';
 import type { v1CountEmployeesByClinicResponse } from '../models/v1CountEmployeesByClinicResponse';
 import type { v1CountEmployeesByDepartmentResponse } from '../models/v1CountEmployeesByDepartmentResponse';
 import type { v1CountEmployeesByOrganizationResponse } from '../models/v1CountEmployeesByOrganizationResponse';
 import type { v1CountVacationsByEmployeeResponse } from '../models/v1CountVacationsByEmployeeResponse';
+import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetClinicHeadResponse } from '../models/v1GetClinicHeadResponse';
 import type { v1GetDepartmentResponsibleResponse } from '../models/v1GetDepartmentResponsibleResponse';
 import type { v1GetEmployeeResponse } from '../models/v1GetEmployeeResponse';
@@ -22,7 +22,7 @@ import type { v1SearchEmployeesByOrganizationResponse } from '../models/v1Search
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
-export class MembershipQueryServiceService {
+export class MembershipQueryService {
     /**
      * @param clinicId
      * @param limit
@@ -34,17 +34,17 @@ export class MembershipQueryServiceService {
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
      * @returns v1ListEmployeesByClinicResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListEmployeesByClinic(
+    public static membershipQueryListEmployeesByClinic(
         clinicId: string,
         limit?: number,
         offset?: number,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
-    ): CancelablePromise<v1ListEmployeesByClinicResponse | rpcStatus> {
+    ): CancelablePromise<v1ListEmployeesByClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/clinics/{clinicId}/employees',
@@ -58,6 +58,12 @@ export class MembershipQueryServiceService {
                 'onVacation': onVacation,
                 'position': position,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -69,15 +75,15 @@ export class MembershipQueryServiceService {
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
      * @returns v1CountEmployeesByClinicResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceCountEmployeesByClinic(
+    public static membershipQueryCountEmployeesByClinic(
         clinicId: string,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
-    ): CancelablePromise<v1CountEmployeesByClinicResponse | rpcStatus> {
+    ): CancelablePromise<v1CountEmployeesByClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/clinics/{clinicId}/employees:count',
@@ -89,22 +95,34 @@ export class MembershipQueryServiceService {
                 'onVacation': onVacation,
                 'position': position,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param clinicId
      * @returns v1GetClinicHeadResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceGetClinicHead(
+    public static membershipQueryGetClinicHead(
         clinicId: string,
-    ): CancelablePromise<v1GetClinicHeadResponse | rpcStatus> {
+    ): CancelablePromise<v1GetClinicHeadResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/clinics/{clinicId}/head',
             path: {
                 'clinicId': clinicId,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -119,17 +137,17 @@ export class MembershipQueryServiceService {
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
      * @returns v1ListEmployeesByDepartmentResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListEmployeesByDepartment(
+    public static membershipQueryListEmployeesByDepartment(
         departmentId: string,
         limit?: number,
         offset?: number,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
-    ): CancelablePromise<v1ListEmployeesByDepartmentResponse | rpcStatus> {
+    ): CancelablePromise<v1ListEmployeesByDepartmentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/departments/{departmentId}/employees',
@@ -143,6 +161,12 @@ export class MembershipQueryServiceService {
                 'onVacation': onVacation,
                 'position': position,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -154,15 +178,15 @@ export class MembershipQueryServiceService {
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
      * @returns v1CountEmployeesByDepartmentResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceCountEmployeesByDepartment(
+    public static membershipQueryCountEmployeesByDepartment(
         departmentId: string,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
-    ): CancelablePromise<v1CountEmployeesByDepartmentResponse | rpcStatus> {
+    ): CancelablePromise<v1CountEmployeesByDepartmentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/departments/{departmentId}/employees:count',
@@ -174,22 +198,34 @@ export class MembershipQueryServiceService {
                 'onVacation': onVacation,
                 'position': position,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param departmentId
      * @returns v1GetDepartmentResponsibleResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceGetDepartmentResponsible(
+    public static membershipQueryGetDepartmentResponsible(
         departmentId: string,
-    ): CancelablePromise<v1GetDepartmentResponsibleResponse | rpcStatus> {
+    ): CancelablePromise<v1GetDepartmentResponsibleResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/departments/{departmentId}/responsible',
             path: {
                 'departmentId': departmentId,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -200,15 +236,15 @@ export class MembershipQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListVacationsByEmployeeResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListVacationsByEmployee(
+    public static membershipQueryListVacationsByEmployee(
         employeeId: string,
         state?: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListVacationsByEmployeeResponse | rpcStatus> {
+    ): CancelablePromise<v1ListVacationsByEmployeeResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/employees/{employeeId}/vacations',
@@ -220,6 +256,12 @@ export class MembershipQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -227,13 +269,13 @@ export class MembershipQueryServiceService {
      * @param state Optional state filter. When empty, counts all states.
      * Valid values: scheduled, active, ended, cancelled.
      * @returns v1CountVacationsByEmployeeResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceCountVacationsByEmployee(
+    public static membershipQueryCountVacationsByEmployee(
         employeeId: string,
         state?: string,
-    ): CancelablePromise<v1CountVacationsByEmployeeResponse | rpcStatus> {
+    ): CancelablePromise<v1CountVacationsByEmployeeResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/employees/{employeeId}/vacations:count',
@@ -243,22 +285,36 @@ export class MembershipQueryServiceService {
             query: {
                 'state': state,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param id
      * @returns v1GetEmployeeResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceGetEmployee(
+    public static membershipQueryGetEmployee(
         id: string,
-    ): CancelablePromise<v1GetEmployeeResponse | rpcStatus> {
+    ): CancelablePromise<v1GetEmployeeResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/employees/{id}',
             path: {
                 'id': id,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`employee_card_not_found\` — employee with the given ID does not exist.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -267,14 +323,14 @@ export class MembershipQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListOrgAdminsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListOrgAdmins(
+    public static membershipQueryListOrgAdmins(
         organizationId: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListOrgAdminsResponse | rpcStatus> {
+    ): CancelablePromise<v1ListOrgAdminsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/admins',
@@ -285,6 +341,12 @@ export class MembershipQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -292,14 +354,14 @@ export class MembershipQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListOrgDispatchersResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListOrgDispatchers(
+    public static membershipQueryListOrgDispatchers(
         organizationId: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListOrgDispatchersResponse | rpcStatus> {
+    ): CancelablePromise<v1ListOrgDispatchersResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/dispatchers',
@@ -309,6 +371,12 @@ export class MembershipQueryServiceService {
             query: {
                 'limit': limit,
                 'offset': offset,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -323,17 +391,17 @@ export class MembershipQueryServiceService {
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
      * @returns v1ListEmployeesByOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListEmployeesByOrganization(
+    public static membershipQueryListEmployeesByOrganization(
         organizationId: string,
         limit?: number,
         offset?: number,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
-    ): CancelablePromise<v1ListEmployeesByOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1ListEmployeesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/employees',
@@ -347,6 +415,12 @@ export class MembershipQueryServiceService {
                 'onVacation': onVacation,
                 'position': position,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -358,15 +432,15 @@ export class MembershipQueryServiceService {
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
      * @returns v1CountEmployeesByOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceCountEmployeesByOrganization(
+    public static membershipQueryCountEmployeesByOrganization(
         organizationId: string,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
-    ): CancelablePromise<v1CountEmployeesByOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1CountEmployeesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/employees:count',
@@ -377,6 +451,12 @@ export class MembershipQueryServiceService {
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -397,10 +477,10 @@ export class MembershipQueryServiceService {
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
      * @returns v1SearchEmployeesByOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceSearchEmployeesByOrganization(
+    public static membershipQuerySearchEmployeesByOrganization(
         organizationId: string,
         query?: string,
         limit?: number,
@@ -408,7 +488,7 @@ export class MembershipQueryServiceService {
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
-    ): CancelablePromise<v1SearchEmployeesByOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1SearchEmployeesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/employees:search',
@@ -423,6 +503,12 @@ export class MembershipQueryServiceService {
                 'onVacation': onVacation,
                 'position': position,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -430,14 +516,14 @@ export class MembershipQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListOrgHeadsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListOrgHeads(
+    public static membershipQueryListOrgHeads(
         organizationId: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListOrgHeadsResponse | rpcStatus> {
+    ): CancelablePromise<v1ListOrgHeadsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/heads',
@@ -448,25 +534,37 @@ export class MembershipQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param limit
      * @param offset
      * @returns v1ListSystemAdminsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static membershipQueryServiceListSystemAdmins(
+    public static membershipQueryListSystemAdmins(
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListSystemAdminsResponse | rpcStatus> {
+    ): CancelablePromise<v1ListSystemAdminsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/system-admins',
             query: {
                 'limit': limit,
                 'offset': offset,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }

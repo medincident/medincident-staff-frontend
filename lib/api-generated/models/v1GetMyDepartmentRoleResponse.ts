@@ -2,4 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type protobufAny = Record<string, any>;
+export type v1GetMyDepartmentRoleResponse = {
+    isDepartmentResponsible?: boolean;
+};
+

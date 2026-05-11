@@ -19,8 +19,8 @@ import {
 import { notify } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import {
-  IncidentClassifierQueryServiceService,
-  IncidentClassifierCommandServiceService,
+  IncidentClassifierQueryService,
+  IncidentClassifierCommandService,
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { cleanText } from "@/lib/text";
@@ -65,7 +65,7 @@ export function IncidentClassifierView() {
     if (!organizationId) return;
     try {
       setIsLoading(true);
-      const result = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(organizationId, 100);
+      const result = await IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(organizationId, 100);
       const fetchedCats = (result as any).items || [];
 
       const filtered = search
@@ -76,7 +76,7 @@ export function IncidentClassifierView() {
 
       const typesResults = await Promise.all(
         filtered.map((cat: any) =>
-          IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(cat.id, 100)
+          IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(cat.id, 100)
             .then(res => ({ id: cat.id, types: (res as any).items || [] }))
             .catch(() => ({ id: cat.id, types: [] }))
         )
@@ -120,12 +120,12 @@ export function IncidentClassifierView() {
     setIsSaving(true);
     try {
       if (editingItem) {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceUpdateIncidentCategoryDetails(editingItem.id, {
+        await IncidentClassifierCommandService.incidentClassifierCommandUpdateIncidentCategoryDetails(editingItem.id, {
           name,
           ...(description !== undefined ? { description } : {}),
         });
       } else {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceCreateIncidentCategory(organizationId, {
+        await IncidentClassifierCommandService.incidentClassifierCommandCreateIncidentCategory(organizationId, {
           name,
           ...(description !== undefined ? { description } : {}),
           ...(targetCategoryId ? { parentCategoryId: targetCategoryId } : {}),
@@ -135,7 +135,7 @@ export function IncidentClassifierView() {
       setIsCategoryDialogOpen(false);
       loadCategories();
     } catch (e) {
-      notify.mutationError("Ошибка", "Не удалось сохранить категорию.");
+      notify.apiError(e, "Не удалось сохранить категорию");
     } finally {
       setIsSaving(false);
     }
@@ -144,26 +144,26 @@ export function IncidentClassifierView() {
   const toggleCategoryStatus = async (id: string, currentStatus: boolean) => {
     try {
       if (currentStatus) {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeactivateIncidentCategory(id);
+        await IncidentClassifierCommandService.incidentClassifierCommandDeactivateIncidentCategory(id);
         notify.mutationSuccess("Категория деактивирована", "Категория скрыта из активного справочника.");
       } else {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceReactivateIncidentCategory(id);
+        await IncidentClassifierCommandService.incidentClassifierCommandReactivateIncidentCategory(id);
         notify.mutationSuccess("Категория активирована", "Категория снова доступна для использования.");
       }
       loadCategories();
     } catch (e) {
-      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус категории.");
+      notify.apiError(e, "Не удалось обновить статус категории");
     }
   };
 
   const deleteCategory = async (id: string) => {
     if (confirm("Удалить категорию и все ее подкатегории/типы?")) {
       try {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeleteIncidentCategory(id);
+        await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentCategory(id);
         notify.mutationSuccess("Категория удалена", "Запись категории удалена из справочника.");
         loadCategories();
       } catch (e) {
-        notify.mutationError("Ошибка удаления", "Не удалось удалить категорию. Проверьте, что в ней нет связанных данных.");
+        notify.apiError(e, "Не удалось удалить категорию");
       }
     }
   };
@@ -190,34 +190,34 @@ export function IncidentClassifierView() {
     setIsSaving(true);
     try {
       if (editingItem) {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceUpdateIncidentTypeDetails(editingItem.id, {
+        await IncidentClassifierCommandService.incidentClassifierCommandUpdateIncidentTypeDetails(editingItem.id, {
           name,
           ...(description !== undefined ? { description } : {}),
         });
         // Обновляем разрешение для пациентов отдельным вызовом
         if (newItemPatientCanReport) {
-          await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceAllowIncidentTypeForPatients(editingItem.id).catch(() => {});
+          await IncidentClassifierCommandService.incidentClassifierCommandAllowIncidentTypeForPatients(editingItem.id).catch(() => {});
         } else {
-          await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDisallowIncidentTypeForPatients(editingItem.id).catch(() => {});
+          await IncidentClassifierCommandService.incidentClassifierCommandDisallowIncidentTypeForPatients(editingItem.id).catch(() => {});
         }
       } else {
-        const res = await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceCreateIncidentType(targetCategoryId, {
+        const res = await IncidentClassifierCommandService.incidentClassifierCommandCreateIncidentType(targetCategoryId, {
           name,
           ...(description !== undefined ? { description } : {}),
         });
         const newTypeId = (res as any).id;
         if (newTypeId && newItemPatientCanReport) {
-          await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceAllowIncidentTypeForPatients(newTypeId).catch(() => {});
+          await IncidentClassifierCommandService.incidentClassifierCommandAllowIncidentTypeForPatients(newTypeId).catch(() => {});
         }
       }
 
-      const typesResult = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(targetCategoryId, 100);
+      const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(targetCategoryId, 100);
       setTypesMap(prev => ({ ...prev, [targetCategoryId!]: (typesResult as any).items || [] }));
 
       notify.mutationSuccess("Сохранено", "Тип события сохранён в справочнике.");
       setIsTypeDialogOpen(false);
     } catch (e) {
-      notify.mutationError("Ошибка", "Не удалось сохранить тип события.");
+      notify.apiError(e, "Не удалось сохранить тип события");
     } finally {
       setIsSaving(false);
     }
@@ -226,28 +226,28 @@ export function IncidentClassifierView() {
   const toggleTypeStatus = async (typeId: string, categoryId: string, currentStatus: boolean) => {
     try {
       if (currentStatus) {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeactivateIncidentType(typeId);
+        await IncidentClassifierCommandService.incidentClassifierCommandDeactivateIncidentType(typeId);
         notify.mutationSuccess("Тип события деактивирован", "Тип скрыт из активного справочника.");
       } else {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceReactivateIncidentType(typeId);
+        await IncidentClassifierCommandService.incidentClassifierCommandReactivateIncidentType(typeId);
         notify.mutationSuccess("Тип события активирован", "Тип снова доступен для использования.");
       }
-      const typesResult = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(categoryId, 100);
+      const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
       setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
     } catch (e) {
-      notify.mutationError("Ошибка изменения статуса", "Не удалось обновить статус типа события.");
+      notify.apiError(e, "Не удалось обновить статус типа");
     }
   };
 
   const deleteType = async (typeId: string, categoryId: string) => {
     if (confirm("Удалить этот тип события?")) {
       try {
-        await IncidentClassifierCommandServiceService.incidentClassifierCommandServiceDeleteIncidentType(typeId);
-        const typesResult = await IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListTypesByCategory(categoryId, 100);
+        await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentType(typeId);
+        const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
         setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
         notify.mutationSuccess("Тип удалён", "Запись типа события удалена из справочника.");
       } catch (e) {
-        notify.mutationError("Ошибка удаления", "Не удалось удалить тип события.");
+        notify.apiError(e, "Не удалось удалить тип события");
       }
     }
   };

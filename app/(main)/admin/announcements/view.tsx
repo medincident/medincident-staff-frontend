@@ -41,8 +41,8 @@ import {
 import { notify } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
-  AnnouncementCommandServiceService,
-  AnnouncementQueryServiceService,
+  AnnouncementCommandService,
+  AnnouncementQueryService,
   commandAnnouncementV1AnnouncementPriority,
   v1AnnouncementView,
 } from "@/lib/api-generated";
@@ -117,7 +117,7 @@ export function AnnouncementsView() {
   const loadAnnouncements = async (orgId: string) => {
     setIsLoading(true);
     try {
-      const res = await AnnouncementQueryServiceService.announcementQueryServiceListAnnouncementsForOrganization(
+      const res = await AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(
         orgId,
         includeArchived,
         "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
@@ -194,7 +194,7 @@ export function AnnouncementsView() {
     setIsSaving(true);
     try {
       if (editingId) {
-        await AnnouncementCommandServiceService.announcementCommandServiceUpdateAnnouncement(editingId, {
+        await AnnouncementCommandService.announcementCommandUpdateAnnouncement(editingId, {
           title,
           content,
           startsAt: inputToIso(form.startsAt),
@@ -202,13 +202,13 @@ export function AnnouncementsView() {
         });
         const original = items.find((i) => i.id === editingId);
         if (original && (original.priority as any) !== form.priority) {
-          await AnnouncementCommandServiceService.announcementCommandServiceUpdateAnnouncementPriority(editingId, {
+          await AnnouncementCommandService.announcementCommandUpdateAnnouncementPriority(editingId, {
             priority: form.priority,
           });
         }
         notify.mutationSuccess("Объявление обновлено", "Изменения сохранены.");
       } else {
-        await AnnouncementCommandServiceService.announcementCommandServiceCreateAnnouncement({
+        await AnnouncementCommandService.announcementCommandCreateAnnouncement({
           organizationId,
           title,
           content,
@@ -222,7 +222,7 @@ export function AnnouncementsView() {
       void loadAnnouncements(organizationId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось сохранить объявление.");
+      notify.apiError(e, "Не удалось сохранить объявление");
     } finally {
       setIsSaving(false);
     }
@@ -234,24 +234,24 @@ export function AnnouncementsView() {
       return;
     }
     try {
-      await AnnouncementCommandServiceService.announcementCommandServiceArchiveAnnouncement(a.id);
+      await AnnouncementCommandService.announcementCommandArchiveAnnouncement(a.id);
       notify.mutationSuccess("Объявление архивировано", "");
       void loadAnnouncements(organizationId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось архивировать объявление.");
+      notify.apiError(e, "Не удалось архивировать объявление");
     }
   };
 
   const handleUnarchive = async (a: v1AnnouncementView) => {
     if (!a.id || !organizationId) return;
     try {
-      await AnnouncementCommandServiceService.announcementCommandServiceUnarchiveAnnouncement(a.id);
+      await AnnouncementCommandService.announcementCommandUnarchiveAnnouncement(a.id);
       notify.mutationSuccess("Объявление восстановлено", "Снова видно сотрудникам.");
       void loadAnnouncements(organizationId);
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось восстановить объявление.");
+      notify.apiError(e, "Не удалось восстановить объявление");
     }
   };
 

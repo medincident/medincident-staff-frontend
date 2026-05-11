@@ -23,15 +23,16 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
 
 import {
-  IncidentQueryServiceService,
-  IncidentCommandServiceService,
-  IncidentClassifierQueryServiceService,
+  IncidentQueryService,
+  IncidentCommandService,
+  IncidentClassifierQueryService,
   v1Category,
   classifierV1Type,
   v1IncidentView
 } from "@/lib/api-generated";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { useRequirePermission } from "@/lib/auth/use-require-permission";
 import { cleanText } from "@/lib/text";
 
 const formSchema = z.object({
@@ -51,6 +52,8 @@ export function EventForm({ eventId }: EventFormProps) {
   const { data: session } = useSession();
   const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
   const isEditMode = !!eventId;
+  // Создание/редактирование события — только для сотрудников орги.
+  useRequirePermission("canCreateIncident");
 
   const [categories, setCategories] = useState<v1Category[]>([]);
   const [types, setTypes] = useState<classifierV1Type[]>([]);
@@ -90,8 +93,8 @@ export function EventForm({ eventId }: EventFormProps) {
 
         if (currentOrgId) {
           const [catsRes, typesRes] = await Promise.all([
-            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListCategoriesByOrganization(currentOrgId, 100),
-            IncidentClassifierQueryServiceService.incidentClassifierQueryServiceListActiveTypesByOrganization(currentOrgId, 100)
+            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(currentOrgId, 100),
+            IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(currentOrgId, 100)
           ]);
           if (catsRes && "items" in catsRes && catsRes.items) {
             setCategories(catsRes.items);
@@ -102,7 +105,7 @@ export function EventForm({ eventId }: EventFormProps) {
         }
 
         if (isEditMode && eventId) {
-          const incidentRes = await IncidentQueryServiceService.incidentQueryServiceGetIncident(eventId);
+          const incidentRes = await IncidentQueryService.incidentQueryGetIncident(eventId);
           if (!incidentRes || !("incident" in incidentRes) || !incidentRes.incident) {
             setNotFound(true);
           } else {
@@ -134,6 +137,13 @@ export function EventForm({ eventId }: EventFormProps) {
   }, [selectedCategoryId, types]);
 
   async function onSubmit(values: EventFormValues) {
+    if (!isEditMode && !employeeDeptId) {
+      notify.error(
+        "Нет привязки к отделению",
+        "Чтобы создать инцидент, вы должны быть сотрудником одной из клиник этой организации. Попросите администратора нанять вас через раздел «Пользователи».",
+      );
+      return;
+    }
     setIsSubmitting(true);
     try {
       const description = cleanText(values.description);
@@ -144,14 +154,14 @@ export function EventForm({ eventId }: EventFormProps) {
           setIsSubmitting(false);
           return;
         }
-        await IncidentCommandServiceService.incidentCommandServiceUpdateIncidentDescription(existingEvent.id, {
+        await IncidentCommandService.incidentCommandUpdateIncidentDescription(existingEvent.id, {
           description,
         });
         notify.mutationSuccess("Изменения сохранены", "Данные события обновлены.");
       } else {
         // Бэк-валидация CreateIncident.description: omitnil, min=1, max=10000.
         // Пустую строку НЕ шлём — иначе omitnil не сработает и упадёт на min=1.
-        await IncidentCommandServiceService.incidentCommandServiceCreateIncident({
+        await IncidentCommandService.incidentCommandCreateIncident({
           departmentId: employeeDeptId,
           categoryId: values.categoryId,
           typeId: values.typeId,
@@ -218,6 +228,16 @@ export function EventForm({ eventId }: EventFormProps) {
           {isEditMode ? `Редактирование события` : "Новое событие"}
         </h1>
       </div>
+
+      {!isEditMode && !isLoading && !employeeDeptId && (
+        <div className="mb-4 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-foreground">
+          <p className="font-medium">Нет привязки к отделению в активной организации.</p>
+          <p className="text-xs text-muted-foreground mt-1 leading-snug">
+            Создавать инциденты могут только сотрудники этой организации.
+            Попросите администратора нанять вас через раздел «Пользователи».
+          </p>
+        </div>
+      )}
 
       <div className="bg-card p-6 rounded-xl border">
         <Form {...form}>
@@ -298,7 +318,11 @@ export function EventForm({ eventId }: EventFormProps) {
               )}
             />
 
-            <Button type="submit" disabled={isSubmitting || isLoading} className="w-full h-12 text-lg">
+            <Button
+              type="submit"
+              disabled={isSubmitting || isLoading || (!isEditMode && !employeeDeptId)}
+              className="w-full h-12 text-lg"
+            >
               {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : isEditMode ? (
                 <><Save className="mr-2 h-5 w-5" /> Сохранить изменения</>
               ) : (

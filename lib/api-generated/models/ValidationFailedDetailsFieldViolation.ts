@@ -2,10 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { protobufAny } from './protobufAny';
-export type rpcStatus = {
-    code?: number;
+export type ValidationFailedDetailsFieldViolation = {
+    field?: string;
+    rule?: string;
     message?: string;
-    details?: Array<protobufAny>;
+    param?: string;
 };
 

@@ -57,7 +57,6 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, account, profile }) {
       if (account) {
         const p = profile as Record<string, any> | undefined;
-        const rolesObj = p?.["urn:zitadel:iam:org:project:roles"];
 
         // name/email/picture в id_token приходят только при включённом
         // "Include user's profile info in the ID Token". Чтобы не зависеть
@@ -105,7 +104,6 @@ export const authOptions: NextAuthOptions = {
           expiresAt: account.expires_at
             ? account.expires_at * 1000
             : Date.now() + 3600 * 1000,
-          scopes: rolesObj ? Object.keys(rolesObj) : ["worker"],
         };
       }
 
@@ -116,9 +114,9 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.sub as string;
-        (session as any).scopes = token.scopes;
         // Шлём оба токена: бэк валидирует id_token (JWT), а access_token
-        // в Zitadel может прийти opaque.
+        // в Zitadel может прийти opaque. Доменные роли больше не лежат
+        // в session — фронт спрашивает их у бэка через SelfQueryService.
         (session as any).idToken = token.idToken;
         (session as any).accessToken = token.accessToken;
         (session as any).error = token.error;

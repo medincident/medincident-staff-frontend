@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { SCOPES } from "@/lib/auth/scopes";
+import { usePermissions, type PermissionKey } from "@/lib/auth/use-permissions";
 import {
   AlertTriangle,
   BarChart3,
@@ -14,7 +13,8 @@ import {
   Building,
   UserCheck,
   Network,
-  Wrench
+  Wrench,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_CONFIG } from "@/lib/constants";
@@ -22,30 +22,84 @@ import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
 import { useMiniApp } from "@/lib/miniapp";
 import { OrgScopePicker } from "@/components/layout/org-scope-picker";
 
+interface NavLink {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /**
+   * Любой из этих permission'ов делает ссылку видимой. Если не задан —
+   * ссылка видна всем авторизованным.
+   */
+  can?: PermissionKey | PermissionKey[];
+}
+
+const MAIN_LINKS: NavLink[] = [
+  { href: "/dashboard", label: "Главная", icon: LayoutDashboard },
+  {
+    href: "/events",
+    label: "События",
+    icon: AlertTriangle,
+    can: ["canSeeOwnIncidents", "canSeeAllIncidents"],
+  },
+  {
+    href: "/requests",
+    label: "Заявки",
+    icon: Wrench,
+    can: ["canSeeOwnRequests", "canSeeAllRequests"],
+  },
+  { href: "/reports", label: "Отчеты", icon: BarChart3, can: "canViewReports" },
+];
+
+const ADMIN_LINKS: NavLink[] = [
+  {
+    href: "/admin/organizations",
+    label: "Организации",
+    icon: Network,
+    can: "canManageOrganizations",
+  },
+  {
+    href: "/admin/structure",
+    label: "Структура",
+    icon: Building,
+    can: "canManageOrgStructure",
+  },
+  {
+    href: "/admin/department",
+    label: "Подразделение",
+    icon: UserCheck,
+    can: "canManageDepartmentSettings",
+  },
+  {
+    href: "/admin/classifier",
+    label: "Классификатор",
+    icon: Shield,
+    can: "canManageClassifiers",
+  },
+  {
+    href: "/admin/announcements",
+    label: "Объявления",
+    icon: Megaphone,
+    can: "canManageAnnouncements",
+  },
+  { href: "/admin/users", label: "Пользователи", icon: Users, can: "canManageOrgUsers" },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const perms = usePermissions();
   const miniApp = useMiniApp();
-  
-  const isAdmin = (session as any)?.scopes?.includes(SCOPES.SYSTEM_ADMIN) || (session as any)?.scopes?.includes(SCOPES.ORG_ADMIN);
 
   if (miniApp) return null;
 
-  const mainLinks = [
-    { href: "/dashboard", label: "Главная", icon: LayoutDashboard },
-    { href: "/events", label: "События", icon: AlertTriangle },
-    { href: "/requests", label: "Заявки", icon: Wrench },
-    { href: "/reports", label: "Отчеты", icon: BarChart3 },
-  ];
+  const isVisible = (link: NavLink) => {
+    if (!link.can) return true;
+    const keys = Array.isArray(link.can) ? link.can : [link.can];
+    return keys.some((k) => !!perms[k]);
+  };
 
-  const adminLinks = [
-    { href: "/admin/organizations", label: "Организации", icon: Network },
-    { href: "/admin/structure", label: "Структура", icon: Building },
-    { href: "/admin/department", label: "Подразделение", icon: UserCheck },
-    { href: "/admin/classifier", label: "Классификатор", icon: Shield },
-    { href: "/admin/announcements", label: "Объявления", icon: Megaphone },
-    { href: "/admin/users", label: "Пользователи", icon: Users },
-  ];
+  const mainLinks = MAIN_LINKS.filter(isVisible);
+  const adminLinks = ADMIN_LINKS.filter(isVisible);
+  const showAdminSection = adminLinks.length > 0;
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r bg-card h-screen sticky top-0 z-20 transition-colors duration-300">
@@ -98,7 +152,7 @@ export function Sidebar() {
         </div>
 
         {/* АДМИН ПАНЕЛЬ */}
-        {isAdmin && (
+        {showAdminSection && (
           <div>
              <h3 className="mb-2 px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
                 Администрирование

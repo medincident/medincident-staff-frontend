@@ -53,6 +53,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://patient-medincident.ulbwa.bombomeow.ru/api/v1' }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://patient-medincident.ulbwa.bombomeow.ru/api' }}
             NEXT_PUBLIC_ZITADEL_ISSUER=${{ vars.NEXT_PUBLIC_ZITADEL_ISSUER || 'https://zitadel-medincident.ulbwa.bombomeow.ru' }}
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}

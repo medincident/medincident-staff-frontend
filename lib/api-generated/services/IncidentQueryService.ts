@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { rpcStatus } from '../models/rpcStatus';
+import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetBufferEntryResponse } from '../models/v1GetBufferEntryResponse';
 import type { v1GetIncidentHistoryResponse } from '../models/v1GetIncidentHistoryResponse';
 import type { v1GetIncidentResponse } from '../models/v1GetIncidentResponse';
@@ -13,38 +13,54 @@ import type { v1ListMyIncidentsResponse } from '../models/v1ListMyIncidentsRespo
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
-export class IncidentQueryServiceService {
+export class IncidentQueryService {
     /**
      * @param id
      * @returns v1GetIncidentResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentQueryServiceGetIncident(
+    public static incidentQueryGetIncident(
         id: string,
-    ): CancelablePromise<v1GetIncidentResponse | rpcStatus> {
+    ): CancelablePromise<v1GetIncidentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/incidents/{id}',
             path: {
                 'id': id,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`incident_query_not_found\` — incident with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param incidentId
      * @returns v1GetIncidentHistoryResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentQueryServiceGetIncidentHistory(
+    public static incidentQueryGetIncidentHistory(
         incidentId: string,
-    ): CancelablePromise<v1GetIncidentHistoryResponse | rpcStatus> {
+    ): CancelablePromise<v1GetIncidentHistoryResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/incidents/{incidentId}/history',
             path: {
                 'incidentId': incidentId,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`incident_query_not_found\` — incident with the given ID does not exist.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -52,19 +68,25 @@ export class IncidentQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListMyIncidentsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentQueryServiceListMyIncidents(
+    public static incidentQueryListMyIncidents(
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListMyIncidentsResponse | rpcStatus> {
+    ): CancelablePromise<v1ListMyIncidentsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/incidents:mine',
             query: {
                 'limit': limit,
                 'offset': offset,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -81,10 +103,10 @@ export class IncidentQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListIncidentsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentQueryServiceListIncidents(
+    public static incidentQueryListIncidents(
         organizationId: string,
         statuses?: Array<string>,
         priorities?: Array<string>,
@@ -96,7 +118,7 @@ export class IncidentQueryServiceService {
         occurredTo?: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListIncidentsResponse | rpcStatus> {
+    ): CancelablePromise<v1ListIncidentsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/organizations/{organizationId}/incidents',
@@ -115,6 +137,12 @@ export class IncidentQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -123,15 +151,15 @@ export class IncidentQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListBufferEntriesResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentQueryServiceListBufferEntries(
+    public static incidentQueryListBufferEntries(
         organizationId: string,
         statuses?: Array<string>,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListBufferEntriesResponse | rpcStatus> {
+    ): CancelablePromise<v1ListBufferEntriesResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/organizations/{organizationId}/patient-incidents',
@@ -143,23 +171,37 @@ export class IncidentQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * Buffer reads.
      * @param id
      * @returns v1GetBufferEntryResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentQueryServiceGetBufferEntry(
+    public static incidentQueryGetBufferEntry(
         id: string,
-    ): CancelablePromise<v1GetBufferEntryResponse | rpcStatus> {
+    ): CancelablePromise<v1GetBufferEntryResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/patient-incidents/{id}',
             path: {
                 'id': id,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`buffer_query_not_found\` — patient incident with the given ID does not exist.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -167,19 +209,25 @@ export class IncidentQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListMyBufferEntriesResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentQueryServiceListMyBufferEntries(
+    public static incidentQueryListMyBufferEntries(
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListMyBufferEntriesResponse | rpcStatus> {
+    ): CancelablePromise<v1ListMyBufferEntriesResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/patient-incidents:mine',
             query: {
                 'limit': limit,
                 'offset': offset,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }

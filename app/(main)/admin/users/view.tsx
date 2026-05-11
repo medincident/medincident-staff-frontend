@@ -35,9 +35,9 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { notify } from "@/lib/toast";
 import {
-  MembershipQueryServiceService,
-  MembershipCommandServiceService,
-  OrgStructureQueryServiceService,
+  MembershipQueryService,
+  MembershipCommandService,
+  OrgStructureQueryService,
 } from "@/lib/api-generated";
 import type { v1EmployeeCardView } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
@@ -103,10 +103,10 @@ export function UsersView() {
       const orgId = organizationId;
 
       const [usersListRes, adminsRes, headsRes, dispatchersRes] = await Promise.all([
-        MembershipQueryServiceService.membershipQueryServiceSearchEmployeesByOrganization(orgId, search || undefined, 50),
-        MembershipQueryServiceService.membershipQueryServiceListOrgAdmins(orgId, 100),
-        MembershipQueryServiceService.membershipQueryServiceListOrgHeads(orgId, 100),
-        MembershipQueryServiceService.membershipQueryServiceListOrgDispatchers(orgId, 100),
+        MembershipQueryService.membershipQuerySearchEmployeesByOrganization(orgId, search || undefined, 50),
+        MembershipQueryService.membershipQueryListOrgAdmins(orgId, 100),
+        MembershipQueryService.membershipQueryListOrgHeads(orgId, 100),
+        MembershipQueryService.membershipQueryListOrgDispatchers(orgId, 100),
       ]);
 
       if (usersListRes && "items" in usersListRes && usersListRes.items) {
@@ -126,10 +126,10 @@ export function UsersView() {
       }
 
       if (clinics.length === 0) {
-        const clinicsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListClinicsByOrganization(orgId, 100);
+        const clinicsRes = await OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(orgId, 100);
         if (clinicsRes && "items" in clinicsRes && clinicsRes.items) {
           const builtClinics = await Promise.all((clinicsRes.items as any[]).map(async (clinic: any) => {
-            const deptsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListDepartmentsByClinic(clinic.id, 100);
+            const deptsRes = await OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 100);
             return { ...clinic, departments: (deptsRes as any).items || [] };
           }));
           setClinics(builtClinics);
@@ -174,13 +174,13 @@ export function UsersView() {
       if (!currentUser) return;
 
       if (formData.departmentId && formData.departmentId !== currentUser.departmentId) {
-        await MembershipCommandServiceService.membershipCommandServiceUpdateEmployeeDepartment(editingUserId, {
+        await MembershipCommandService.membershipCommandUpdateEmployeeDepartment(editingUserId, {
           departmentId: formData.departmentId
         });
       }
 
       if (formData.position && formData.position !== currentUser.position) {
-        await MembershipCommandServiceService.membershipCommandServiceUpdateEmployeePosition(editingUserId, {
+        await MembershipCommandService.membershipCommandUpdateEmployeePosition(editingUserId, {
           position: formData.position
         });
       }
@@ -191,32 +191,32 @@ export function UsersView() {
         const wasDispatcher = orgDispatchers.includes(editingUserId);
 
         if (formData.isAdmin && !wasAdmin) {
-          await MembershipCommandServiceService.membershipCommandServiceAssignOrganizationAdmin(organizationId, {
+          await MembershipCommandService.membershipCommandAssignOrganizationAdmin(organizationId, {
             employeeId: editingUserId,
           });
         } else if (!formData.isAdmin && wasAdmin) {
-          await MembershipCommandServiceService.membershipCommandServiceRevokeOrganizationAdmin(organizationId, editingUserId);
+          await MembershipCommandService.membershipCommandRevokeOrganizationAdmin(organizationId, editingUserId);
         }
 
         if (formData.isOrgHead && !wasHead) {
-          await MembershipCommandServiceService.membershipCommandServiceAssignOrganizationHead(organizationId, {
+          await MembershipCommandService.membershipCommandAssignOrganizationHead(organizationId, {
             employeeId: editingUserId,
           });
         } else if (!formData.isOrgHead && wasHead) {
-          await MembershipCommandServiceService.membershipCommandServiceRevokeOrganizationHead(organizationId, editingUserId);
+          await MembershipCommandService.membershipCommandRevokeOrganizationHead(organizationId, editingUserId);
         }
 
         if (formData.isOrgDispatcher && !wasDispatcher) {
-          await MembershipCommandServiceService.membershipCommandServiceAssignOrganizationDispatcher(organizationId, {
+          await MembershipCommandService.membershipCommandAssignOrganizationDispatcher(organizationId, {
             employeeId: editingUserId,
           });
         } else if (!formData.isOrgDispatcher && wasDispatcher) {
-          await MembershipCommandServiceService.membershipCommandServiceRevokeOrganizationDispatcher(organizationId, editingUserId);
+          await MembershipCommandService.membershipCommandRevokeOrganizationDispatcher(organizationId, editingUserId);
         }
       }
 
       if (currentUser && !currentUser.terminatedAt && !formData.isActive) {
-        await MembershipCommandServiceService.membershipCommandServiceTerminateEmployee(editingUserId);
+        await MembershipCommandService.membershipCommandTerminateEmployee(editingUserId);
       }
 
       notify.mutationSuccess("Успешно", "Данные пользователя обновлены.");
@@ -224,7 +224,7 @@ export function UsersView() {
       loadData();
     } catch (e) {
       console.error(e);
-      notify.mutationError("Ошибка", "Не удалось сохранить изменения.");
+      notify.apiError(e, "Не удалось сохранить изменения");
     } finally {
       setIsSaving(false);
     }
@@ -233,25 +233,25 @@ export function UsersView() {
   const toggleUserStatus = async (id: string, isActive: boolean) => {
     try {
       if (isActive) {
-        await MembershipCommandServiceService.membershipCommandServiceTerminateEmployee(id);
+        await MembershipCommandService.membershipCommandTerminateEmployee(id);
         notify.mutationSuccess("Пользователь деактивирован", "Сотрудник уволен.");
         loadData();
       } else {
-        notify.mutationError("Ошибка", "Невозможно восстановить уволенного сотрудника.");
+        notify.error("Невозможно восстановить уволенного сотрудника", "Создайте новую запись.");
       }
     } catch (e) {
-      notify.mutationError("Ошибка", "Не удалось изменить статус пользователя.");
+      notify.apiError(e, "Не удалось изменить статус пользователя");
     }
   };
 
   const handleDeleteUser = async (id: string) => {
     if (confirm("Уволить сотрудника навсегда? Это действие нельзя отменить.")) {
       try {
-        await MembershipCommandServiceService.membershipCommandServiceTerminateEmployee(id);
+        await MembershipCommandService.membershipCommandTerminateEmployee(id);
         notify.mutationSuccess("Успешно", "Сотрудник уволен.");
         loadData();
       } catch (e) {
-        notify.mutationError("Ошибка удаления", "Возможно, пользователь связан с историческими данными.");
+        notify.apiError(e, "Не удалось удалить");
       }
     }
   };
@@ -276,7 +276,7 @@ export function UsersView() {
     }
     setIsHiring(true);
     try {
-      await MembershipCommandServiceService.membershipCommandServiceHireEmployee({
+      await MembershipCommandService.membershipCommandHireEmployee({
         zitadelUserId: hireForm.zitadelUserId.trim(),
         departmentId: hireForm.departmentId,
         position: hireForm.position.trim() || undefined,
@@ -285,8 +285,10 @@ export function UsersView() {
       setIsHireDialogOpen(false);
       loadData();
     } catch (e) {
-      console.error(e);
-      notify.mutationError("Ошибка", "Не удалось принять сотрудника. Проверьте Zitadel ID.");
+      // Бэк теперь возвращает осмысленные code/message — apiError сам
+      // распакует "employee_already_hired", "zitadel_user_not_found",
+      // "validation_failed" с violations и т.д.
+      notify.apiError(e, "Не удалось принять сотрудника");
     } finally {
       setIsHiring(false);
     }

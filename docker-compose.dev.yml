@@ -1,0 +1,50 @@
+name: medincident-staff-dev
+
+services:
+  nextjs:
+    image: node:20-alpine
+    container_name: nextjs_app
+    working_dir: /app
+    # При первом старте поставим зависимости в named volume.
+    # Дальнейшие старты быстрые — node_modules переиспользуется.
+    command: sh -c "[ -f node_modules/.package-lock.json ] || npm ci --prefer-offline --no-audit; npm run dev"
+    restart: unless-stopped
+    expose:
+      - "3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      # File-system watching через polling — иначе hot-reload не видит
+      # изменения с хоста (типичный bind-mount-gotcha).
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - .:/app
+      # node_modules и .next держим в named volumes, чтобы не пересекаться
+      # с продовским image-сборкой и не тащить из хоста (на хосте может
+      # быть ABI с другой архитектуры).
+      - dev_node_modules:/app/node_modules
+      - dev_next_cache:/app/.next
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx_gateway
+    restart: unless-stopped
+    ports:
+      - "8083:80"
+    networks:
+      - default
+      - proxy-network
+    volumes:
+      - ./deployment/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - nextjs
+
+volumes:
+  dev_node_modules:
+  dev_next_cache:
+
+networks:
+  proxy-network:
+    external: true

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Building, Check, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,50 +17,23 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { OrgStructureQueryServiceService } from "@/lib/api-generated";
-import { useActiveOrgId, type ActiveOrg } from "@/lib/auth/active-org-context";
+import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { cn } from "@/lib/utils";
 
-// Locked → плашка без выпадайки. Мульти-орг → выпадайка из myOrgs.
-// Sysadmin (нет employee-карточек) → выпадайка со всеми орг.
+// Picker всегда виден (для всех ролей). Список доступных орг приходит
+// из ActiveOrgProvider — для сотрудника это его employments, для
+// sysadmin'а — все организации.
 export function OrgScopePicker() {
-  const { orgId, setOrgId, isLocked, isResolving, myOrgs } = useActiveOrgId();
-  const [allOrgs, setAllOrgs] = useState<ActiveOrg[]>([]);
+  const { orgId, setOrgId, isResolving, availableOrgs } = useActiveOrgId();
   const [open, setOpen] = useState(false);
-
-  const isSysadminPicker = !isLocked && myOrgs.length === 0;
-  useEffect(() => {
-    if (isResolving) return;
-    if (!isSysadminPicker) return;
-    OrgStructureQueryServiceService.orgStructureQueryServiceListOrganizations(100)
-      .then((res) => {
-        const items = ((res as any)?.items ?? []) as Array<{ id?: string; name?: string }>;
-        setAllOrgs(
-          items
-            .filter((o) => o.id)
-            .map((o) => ({ id: o.id as string, name: o.name })),
-        );
-      })
-      .catch(() => setAllOrgs([]));
-  }, [isResolving, isSysadminPicker]);
 
   if (isResolving) {
     return <div className="h-9 rounded-md bg-muted/40 animate-pulse" aria-hidden />;
   }
 
-  const shownOrgs: ActiveOrg[] = isSysadminPicker ? allOrgs : myOrgs;
   const currentName =
-    shownOrgs.find((o) => o.id === orgId)?.name ??
+    availableOrgs.find((o) => o.id === orgId)?.name ??
     (orgId ? "—" : "Выберите организацию");
-
-  if (isLocked) {
-    return (
-      <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/40 text-xs">
-        <Building className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className="truncate text-foreground" title={currentName}>{currentName}</span>
-      </div>
-    );
-  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -88,7 +61,7 @@ export function OrgScopePicker() {
           <CommandList>
             <CommandEmpty>Организации не найдены</CommandEmpty>
             <CommandGroup>
-              {shownOrgs.map((o) => (
+              {availableOrgs.map((o) => (
                 <CommandItem
                   key={o.id}
                   value={o.name ?? ""}

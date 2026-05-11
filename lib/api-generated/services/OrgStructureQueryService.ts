@@ -2,10 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { rpcStatus } from '../models/rpcStatus';
 import type { v1CountClinicsByOrganizationResponse } from '../models/v1CountClinicsByOrganizationResponse';
 import type { v1CountDepartmentsByClinicResponse } from '../models/v1CountDepartmentsByClinicResponse';
 import type { v1CountOrganizationsResponse } from '../models/v1CountOrganizationsResponse';
+import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetClinicResponse } from '../models/v1GetClinicResponse';
 import type { v1GetDepartmentResponse } from '../models/v1GetDepartmentResponse';
 import type { v1GetOrganizationResponse } from '../models/v1GetOrganizationResponse';
@@ -16,20 +16,20 @@ import type { v1SearchOrganizationsResponse } from '../models/v1SearchOrganizati
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
-export class OrgStructureQueryServiceService {
+export class OrgStructureQueryService {
     /**
      * @param clinicId
      * @param limit
      * @param offset
      * @returns v1ListDepartmentsByClinicResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceListDepartmentsByClinic(
+    public static orgStructureQueryListDepartmentsByClinic(
         clinicId: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListDepartmentsByClinicResponse | rpcStatus> {
+    ): CancelablePromise<v1ListDepartmentsByClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/clinics/{clinicId}/departments',
@@ -40,56 +40,84 @@ export class OrgStructureQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param clinicId
      * @returns v1CountDepartmentsByClinicResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceCountDepartmentsByClinic(
+    public static orgStructureQueryCountDepartmentsByClinic(
         clinicId: string,
-    ): CancelablePromise<v1CountDepartmentsByClinicResponse | rpcStatus> {
+    ): CancelablePromise<v1CountDepartmentsByClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/clinics/{clinicId}/departments:count',
             path: {
                 'clinicId': clinicId,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param id
      * @returns v1GetClinicResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceGetClinic(
+    public static orgStructureQueryGetClinic(
         id: string,
-    ): CancelablePromise<v1GetClinicResponse | rpcStatus> {
+    ): CancelablePromise<v1GetClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/clinics/{id}',
             path: {
                 'id': id,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`clinic_not_found\` — clinic with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param id
      * @returns v1GetDepartmentResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceGetDepartment(
+    public static orgStructureQueryGetDepartment(
         id: string,
-    ): CancelablePromise<v1GetDepartmentResponse | rpcStatus> {
+    ): CancelablePromise<v1GetDepartmentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/departments/{id}',
             path: {
                 'id': id,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`department_not_found\` — department with the given ID does not exist.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -97,13 +125,13 @@ export class OrgStructureQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListOrganizationsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceListOrganizations(
+    public static orgStructureQueryListOrganizations(
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListOrganizationsResponse | rpcStatus> {
+    ): CancelablePromise<v1ListOrganizationsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations',
@@ -111,22 +139,36 @@ export class OrgStructureQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param id
      * @returns v1GetOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceGetOrganization(
+    public static orgStructureQueryGetOrganization(
         id: string,
-    ): CancelablePromise<v1GetOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1GetOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{id}',
             path: {
                 'id': id,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`organization_not_found\` — organization with the given ID does not exist.`,
+                500: `Unexpected server error.`,
             },
         });
     }
@@ -135,14 +177,14 @@ export class OrgStructureQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1ListClinicsByOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceListClinicsByOrganization(
+    public static orgStructureQueryListClinicsByOrganization(
         organizationId: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1ListClinicsByOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1ListClinicsByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/clinics',
@@ -153,34 +195,52 @@ export class OrgStructureQueryServiceService {
                 'limit': limit,
                 'offset': offset,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @param organizationId
      * @returns v1CountClinicsByOrganizationResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceCountClinicsByOrganization(
+    public static orgStructureQueryCountClinicsByOrganization(
         organizationId: string,
-    ): CancelablePromise<v1CountClinicsByOrganizationResponse | rpcStatus> {
+    ): CancelablePromise<v1CountClinicsByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/clinics:count',
             path: {
                 'organizationId': organizationId,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
      * @returns v1CountOrganizationsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceCountOrganizations(): CancelablePromise<v1CountOrganizationsResponse | rpcStatus> {
+    public static orgStructureQueryCountOrganizations(): CancelablePromise<v1CountOrganizationsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations:count',
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
+            },
         });
     }
     /**
@@ -188,14 +248,14 @@ export class OrgStructureQueryServiceService {
      * @param limit
      * @param offset
      * @returns v1SearchOrganizationsResponse A successful response.
-     * @returns rpcStatus An unexpected error response.
+     * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static orgStructureQueryServiceSearchOrganizations(
+    public static orgStructureQuerySearchOrganizations(
         query?: string,
         limit?: number,
         offset?: number,
-    ): CancelablePromise<v1SearchOrganizationsResponse | rpcStatus> {
+    ): CancelablePromise<v1SearchOrganizationsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations:search',
@@ -203,6 +263,12 @@ export class OrgStructureQueryServiceService {
                 'query': query,
                 'limit': limit,
                 'offset': offset,
+            },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Unexpected server error.`,
             },
         });
     }

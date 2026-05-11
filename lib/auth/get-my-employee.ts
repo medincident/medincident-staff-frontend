@@ -1,14 +1,13 @@
 import {
-  MembershipQueryServiceService,
-  OrgStructureQueryServiceService,
+  SelfQueryService,
   v1EmployeeCardView,
 } from "@/lib/api-generated";
 
-// ⚠️ ВРЕМЕННЫЙ ХАК — medincident-backend#146.
-// На бэке нет lookup'а employee по zitadel_user_id, поэтому перебираем
-// все организации и собираем матчи. UNIQUE(organization_id, zitadel_user_id)
-// допускает мульти-орг — отсюда массив. После фикса бэка заменить тело
-// `getMyEmployees` на один вызов нового RPC.
+// Источник данных — `SelfQueryService` бэка (PR medincident-backend#155):
+// `ListMyOrganizations` отдаёт орги, в которых юзер реально нанят, а
+// `GetMyEmployment(orgId)` — карточку сотрудника в конкретной орге.
+// Мы кэшируем карточки в sessionStorage по zitadelUserId, чтобы хук
+// useMyEmployee не дёргал сеть при каждом маунте.
 
 const CACHE_KEY_PREFIX = "myEmployees:";
 
@@ -33,11 +32,13 @@ function writeCache(zitadelUserId: string, items: v1EmployeeCardView[]): void {
 
 export function clearMyEmployeeCache(): void {
   if (typeof window === "undefined") return;
+  // Чистим всё связанное с identity/ролями/employees при logout — иначе
+  // следующий юзер на той же машине попадёт на чужой кэш.
+  const PREFIXES = [CACHE_KEY_PREFIX, "myEmployee:", "myIdentity:", "myOrgRole:"];
   for (let i = sessionStorage.length - 1; i >= 0; i--) {
     const key = sessionStorage.key(i);
-    if (key?.startsWith(CACHE_KEY_PREFIX)) sessionStorage.removeItem(key);
-    // Старый ключ single-employee из предыдущей версии хелпера.
-    if (key?.startsWith("myEmployee:")) sessionStorage.removeItem(key);
+    if (!key) continue;
+    if (PREFIXES.some((p) => key.startsWith(p))) sessionStorage.removeItem(key);
   }
 }
 
@@ -55,24 +56,24 @@ export async function getMyEmployees(
   inflight = (async () => {
     const found: v1EmployeeCardView[] = [];
     try {
-      const orgsRes = await OrgStructureQueryServiceService.orgStructureQueryServiceListOrganizations(100);
-      const orgs = (orgsRes as any)?.items ?? [];
+      const orgsRes = await SelfQueryService.selfQueryListMyOrganizations();
+      const orgs = ((orgsRes as any)?.items ?? []) as Array<{ id?: string }>;
 
-      for (const org of orgs) {
-        if (!org?.id) continue;
-        try {
-          const empRes = await MembershipQueryServiceService.membershipQueryServiceListEmployeesByOrganization(
-            org.id,
-            500,
-            undefined,
-            true,
-          );
-          const items = ((empRes as any)?.items ?? []) as v1EmployeeCardView[];
-          const match = items.find((e) => e.zitadelUserId === zitadelUserId);
-          if (match) found.push(match);
-        } catch {
-          // Нет прав на чтение employees этой орги — пропускаем.
-        }
+      // По одной orgId дёргаем GetMyEmployment — так возвращается полная
+      // карточка с departmentId/clinicId/position. Параллельно через
+      // Promise.all, чтобы не пилить N+1 последовательно.
+      const employments = await Promise.all(
+        orgs
+          .filter((o) => o.id)
+          .map((o) =>
+            SelfQueryService.selfQueryGetMyEmployment(o.id as string)
+              .then((res) => ((res as any)?.employee ?? null) as v1EmployeeCardView | null)
+              .catch(() => null),
+          ),
+      );
+
+      for (const emp of employments) {
+        if (emp) found.push(emp);
       }
       writeCache(zitadelUserId, found);
       return found;
