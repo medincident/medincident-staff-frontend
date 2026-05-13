@@ -5,5 +5,6 @@
 import type { v1SystemAdminView } from './v1SystemAdminView';
 export type v1ListSystemAdminsResponse = {
     items?: Array<v1SystemAdminView>;
+    nextCursor?: string;
 };
 

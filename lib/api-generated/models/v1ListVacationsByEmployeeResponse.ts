@@ -5,5 +5,6 @@
 import type { v1VacationView } from './v1VacationView';
 export type v1ListVacationsByEmployeeResponse = {
     items?: Array<v1VacationView>;
+    nextCursor?: string;
 };
 

@@ -13,7 +13,7 @@ export class RequestClassifierQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListRequestTypesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -21,7 +21,7 @@ export class RequestClassifierQueryService {
     public static requestClassifierQueryListRequestTypesByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListRequestTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -31,10 +31,11 @@ export class RequestClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`request_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -44,7 +45,7 @@ export class RequestClassifierQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListActiveRequestTypesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -52,7 +53,7 @@ export class RequestClassifierQueryService {
     public static requestClassifierQueryListActiveRequestTypesByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListActiveRequestTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -62,10 +63,11 @@ export class RequestClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`request_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,

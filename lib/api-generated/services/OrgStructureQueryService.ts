@@ -20,7 +20,7 @@ export class OrgStructureQueryService {
     /**
      * @param clinicId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListDepartmentsByClinicResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -28,7 +28,7 @@ export class OrgStructureQueryService {
     public static orgStructureQueryListDepartmentsByClinic(
         clinicId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListDepartmentsByClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -38,10 +38,11 @@ export class OrgStructureQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -123,24 +124,27 @@ export class OrgStructureQueryService {
     }
     /**
      * @param limit
-     * @param offset
+     * @param after Opaque pagination cursor returned as next_cursor from a previous
+     * response. Omit or leave empty to start from the first page. An
+     * invalid cursor is rejected with a domain error.
      * @returns v1ListOrganizationsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
     public static orgStructureQueryListOrganizations(
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListOrganizationsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations',
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -175,7 +179,7 @@ export class OrgStructureQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListClinicsByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -183,7 +187,7 @@ export class OrgStructureQueryService {
     public static orgStructureQueryListClinicsByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListClinicsByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -193,10 +197,11 @@ export class OrgStructureQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -246,7 +251,7 @@ export class OrgStructureQueryService {
     /**
      * @param query
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1SearchOrganizationsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -254,7 +259,7 @@ export class OrgStructureQueryService {
     public static orgStructureQuerySearchOrganizations(
         query?: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1SearchOrganizationsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -262,10 +267,11 @@ export class OrgStructureQueryService {
             query: {
                 'query': query,
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,

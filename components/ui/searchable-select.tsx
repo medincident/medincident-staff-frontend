@@ -48,67 +48,53 @@ export function SearchableSelect({
   placeholder = "Выберите...",
   emptyMessage = "Ничего не найдено",
   disabled = false,
-  threshold = 5, 
+  threshold = 5,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
 
-  // !!! ГЛАВНОЕ ИСПРАВЛЕНИЕ !!!
-  // Приводим текущее значение к строке для корректного сравнения,
-  // так как value селектов всегда строки в HTML.
+  // value у HTML-селекта — всегда строка, поэтому приводим заранее.
   const stringValue = value !== undefined && value !== null ? String(value) : "";
+  const selectedLabel = options.find((o) => String(o.value) === stringValue)?.label;
 
-  // 1. Режим простого списка (мало элементов)
+  // Режим простого списка
   if (options.length <= threshold) {
     return (
-      <Select 
-        disabled={disabled} 
-        value={stringValue} // Используем строковое значение
-        onValueChange={onChange}
-      >
+      <Select disabled={disabled} value={stringValue} onValueChange={onChange}>
         <SelectTrigger
+          style={{ height: 36, whiteSpace: "nowrap", overflow: "hidden" }}
           className={cn(
-            "w-full bg-background text-foreground border-input transition-colors whitespace-normal",
+            "w-full bg-background text-foreground border-input transition-colors",
             "hover:border-primary",
             "focus:ring-0 focus:ring-offset-0 focus:border-primary",
-            "min-w-0 overflow-hidden items-start text-left py-2",
-            // Снимаем фиксированную высоту (h-9/h-8) shadcn, чтобы триггер
-            // растягивался под двустрочный контент (label + description).
-            "data-[size=default]:h-auto data-[size=sm]:h-auto min-h-9",
-            // Переопределяем стили SelectValue через тот же *-селектор, что
-            // у shadcn, иначе tailwind-merge их не схлопывает и line-clamp-1
-            // + flex-row остаются:
-            "*:data-[slot=select-value]:line-clamp-none",
-            "*:data-[slot=select-value]:flex-col",
-            "*:data-[slot=select-value]:items-start",
-            "*:data-[slot=select-value]:gap-0",
-            "*:data-[slot=select-value]:flex-1",
-            "*:data-[slot=select-value]:min-w-0",
-            "*:data-[slot=select-value]:overflow-hidden",
-            "*:data-[slot=select-value]:text-left",
+            "min-w-0 text-left",
             !stringValue && "text-muted-foreground",
           )}
         >
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={placeholder}>
+            <span
+              style={{
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                minWidth: 0,
+                flex: 1,
+                textAlign: "left",
+              }}
+            >
+              {selectedLabel || placeholder}
+            </span>
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent
-          className="bg-popover text-popover-foreground border-border w-[var(--radix-select-trigger-width)]"
-        >
+        <SelectContent className="bg-popover text-popover-foreground border-border w-[var(--radix-select-trigger-width)]">
           {options.length > 0 ? (
             options.map((option) => (
               <SelectItem
                 key={String(option.value)}
                 value={String(option.value)}
-                // whitespace-normal — разрешаем перенос длинного лейбла.
-                // items-start — текст выровнен по верху при переносе.
-                //
-                // Галку-индикатор двигаем с правой стороны (дефолт shadcn)
-                // на левую — так одинаково с combobox-режимом этого же
-                // компонента. Индикатор у Radix это <span> — первый
-                // прямой потомок SelectItem с absolute-позиционированием.
-                // Меняем right-2 → left-2, плюс ставим top-1/2 + translate,
-                // чтобы при многострочном тексте он был по центру, а не
-                // «прилипал» к первой строке. Паддинги тоже переворачиваем
-                // (pl-8 pr-2 вместо pr-8 pl-2).
+                // Галку-индикатор переносим слева — для единообразия с
+                // combobox-режимом. Радикс рендерит индикатор как первый
+                // <span> SelectItem с absolute-позиционированием.
                 className="cursor-pointer items-start whitespace-normal focus:bg-accent focus:text-accent-foreground pl-8 pr-2 [&>span:first-child]:left-2 [&>span:first-child]:right-auto [&>span:first-child]:top-1/2 [&>span:first-child]:-translate-y-1/2"
               >
                 <div className="flex flex-col min-w-0 w-full text-left gap-0.5">
@@ -131,11 +117,7 @@ export function SearchableSelect({
     );
   }
 
-  // 2. Режим поиска (Combobox)
-  
-  // Ищем лейбл, сравнивая значения как строки
-  const selectedLabel = options.find((opt) => String(opt.value) === stringValue)?.label;
-
+  // Режим combobox с поиском (опций больше threshold)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -145,11 +127,10 @@ export function SearchableSelect({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            "w-full justify-between bg-background font-normal border-input transition-colors",
+            "w-full justify-between bg-background font-normal border-input transition-colors overflow-hidden",
             "hover:bg-background hover:text-foreground hover:border-primary",
             "focus:ring-0 focus:ring-offset-0 focus:border-primary",
             !stringValue && "text-muted-foreground",
-            "overflow-hidden" 
           )}
         >
           <span className="truncate flex-1 text-left min-w-0 pr-2">
@@ -158,25 +139,21 @@ export function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      
-      <PopoverContent 
-        className="p-0 bg-popover border-border" 
+
+      <PopoverContent
+        className="p-0 bg-popover border-border"
         align="start"
         style={{ width: "var(--radix-popover-trigger-width)" }}
       >
         <Command
-             filter={(val, search) => {
-                // val — комбинированная строка "label | description" (см. CommandItem value ниже),
-                // чтобы поиск работал и по описанию.
-                if (val.toLowerCase().includes(search.toLowerCase())) return 1;
-                return 0;
-             }}
-             className="bg-popover text-popover-foreground w-full"
+          // value у CommandItem — "label | description", чтобы поиск работал
+          // и по описанию (см. ниже).
+          filter={(val, search) =>
+            val.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+          }
+          className="bg-popover text-popover-foreground w-full"
         >
-          <CommandInput 
-            placeholder="Поиск..." 
-            className="h-9 border-none focus:ring-0" 
-          />
+          <CommandInput placeholder="Поиск..." className="h-9 border-none focus:ring-0" />
           <CommandList>
             <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
@@ -189,7 +166,7 @@ export function SearchableSelect({
                     e.stopPropagation();
                   }}
                   onSelect={() => {
-                    onChange(String(option.value)); // Возвращаем всегда строку
+                    onChange(String(option.value));
                     setOpen(false);
                   }}
                   className="cursor-pointer items-start aria-selected:bg-accent aria-selected:text-accent-foreground"
@@ -197,8 +174,7 @@ export function SearchableSelect({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4 mt-0.5 shrink-0",
-                      // Сравниваем как строки
-                      stringValue === String(option.value) ? "opacity-100" : "opacity-0"
+                      stringValue === String(option.value) ? "opacity-100" : "opacity-0",
                     )}
                   />
                   <div className="flex flex-col min-w-0 flex-1 text-left gap-0.5">

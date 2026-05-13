@@ -19,7 +19,7 @@ export class IncidentClassifierQueryService {
     /**
      * @param categoryId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListTypesByCategoryResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -27,7 +27,7 @@ export class IncidentClassifierQueryService {
     public static incidentClassifierQueryListTypesByCategory(
         categoryId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListTypesByCategoryResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -37,10 +37,11 @@ export class IncidentClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -123,7 +124,7 @@ export class IncidentClassifierQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListCategoriesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -131,7 +132,7 @@ export class IncidentClassifierQueryService {
     public static incidentClassifierQueryListCategoriesByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListCategoriesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -141,10 +142,11 @@ export class IncidentClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -154,7 +156,7 @@ export class IncidentClassifierQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListPatientVisibleCategoriesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -162,7 +164,7 @@ export class IncidentClassifierQueryService {
     public static incidentClassifierQueryListPatientVisibleCategoriesByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListPatientVisibleCategoriesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -172,10 +174,11 @@ export class IncidentClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -185,7 +188,7 @@ export class IncidentClassifierQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListActiveRootCategoriesResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -193,7 +196,7 @@ export class IncidentClassifierQueryService {
     public static incidentClassifierQueryListActiveRootCategories(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListActiveRootCategoriesResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -203,10 +206,11 @@ export class IncidentClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -216,7 +220,7 @@ export class IncidentClassifierQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListActiveTypesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -224,7 +228,7 @@ export class IncidentClassifierQueryService {
     public static incidentClassifierQueryListActiveTypesByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListActiveTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -234,10 +238,11 @@ export class IncidentClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -250,7 +255,7 @@ export class IncidentClassifierQueryService {
      * an incident.
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListPatientAllowedTypesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -258,7 +263,7 @@ export class IncidentClassifierQueryService {
     public static incidentClassifierQueryListPatientAllowedTypesByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListPatientAllowedTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -268,10 +273,11 @@ export class IncidentClassifierQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,

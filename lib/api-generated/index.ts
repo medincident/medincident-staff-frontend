@@ -50,6 +50,8 @@ export { queryAnnouncementV1AnnouncementPriority } from './models/queryAnnouncem
 export { queryIncidentV1IncidentPriority } from './models/queryIncidentV1IncidentPriority';
 export { queryIncidentV1IncidentStatus } from './models/queryIncidentV1IncidentStatus';
 export type { queryIncidentV1StatusHistoryEntry } from './models/queryIncidentV1StatusHistoryEntry';
+export type { queryOrgstructureV1Address } from './models/queryOrgstructureV1Address';
+export type { queryOrgstructureV1Point } from './models/queryOrgstructureV1Point';
 export type { queryRequestV1StatusHistoryEntry } from './models/queryRequestV1StatusHistoryEntry';
 export type { RequestClassifierCommandServiceCreateRequestTypeBody } from './models/RequestClassifierCommandServiceCreateRequestTypeBody';
 export type { RequestClassifierCommandServiceUpdateRequestTypeDetailsBody } from './models/RequestClassifierCommandServiceUpdateRequestTypeDetailsBody';
@@ -57,7 +59,6 @@ export type { ServiceRequestCommandServiceAssignExecutorsBody } from './models/S
 export type { ServiceRequestCommandServiceUpdateServiceRequestDescriptionBody } from './models/ServiceRequestCommandServiceUpdateServiceRequestDescriptionBody';
 export type { ServiceRequestCommandServiceUpdateServiceRequestStatusBody } from './models/ServiceRequestCommandServiceUpdateServiceRequestStatusBody';
 export type { v1ActorView } from './models/v1ActorView';
-export type { v1Address } from './models/v1Address';
 export type { v1AddressInput } from './models/v1AddressInput';
 export type { v1AllowIncidentTypeForPatientsResponse } from './models/v1AllowIncidentTypeForPatientsResponse';
 export type { v1AnnouncementView } from './models/v1AnnouncementView';
@@ -161,6 +162,13 @@ export type { v1ListAnnouncementsForClinicResponse } from './models/v1ListAnnoun
 export type { v1ListAnnouncementsForDepartmentResponse } from './models/v1ListAnnouncementsForDepartmentResponse';
 export type { v1ListAnnouncementsForOrganizationResponse } from './models/v1ListAnnouncementsForOrganizationResponse';
 export type { v1ListBufferEntriesResponse } from './models/v1ListBufferEntriesResponse';
+export type { v1ListCandidatesForClinicHeadResponse } from './models/v1ListCandidatesForClinicHeadResponse';
+export type { v1ListCandidatesForDeptResponsibleResponse } from './models/v1ListCandidatesForDeptResponsibleResponse';
+export type { v1ListCandidatesForHireResponse } from './models/v1ListCandidatesForHireResponse';
+export type { v1ListCandidatesForOrgAdminResponse } from './models/v1ListCandidatesForOrgAdminResponse';
+export type { v1ListCandidatesForOrgDispatcherResponse } from './models/v1ListCandidatesForOrgDispatcherResponse';
+export type { v1ListCandidatesForOrgHeadResponse } from './models/v1ListCandidatesForOrgHeadResponse';
+export type { v1ListCandidatesForSystemAdminResponse } from './models/v1ListCandidatesForSystemAdminResponse';
 export type { v1ListCategoriesByOrganizationResponse } from './models/v1ListCategoriesByOrganizationResponse';
 export type { v1ListCategorySubtreeResponse } from './models/v1ListCategorySubtreeResponse';
 export type { v1ListClinicsByOrganizationResponse } from './models/v1ListClinicsByOrganizationResponse';
@@ -192,7 +200,6 @@ export type { v1OrganizationStats } from './models/v1OrganizationStats';
 export type { v1PatientBufferStatusBreakdown } from './models/v1PatientBufferStatusBreakdown';
 export type { v1PatientBufferSummary } from './models/v1PatientBufferSummary';
 export { v1PatientStatus } from './models/v1PatientStatus';
-export type { v1Point } from './models/v1Point';
 export type { v1PointInput } from './models/v1PointInput';
 export type { v1PriorityHistoryEntry } from './models/v1PriorityHistoryEntry';
 export type { v1PublishPatientIncidentResponse } from './models/v1PublishPatientIncidentResponse';
@@ -258,6 +265,7 @@ export type { v1UpdateServiceRequestStatusResponse } from './models/v1UpdateServ
 export type { v1UpdateVacationEndDateResponse } from './models/v1UpdateVacationEndDateResponse';
 export type { v1VacationView } from './models/v1VacationView';
 export type { v1ValidationFailedDetails } from './models/v1ValidationFailedDetails';
+export type { v1ZitadelUserView } from './models/v1ZitadelUserView';
 export type { ValidationFailedDetailsFieldViolation } from './models/ValidationFailedDetailsFieldViolation';
 
 export { AnalyticsQueryService } from './services/AnalyticsQueryService';

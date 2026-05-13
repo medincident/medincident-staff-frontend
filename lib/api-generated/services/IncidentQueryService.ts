@@ -66,24 +66,25 @@ export class IncidentQueryService {
     }
     /**
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListMyIncidentsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
     public static incidentQueryListMyIncidents(
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListMyIncidentsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/incidents:mine',
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -101,7 +102,7 @@ export class IncidentQueryService {
      * @param occurredFrom RFC3339Nano
      * @param occurredTo
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListIncidentsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -117,7 +118,7 @@ export class IncidentQueryService {
         occurredFrom?: string,
         occurredTo?: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListIncidentsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -135,10 +136,11 @@ export class IncidentQueryService {
                 'occurredFrom': occurredFrom,
                 'occurredTo': occurredTo,
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -149,7 +151,7 @@ export class IncidentQueryService {
      * @param organizationId
      * @param statuses
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListBufferEntriesResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -158,7 +160,7 @@ export class IncidentQueryService {
         organizationId: string,
         statuses?: Array<string>,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListBufferEntriesResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -169,10 +171,11 @@ export class IncidentQueryService {
             query: {
                 'statuses': statuses,
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -207,24 +210,25 @@ export class IncidentQueryService {
     }
     /**
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListMyBufferEntriesResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
     public static incidentQueryListMyBufferEntries(
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListMyBufferEntriesResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/query/patient-incidents:mine',
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`incident_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,

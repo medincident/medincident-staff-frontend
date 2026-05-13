@@ -14,7 +14,7 @@ export class ServiceRequestQueryService {
     /**
      * @param incidentId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListServiceRequestsByIncidentResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -22,7 +22,7 @@ export class ServiceRequestQueryService {
     public static serviceRequestQueryListServiceRequestsByIncident(
         incidentId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListServiceRequestsByIncidentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -32,10 +32,12 @@ export class ServiceRequestQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`service_request_list_limit_out_of_range\` — limit exceeds the allowed maximum.
+                - \`request_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 404: `Not found. Error codes:
@@ -47,7 +49,7 @@ export class ServiceRequestQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListServiceRequestsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -55,7 +57,7 @@ export class ServiceRequestQueryService {
     public static serviceRequestQueryListServiceRequests(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListServiceRequestsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -65,12 +67,12 @@ export class ServiceRequestQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`service_request_list_limit_out_of_range\` — limit exceeds the allowed maximum.
-                - \`service_request_list_offset_out_of_range\` — offset is out of the allowed range.`,
+                - \`request_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,

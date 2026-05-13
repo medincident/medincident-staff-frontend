@@ -5,5 +5,6 @@
 import type { v1ServiceRequest } from './v1ServiceRequest';
 export type v1ListServiceRequestsByIncidentResponse = {
     items?: Array<v1ServiceRequest>;
+    nextCursor?: string;
 };
 

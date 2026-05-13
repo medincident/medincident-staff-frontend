@@ -5,5 +5,6 @@
 import type { v1OrganizationListItem } from './v1OrganizationListItem';
 export type v1SearchOrganizationsResponse = {
     items?: Array<v1OrganizationListItem>;
+    nextCursor?: string;
 };
 

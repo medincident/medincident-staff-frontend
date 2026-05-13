@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { v1Address } from './v1Address';
+import type { queryOrgstructureV1Address } from './queryOrgstructureV1Address';
 /**
  * Clinic mirrors the projections.clinics row returned by GetClinic.
  */
@@ -11,7 +11,7 @@ export type v1Clinic = {
     organizationId?: string;
     name?: string;
     description?: string;
-    physicalAddress?: v1Address;
+    physicalAddress?: queryOrgstructureV1Address;
     createdAt?: string;
     updatedAt?: string;
 };

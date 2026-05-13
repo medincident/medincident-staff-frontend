@@ -648,6 +648,76 @@
         ]
       }
     },
+    "/v1/clinics/{clinicId}/candidates:clinic-head": {
+      "get": {
+        "operationId": "MembershipQueryService_ListCandidatesForClinicHead",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCandidatesForClinicHeadResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input. Error codes:\n- `candidate_search_query_too_long` — search query exceeds 256 characters.\n- `invalid_cursor` — cursor is malformed.\n- `list_limit_out_of_range` — limit outside [1, 500].",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error. Error codes:\n- `candidate_load_failed` — database query failed.",
+            "schema": {}
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "clinicId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "query",
+            "description": "Optional substring search (ILIKE %query%) on first_name, last_name,\ndisplay_name, email. Trimmed at the handler boundary. Max 256 chars.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "MembershipQueryService"
+        ]
+      }
+    },
     "/v1/clinics/{clinicId}/departments": {
       "get": {
         "operationId": "OrgStructureQueryService_ListDepartmentsByClinic",
@@ -659,10 +729,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `orgstructure_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -704,11 +772,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -911,10 +978,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -956,11 +1021,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           },
           {
             "name": "includeTerminated",
@@ -1569,6 +1633,76 @@
         ]
       }
     },
+    "/v1/departments/{departmentId}/candidates:dept-responsible": {
+      "get": {
+        "operationId": "MembershipQueryService_ListCandidatesForDeptResponsible",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCandidatesForDeptResponsibleResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input. Error codes:\n- `candidate_search_query_too_long` — search query exceeds 256 characters.\n- `invalid_cursor` — cursor is malformed.\n- `list_limit_out_of_range` — limit outside [1, 500].",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error. Error codes:\n- `candidate_load_failed` — database query failed.",
+            "schema": {}
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "departmentId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "query",
+            "description": "Optional substring search (ILIKE %query%) on first_name, last_name,\ndisplay_name, email. Trimmed at the handler boundary. Max 256 chars.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "MembershipQueryService"
+        ]
+      }
+    },
     "/v1/departments/{departmentId}/details": {
       "put": {
         "operationId": "OrgStructureCommandService_UpdateDepartmentDetails",
@@ -1646,10 +1780,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -1691,11 +1823,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           },
           {
             "name": "includeTerminated",
@@ -2508,10 +2639,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -2560,11 +2689,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -3085,10 +3213,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -3130,11 +3256,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -4106,10 +4231,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `service_request_list_limit_out_of_range` — limit exceeds the allowed maximum.\n- `request_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -4155,11 +4278,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -4702,10 +4824,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `orgstructure_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -4741,11 +4861,11 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
+            "description": "Opaque pagination cursor returned as next_cursor from a previous\nresponse. Omit or leave empty to start from the first page. An\ninvalid cursor is rejected with a domain error.",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -4876,10 +4996,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -4921,11 +5039,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -5204,6 +5321,288 @@
         ]
       }
     },
+    "/v1/organizations/{organizationId}/candidates:hire": {
+      "get": {
+        "operationId": "MembershipQueryService_ListCandidatesForHire",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCandidatesForHireResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input. Error codes:\n- `candidate_search_query_too_long` — search query exceeds 256 characters.\n- `invalid_cursor` — cursor is malformed.\n- `list_limit_out_of_range` — limit outside [1, 500].",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error. Error codes:\n- `candidate_load_failed` — database query failed.",
+            "schema": {}
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "query",
+            "description": "Optional substring search (ILIKE %query%) on first_name, last_name,\ndisplay_name, email. Trimmed at the handler boundary. Max 256 chars.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "description": "Opaque cursor from next_cursor of a previous response. Empty = first page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "description": "Page size. 0 → default 50. Range [1, 500].",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "MembershipQueryService"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/candidates:org-admin": {
+      "get": {
+        "operationId": "MembershipQueryService_ListCandidatesForOrgAdmin",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCandidatesForOrgAdminResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input. Error codes:\n- `candidate_search_query_too_long` — search query exceeds 256 characters.\n- `invalid_cursor` — cursor is malformed.\n- `list_limit_out_of_range` — limit outside [1, 500].",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error. Error codes:\n- `candidate_load_failed` — database query failed.",
+            "schema": {}
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "query",
+            "description": "Optional substring search (ILIKE %query%) on first_name, last_name,\ndisplay_name, email. Trimmed at the handler boundary. Max 256 chars.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "MembershipQueryService"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/candidates:org-dispatcher": {
+      "get": {
+        "operationId": "MembershipQueryService_ListCandidatesForOrgDispatcher",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCandidatesForOrgDispatcherResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input. Error codes:\n- `candidate_search_query_too_long` — search query exceeds 256 characters.\n- `invalid_cursor` — cursor is malformed.\n- `list_limit_out_of_range` — limit outside [1, 500].",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error. Error codes:\n- `candidate_load_failed` — database query failed.",
+            "schema": {}
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "query",
+            "description": "Optional substring search (ILIKE %query%) on first_name, last_name,\ndisplay_name, email. Trimmed at the handler boundary. Max 256 chars.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "MembershipQueryService"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/candidates:org-head": {
+      "get": {
+        "operationId": "MembershipQueryService_ListCandidatesForOrgHead",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCandidatesForOrgHeadResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input. Error codes:\n- `candidate_search_query_too_long` — search query exceeds 256 characters.\n- `invalid_cursor` — cursor is malformed.\n- `list_limit_out_of_range` — limit outside [1, 500].",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error. Error codes:\n- `candidate_load_failed` — database query failed.",
+            "schema": {}
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "query",
+            "description": "Optional substring search (ILIKE %query%) on first_name, last_name,\ndisplay_name, email. Trimmed at the handler boundary. Max 256 chars.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "MembershipQueryService"
+        ]
+      }
+    },
     "/v1/organizations/{organizationId}/clinics": {
       "get": {
         "operationId": "OrgStructureQueryService_ListClinicsByOrganization",
@@ -5215,10 +5614,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `orgstructure_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -5260,11 +5657,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -5467,10 +5863,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -5512,11 +5906,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -5806,10 +6199,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -5851,11 +6242,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           },
           {
             "name": "includeTerminated",
@@ -5970,10 +6360,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6022,11 +6410,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           },
           {
             "name": "includeTerminated",
@@ -6066,10 +6453,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6111,11 +6496,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -6405,10 +6789,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6450,11 +6832,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -6546,10 +6927,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6591,11 +6970,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -6614,10 +6992,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6659,11 +7035,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -6682,10 +7057,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6727,11 +7100,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -6751,10 +7123,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6796,11 +7166,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -6885,10 +7254,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `request_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -6930,11 +7297,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -7017,75 +7383,7 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
-          },
-          "401": {
-            "description": "Unauthenticated — missing or invalid token.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
-          },
-          "403": {
-            "description": "Permission denied.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
-          },
-          "500": {
-            "description": "Unexpected server error.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organizationId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int32"
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int32"
-          }
-        ],
-        "tags": [
-          "RequestClassifierQueryService"
-        ]
-      }
-    },
-    "/v1/organizations/{organizationId}/service-requests": {
-      "get": {
-        "operationId": "ServiceRequestQueryService_ListServiceRequests",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1ListServiceRequestsResponse"
-            }
-          },
-          "400": {
-            "description": "Validation failed. Error codes:\n- `service_request_list_limit_out_of_range` — limit exceeds the allowed maximum.\n- `service_request_list_offset_out_of_range` — offset is out of the allowed range.",
+            "description": "Validation failed. Error codes:\n- `request_classifier_bad_cursor` — pagination cursor is invalid or malformed.",
             "schema": {}
           },
           "401": {
@@ -7128,11 +7426,75 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "RequestClassifierQueryService"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/service-requests": {
+      "get": {
+        "operationId": "ServiceRequestQueryService_ListServiceRequests",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListServiceRequestsResponse"
+            }
+          },
+          "400": {
+            "description": "Validation failed. Error codes:\n- `service_request_list_limit_out_of_range` — limit exceeds the allowed maximum.\n- `request_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
             "in": "query",
             "required": false,
             "type": "integer",
             "format": "int32"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -7251,10 +7613,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `orgstructure_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -7296,11 +7656,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -7983,10 +8342,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -8022,11 +8379,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -8131,10 +8487,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -8248,11 +8602,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -8271,10 +8624,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -8333,11 +8684,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -8415,10 +8765,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `incident_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -8454,11 +8802,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -9173,10 +9520,8 @@
             }
           },
           "400": {
-            "description": "Validation failed or invalid input.",
-            "schema": {
-              "$ref": "#/definitions/v1ErrorResponse"
-            }
+            "description": "Validation failed. Error codes:\n- `membership_bad_cursor` — pagination cursor is invalid or malformed.",
+            "schema": {}
           },
           "401": {
             "description": "Unauthenticated — missing or invalid token.",
@@ -9212,11 +9557,10 @@
             "format": "int32"
           },
           {
-            "name": "offset",
+            "name": "after",
             "in": "query",
             "required": false,
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         ],
         "tags": [
@@ -9288,6 +9632,70 @@
         ],
         "tags": [
           "MembershipCommandService"
+        ]
+      }
+    },
+    "/v1/system-admins/candidates": {
+      "get": {
+        "operationId": "MembershipQueryService_ListCandidatesForSystemAdmin",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListCandidatesForSystemAdminResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input. Error codes:\n- `candidate_search_query_too_long` — search query exceeds 256 characters.\n- `invalid_cursor` — cursor is malformed.\n- `list_limit_out_of_range` — limit outside [1, 500].",
+            "schema": {}
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid token.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error. Error codes:\n- `candidate_load_failed` — database query failed.",
+            "schema": {}
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/v1ErrorResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "query",
+            "description": "Optional substring search (ILIKE %query%) on first_name, last_name,\ndisplay_name, email. Trimmed at the handler boundary. Max 256 chars.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "MembershipQueryService"
         ]
       }
     },
@@ -10177,6 +10585,32 @@
         }
       }
     },
+    "queryOrgstructureV1Address": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "point": {
+          "$ref": "#/definitions/queryOrgstructureV1Point"
+        }
+      },
+      "description": "Address is the read-side view of a stored postal address; Point is\noptional because the command-side allows text-only addresses."
+    },
+    "queryOrgstructureV1Point": {
+      "type": "object",
+      "properties": {
+        "longitude": {
+          "type": "number",
+          "format": "double"
+        },
+        "latitude": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "description": "Point is the coordinate pair attached to an Address. Absent when the\nprojection row has neither longitude nor latitude."
+    },
     "queryRequestV1StatusHistoryEntry": {
       "type": "object",
       "properties": {
@@ -10210,18 +10644,6 @@
           "type": "string"
         }
       }
-    },
-    "v1Address": {
-      "type": "object",
-      "properties": {
-        "text": {
-          "type": "string"
-        },
-        "point": {
-          "$ref": "#/definitions/v1Point"
-        }
-      },
-      "description": "Address is the read-side view of a stored postal address; Point is\noptional because the command-side allows text-only addresses."
     },
     "v1AddressInput": {
       "type": "object",
@@ -10451,7 +10873,7 @@
           "type": "string"
         },
         "physicalAddress": {
-          "$ref": "#/definitions/v1Address"
+          "$ref": "#/definitions/queryOrgstructureV1Address"
         },
         "createdAt": {
           "type": "string"
@@ -11442,6 +11864,9 @@
             "type": "object",
             "$ref": "#/definitions/v1RequestType"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11454,6 +11879,9 @@
             "type": "object",
             "$ref": "#/definitions/v1Category"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11466,6 +11894,9 @@
             "type": "object",
             "$ref": "#/definitions/classifierV1Type"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11523,6 +11954,115 @@
             "type": "object",
             "$ref": "#/definitions/v1BufferEntryView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ListCandidatesForClinicHeadResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1EmployeeCardView"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ListCandidatesForDeptResponsibleResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1EmployeeCardView"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ListCandidatesForHireResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1ZitadelUserView"
+          }
+        },
+        "nextCursor": {
+          "type": "string",
+          "description": "Opaque cursor for the next page. Empty when this is the last page."
+        }
+      }
+    },
+    "v1ListCandidatesForOrgAdminResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1EmployeeCardView"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ListCandidatesForOrgDispatcherResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1EmployeeCardView"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ListCandidatesForOrgHeadResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1EmployeeCardView"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ListCandidatesForSystemAdminResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1ZitadelUserView"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11535,6 +12075,9 @@
             "type": "object",
             "$ref": "#/definitions/v1Category"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11548,7 +12091,8 @@
             "$ref": "#/definitions/v1Category"
           }
         }
-      }
+      },
+      "description": "ListCategorySubtreeResponse returns the full subtree rooted at the\nrequested category. No pagination — the subtree depth is bounded and\nthe full result is always returned."
     },
     "v1ListClinicsByOrganizationResponse": {
       "type": "object",
@@ -11559,6 +12103,9 @@
             "type": "object",
             "$ref": "#/definitions/v1ClinicListItem"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11571,6 +12118,9 @@
             "type": "object",
             "$ref": "#/definitions/v1DepartmentListItem"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11583,6 +12133,9 @@
             "type": "object",
             "$ref": "#/definitions/v1EmployeeCardView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11595,6 +12148,9 @@
             "type": "object",
             "$ref": "#/definitions/v1EmployeeCardView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11607,6 +12163,9 @@
             "type": "object",
             "$ref": "#/definitions/v1EmployeeCardView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11619,6 +12178,9 @@
             "type": "object",
             "$ref": "#/definitions/v1IncidentView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11631,6 +12193,9 @@
             "type": "object",
             "$ref": "#/definitions/v1BufferEntryView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11643,6 +12208,9 @@
             "type": "object",
             "$ref": "#/definitions/v1IncidentView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11667,6 +12235,9 @@
             "type": "object",
             "$ref": "#/definitions/v1RoleAssignment"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11679,6 +12250,9 @@
             "type": "object",
             "$ref": "#/definitions/v1RoleAssignment"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11691,6 +12265,9 @@
             "type": "object",
             "$ref": "#/definitions/v1RoleAssignment"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11703,6 +12280,9 @@
             "type": "object",
             "$ref": "#/definitions/v1OrganizationListItem"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11715,6 +12295,9 @@
             "type": "object",
             "$ref": "#/definitions/classifierV1Type"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11727,6 +12310,9 @@
             "type": "object",
             "$ref": "#/definitions/v1Category"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11739,6 +12325,9 @@
             "type": "object",
             "$ref": "#/definitions/v1RequestType"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11751,6 +12340,9 @@
             "type": "object",
             "$ref": "#/definitions/v1ServiceRequest"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11763,6 +12355,9 @@
             "type": "object",
             "$ref": "#/definitions/v1ServiceRequest"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11775,6 +12370,9 @@
             "type": "object",
             "$ref": "#/definitions/v1SystemAdminView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11787,6 +12385,9 @@
             "type": "object",
             "$ref": "#/definitions/classifierV1Type"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11799,6 +12400,9 @@
             "type": "object",
             "$ref": "#/definitions/v1VacationView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -11821,7 +12425,7 @@
           "type": "string"
         },
         "legalAddress": {
-          "$ref": "#/definitions/v1Address"
+          "$ref": "#/definitions/queryOrgstructureV1Address"
         },
         "createdAt": {
           "type": "string"
@@ -11924,20 +12528,6 @@
       ],
       "default": "PATIENT_STATUS_UNSPECIFIED",
       "description": "PatientStatus is the simplified four-value status surfaced to patients.\n\n - PATIENT_STATUS_PENDING: buffer pending\n - PATIENT_STATUS_ACCEPTED: dispatcher accepted; incident pending/in_progress\n - PATIENT_STATUS_CLOSED: done / rejected / buffer rejected\n - PATIENT_STATUS_CANCELLED: patient cancelled"
-    },
-    "v1Point": {
-      "type": "object",
-      "properties": {
-        "longitude": {
-          "type": "number",
-          "format": "double"
-        },
-        "latitude": {
-          "type": "number",
-          "format": "double"
-        }
-      },
-      "description": "Point is the coordinate pair attached to an Address. Absent when the\nprojection row has neither longitude nor latitude."
     },
     "v1PointInput": {
       "type": "object",
@@ -12206,6 +12796,9 @@
             "type": "object",
             "$ref": "#/definitions/v1EmployeeCardView"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -12218,6 +12811,9 @@
             "type": "object",
             "$ref": "#/definitions/v1OrganizationListItem"
           }
+        },
+        "nextCursor": {
+          "type": "string"
         }
       }
     },
@@ -12635,6 +13231,27 @@
         }
       },
       "description": "ValidationFailedDetails is present only when code = \"validation_failed\".\nEach violation corresponds to one struct-tag rule failure or one\ndomain-level leaf error from errors.Join."
+    },
+    "v1ZitadelUserView": {
+      "type": "object",
+      "properties": {
+        "zitadelUserId": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        }
+      },
+      "description": "ZitadelUserView is a lightweight projection of projections.users used\nby candidate-listing endpoints that operate on raw Zitadel identities\n(ForHire, ForSystemAdmin). Fields mirror the NOT NULL columns of the\nusers table."
     }
   }
 }

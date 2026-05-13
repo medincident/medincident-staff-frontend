@@ -3,7 +3,7 @@ name: medincident-staff-dev
 services:
   nextjs:
     image: node:20-alpine
-    container_name: nextjs_app
+    container_name: nextjs_app_dev
     working_dir: /app
     # При первом старте поставим зависимости в named volume.
     # Дальнейшие старты быстрые — node_modules переиспользуется.
@@ -26,20 +26,14 @@ services:
       # быть ABI с другой архитектуры).
       - dev_node_modules:/app/node_modules
       - dev_next_cache:/app/.next
-
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: nginx_gateway
-    restart: unless-stopped
-    ports:
-      - "8083:80"
     networks:
-      - default
-      - proxy-network
-    volumes:
-      - ./deployment/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - nextjs
+      default: {}
+      # Подключаемся к общей proxy-network с алиасом "nextjs", чтобы
+      # nginx_gateway из prod проксировал /, /api/auth/ в этот контейнер
+      # ровно так же, как он делал бы с прод-фронтом.
+      proxy-network:
+        aliases:
+          - nextjs
 
 volumes:
   dev_node_modules:

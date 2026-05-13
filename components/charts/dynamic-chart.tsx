@@ -73,16 +73,20 @@ interface DynamicChartProps {
   dataKey?: string | string[];
   categoryKey?: string;
   color?: string | string[];
+  // Для bar-vertical c несколькими сериями: складывать столбцы друг на друга,
+  // а не ставить рядом. Полезно для распределения по категориям во времени.
+  stacked?: boolean;
 }
 
-export function DynamicChart({ 
-  data, 
-  type, 
-  title, 
+export function DynamicChart({
+  data,
+  type,
+  title,
   height = 300,
   dataKey = "value",
   categoryKey = "name",
-  color
+  color,
+  stacked = false,
 }: DynamicChartProps) {
 
   if (!data || data.length === 0) {
@@ -178,12 +182,15 @@ export function DynamicChart({
               {isMulti && <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />}
               
               {keys.map((key, i) => (
-                <Bar 
-                  key={key} 
-                  dataKey={key} 
-                  barSize={isMulti ? 16 : 32} 
-                  radius={[4, 4, 0, 0]} 
-                  fill={colors[i % colors.length]} 
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  barSize={isMulti ? 16 : 32}
+                  // В stacked-режиме углы скругляем только у самой верхней
+                  // серии — иначе будет «лесенка» из радиусов.
+                  radius={stacked ? (i === keys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]) : [4, 4, 0, 0]}
+                  fill={colors[i % colors.length]}
+                  stackId={stacked ? "stack" : undefined}
                 >
                   {!isMulti && data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />

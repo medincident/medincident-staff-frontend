@@ -5,5 +5,6 @@
 import type { v1RequestType } from './v1RequestType';
 export type v1ListRequestTypesByOrganizationResponse = {
     items?: Array<v1RequestType>;
+    nextCursor?: string;
 };
 

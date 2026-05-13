@@ -5,5 +5,6 @@
 import type { v1EmployeeCardView } from './v1EmployeeCardView';
 export type v1ListEmployeesByClinicResponse = {
     items?: Array<v1EmployeeCardView>;
+    nextCursor?: string;
 };
 

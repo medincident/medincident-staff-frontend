@@ -6,7 +6,7 @@
  * Point is the coordinate pair attached to an Address. Absent when the
  * projection row has neither longitude nor latitude.
  */
-export type v1Point = {
+export type queryOrgstructureV1Point = {
     longitude?: number;
     latitude?: number;
 };

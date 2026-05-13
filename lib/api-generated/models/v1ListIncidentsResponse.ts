@@ -5,5 +5,6 @@
 import type { v1IncidentView } from './v1IncidentView';
 export type v1ListIncidentsResponse = {
     items?: Array<v1IncidentView>;
+    nextCursor?: string;
 };
 

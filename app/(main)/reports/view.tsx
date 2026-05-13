@@ -12,6 +12,7 @@ import {
   Download,
   FileText,
   Minus,
+  RotateCcw,
   Siren,
   TrendingUp,
   Users,
@@ -282,6 +283,11 @@ export function ReportsView() {
         ? withDuration.reduce((a, b) => a + b, 0) / withDuration.length
         : 0;
 
+    // Повторно открытые НС: бэк помечает событие isReopened=true,
+    // если оно создано через :reopen из ранее завершённого инцидента.
+    const reopenedEvt = events.filter((e: any) => e.isReopened === true).length;
+    const prevReopenedEvt = prevEvents.filter((e: any) => e.isReopened === true).length;
+
     return {
       totalRequests: requests.length,
       deltaRequests: pctChange(requests.length, prevRequests.length),
@@ -291,6 +297,8 @@ export function ReportsView() {
       activeEvents: activeEvt,
       completedRequests: completedReq.length,
       avgCompletionH,
+      reopenedEvents: reopenedEvt,
+      deltaReopened: pctChange(reopenedEvt, prevReopenedEvt),
     };
   }, [filtered]);
 
@@ -592,14 +600,49 @@ export function ReportsView() {
       value,
     }));
 
+    // Динамика НС по категориям: для каждого временного бакета считаем
+    // количество событий по топ-N категорий, остальные сваливаем в «Прочее».
+    // Используется stacked bar-vertical чтобы видеть и общее количество,
+    // и разбивку по категориям одновременно.
+    const TOP_CATEGORIES_LIMIT = 5;
+    const topCategoryNames = byEventCat.slice(0, TOP_CATEGORIES_LIMIT).map((c) => c.name);
+    const useWeeklyCat = effectiveDays > 60;
+    const bucketSizeCatMs = (useWeeklyCat ? 7 : 1) * DAY_MS;
+    const numBucketsCat = Math.max(1, Math.ceil((endMs - startMs) / bucketSizeCatMs));
+    const catBuckets: Array<Record<string, any>> = [];
+    for (let i = 0; i < numBucketsCat; i++) {
+      const bucketStart = startMs + i * bucketSizeCatMs;
+      const d = new Date(bucketStart);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const row: Record<string, any> = { name: `${dd}.${mm}` };
+      for (const cat of topCategoryNames) row[cat] = 0;
+      row["Прочее"] = 0;
+      catBuckets.push(row);
+    }
+    for (const e of filtered.events) {
+      const t = new Date(e.createdAt).getTime();
+      const idx = Math.floor((t - startMs) / bucketSizeCatMs);
+      if (idx < 0 || idx >= numBucketsCat) continue;
+      const cat = (e as any).categoryName ?? (e as any).categoryId ?? "Прочее";
+      const key = topCategoryNames.includes(cat) ? cat : "Прочее";
+      catBuckets[idx][key] = (catBuckets[idx][key] ?? 0) + 1;
+    }
+    // Если «Прочее» во всех бакетах = 0 — серию убираем, чтобы не висеть в легенде.
+    const hasOther = catBuckets.some((b) => b["Прочее"] > 0);
+    const eventCatSeries = hasOther ? [...topCategoryNames, "Прочее"] : topCategoryNames;
+    if (!hasOther) catBuckets.forEach((b) => delete b["Прочее"]);
+
     return {
       byReqStatus: enrichChartData(byReqStatus),
       byDept,
       byPriority: enrichChartData(byPriority),
       byEventCat,
       byEventStatus: enrichChartData(byEventStatus),
+      eventCatTimeline: catBuckets,
+      eventCatTimelineSeries: eventCatSeries,
     };
-  }, [filtered]);
+  }, [filtered, startMs, endMs, effectiveDays]);
 
   const hasAnyData =
     filtered.events.length > 0 || filtered.requests.length > 0;
@@ -677,9 +720,9 @@ export function ReportsView() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
+          Array.from({ length: 4 }).map((_, i) => (
             <Card key={`kpi-skel-${i}`} className="border rounded-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <Skeleton className="h-4 w-24" />
@@ -714,6 +757,15 @@ export function ReportsView() {
               icon={AlertTriangle}
               className="bg-warning/10 border-warning/20 text-warning"
               iconColor="text-warning"
+            />
+            <KPICard
+              title="Повторно открытые НС"
+              value={kpi.reopenedEvents}
+              delta={kpi.deltaReopened}
+              subtitle={kpi.totalEvents > 0 ? `${Math.round((kpi.reopenedEvents / kpi.totalEvents) * 100)}% от всех НС` : "—"}
+              icon={RotateCcw}
+              className="bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400"
+              iconColor="text-purple-600 dark:text-purple-400"
             />
           </>
         )}
@@ -1065,6 +1117,43 @@ export function ReportsView() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-warning" />
+                Динамика НС по категориям
+              </CardTitle>
+              <CardDescription>
+                Количество событий {effectiveDays > 60 ? "по неделям" : "по дням"} с разбивкой по топ-5 категориям
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[360px] w-full">
+                {isLoading ? (
+                  <Skeleton className="h-full w-full rounded-lg" />
+                ) : distributions.eventCatTimelineSeries.length > 0 && filtered.events.length > 0 ? (
+                  <DynamicChart
+                    type="bar-vertical"
+                    data={distributions.eventCatTimeline}
+                    dataKey={distributions.eventCatTimelineSeries}
+                    height={360}
+                    stacked
+                    color={[
+                      "hsl(var(--warning))",
+                      "hsl(var(--primary))",
+                      "hsl(var(--info))",
+                      "hsl(var(--success))",
+                      "hsl(var(--purple))",
+                      "hsl(var(--muted-foreground))",
+                    ]}
+                  />
+                ) : (
+                  <EmptyState />
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="summary" className="mt-4">

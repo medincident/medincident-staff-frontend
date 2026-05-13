@@ -3,7 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { v1EmployeeCardView } from './v1EmployeeCardView';
-export type v1ListEmployeesByDepartmentResponse = {
+export type v1ListCandidatesForOrgAdminResponse = {
     items?: Array<v1EmployeeCardView>;
     nextCursor?: string;
 };

@@ -105,13 +105,20 @@ export function formatViolation(v: FieldViolation): string {
   return v.message?.trim() ? `${fieldName}: ${v.message}` : `${fieldName}: ${ruleLabel}${param}`;
 }
 
-// Заголовок тоста: словарь по code → пришедший с бэка message → fallback.
+// Заголовок тоста: словарный заголовок по code → сам code (raw машинный) →
+// HTTP-статус (если ни code, ни словаря нет) → fallback. Текст из message
+// в title не утекает — он живёт в description, иначе обе строки тоста дублируются.
 export function errorTitle(payload: BackendErrorPayload | null, fallback = "Ошибка"): string {
   if (!payload) return fallback;
-  return CODE_TITLES[payload.code] || payload.message || fallback;
+  const dictTitle = CODE_TITLES[payload.code];
+  if (dictTitle) return dictTitle;
+  if (payload.code) return payload.code;
+  if (payload.status) return `Ошибка ${payload.status}`;
+  return fallback;
 }
 
 // Описание тоста: violations списком (для validation_failed) или сам message.
+// Если message пустой — fallback (а не дубль title).
 export function errorDescription(
   payload: BackendErrorPayload | null,
   fallback?: string,
@@ -120,12 +127,6 @@ export function errorDescription(
   if (payload.violations.length > 0) {
     return payload.violations.map(formatViolation).join(" • ");
   }
-  // Если для этого code в словаре есть title — message не дублируем
-  // (или оставляем как описание, только если он отличается от title).
-  const title = CODE_TITLES[payload.code];
-  if (title && payload.message && payload.message !== title) {
-    return payload.message;
-  }
-  if (!title && payload.message) return payload.message;
+  if (payload.message) return payload.message;
   return fallback;
 }

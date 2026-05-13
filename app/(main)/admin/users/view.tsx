@@ -31,6 +31,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { notify } from "@/lib/toast";
@@ -39,7 +40,7 @@ import {
   MembershipCommandService,
   OrgStructureQueryService,
 } from "@/lib/api-generated";
-import type { v1EmployeeCardView } from "@/lib/api-generated";
+import type { v1EmployeeCardView, v1ZitadelUserView } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { getBadgeColor } from "@/lib/status-helper";
 import { useSession } from "next-auth/react";
@@ -53,6 +54,9 @@ export function UsersView() {
   const [admins, setAdmins] = useState<string[]>([]);
   const [orgHeads, setOrgHeads] = useState<string[]>([]);
   const [orgDispatchers, setOrgDispatchers] = useState<string[]>([]);
+  // Системные администраторы привязаны к Zitadel-пользователю (роль глобальная,
+  // а не к организации), поэтому здесь хранятся zitadelUserId, а не employeeId.
+  const [sysAdmins, setSysAdmins] = useState<string[]>([]);
   const [clinics, setClinics] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -60,6 +64,9 @@ export function UsersView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  // editingZitadelUserId нужен отдельно — для Grant/RevokeSystemAdmin,
+  // которые работают с zitadelUserId, а не с employeeId.
+  const [editingZitadelUserId, setEditingZitadelUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     givenName: "",
     familyName: "",
@@ -71,6 +78,7 @@ export function UsersView() {
     isAdmin: false,
     isOrgHead: false,
     isOrgDispatcher: false,
+    isSysAdmin: false,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -87,6 +95,11 @@ export function UsersView() {
     position: "",
   });
   const [isHiring, setIsHiring] = useState(false);
+  // Кандидаты на найм — пользователи Zitadel, у которых нет employee card
+  // в этой организации. Загружаем по открытию диалога; селектор подставляет
+  // displayName + email, наружу отдаёт zitadelUserId.
+  const [hireCandidates, setHireCandidates] = useState<v1ZitadelUserView[]>([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
 
   const loadData = async () => {
     try {
@@ -98,15 +111,19 @@ export function UsersView() {
         setAdmins([]);
         setOrgHeads([]);
         setOrgDispatchers([]);
+        setSysAdmins([]);
         return;
       }
       const orgId = organizationId;
 
-      const [usersListRes, adminsRes, headsRes, dispatchersRes] = await Promise.all([
+      // Системные админы — глобальная роль, не зависит от orgId, но всё равно
+      // запрашиваем в той же пачке, чтобы UI имел один источник истины.
+      const [usersListRes, adminsRes, headsRes, dispatchersRes, sysAdminsRes] = await Promise.all([
         MembershipQueryService.membershipQuerySearchEmployeesByOrganization(orgId, search || undefined, 50),
         MembershipQueryService.membershipQueryListOrgAdmins(orgId, 100),
         MembershipQueryService.membershipQueryListOrgHeads(orgId, 100),
         MembershipQueryService.membershipQueryListOrgDispatchers(orgId, 100),
+        MembershipQueryService.membershipQueryListSystemAdmins(100),
       ]);
 
       if (usersListRes && "items" in usersListRes && usersListRes.items) {
@@ -123,6 +140,10 @@ export function UsersView() {
 
       if (dispatchersRes && "items" in dispatchersRes && dispatchersRes.items) {
         setOrgDispatchers((dispatchersRes.items as any[]).map((a: any) => a.employeeId));
+      }
+
+      if (sysAdminsRes && "items" in sysAdminsRes && sysAdminsRes.items) {
+        setSysAdmins((sysAdminsRes.items as any[]).map((a: any) => a.zitadelUserId).filter(Boolean));
       }
 
       if (clinics.length === 0) {
@@ -150,6 +171,7 @@ export function UsersView() {
 
   const handleEditUser = (user: v1EmployeeCardView) => {
     setEditingUserId(user.employeeId || null);
+    setEditingZitadelUserId(user.zitadelUserId || null);
     setFormData({
       givenName: user.firstName || "",
       familyName: user.lastName || "",
@@ -161,6 +183,7 @@ export function UsersView() {
       isAdmin: admins.includes(user.employeeId || ""),
       isOrgHead: orgHeads.includes(user.employeeId || ""),
       isOrgDispatcher: orgDispatchers.includes(user.employeeId || ""),
+      isSysAdmin: !!user.zitadelUserId && sysAdmins.includes(user.zitadelUserId),
     });
     setIsDialogOpen(true);
   };
@@ -215,6 +238,20 @@ export function UsersView() {
         }
       }
 
+      // SystemAdmin привязан к Zitadel-учётке, поэтому отдельная ветка вне
+      // блока организации. Если у сотрудника нет zitadelUserId — пропускаем,
+      // иначе бэк вернёт zitadel_user_not_found.
+      if (editingZitadelUserId) {
+        const wasSysAdmin = sysAdmins.includes(editingZitadelUserId);
+        if (formData.isSysAdmin && !wasSysAdmin) {
+          await MembershipCommandService.membershipCommandGrantSystemAdmin({
+            zitadelUserId: editingZitadelUserId,
+          });
+        } else if (!formData.isSysAdmin && wasSysAdmin) {
+          await MembershipCommandService.membershipCommandRevokeSystemAdmin(editingZitadelUserId);
+        }
+      }
+
       if (currentUser && !currentUser.terminatedAt && !formData.isActive) {
         await MembershipCommandService.membershipCommandTerminateEmployee(editingUserId);
       }
@@ -264,9 +301,31 @@ export function UsersView() {
     return clinics.find(c => c.id === hireForm.clinicId)?.departments || [];
   }, [clinics, hireForm.clinicId]);
 
-  const openHireDialog = () => {
+  const openHireDialog = async () => {
     setHireForm({ zitadelUserId: "", clinicId: "", departmentId: "", position: "" });
     setIsHireDialogOpen(true);
+    if (!organizationId) return;
+    setIsLoadingCandidates(true);
+    try {
+      // Берём с запасом — реальный лимит подстрахует пагинация (вряд ли в
+      // одной организации будет 500+ незанятых аккаунтов).
+      const res = await MembershipQueryService.membershipQueryListCandidatesForHire(
+        organizationId,
+        undefined,
+        undefined,
+        500,
+      );
+      if (res && "items" in res && Array.isArray(res.items)) {
+        setHireCandidates(res.items);
+      } else {
+        setHireCandidates([]);
+      }
+    } catch (e) {
+      notify.apiError(e, "Не удалось загрузить список кандидатов");
+      setHireCandidates([]);
+    } finally {
+      setIsLoadingCandidates(false);
+    }
   };
 
   const handleHire = async () => {
@@ -495,6 +554,7 @@ export function UsersView() {
             <DialogTitle>Настройка сотрудника</DialogTitle>
             <DialogDescription className="flex items-center gap-2 flex-wrap">
               {formData.email ? <b>{formData.email}</b> : "Email не указан"}
+              {formData.isSysAdmin && <Badge variant="destructive">Sys Admin</Badge>}
               {formData.isOrgHead && <Badge variant="secondary">Главврач</Badge>}
               {formData.isAdmin && <Badge variant="secondary">Администратор</Badge>}
               {formData.isOrgDispatcher && <Badge variant="secondary">Диспетчер</Badge>}
@@ -576,33 +636,43 @@ export function UsersView() {
                   onCheckedChange={(v) => setFormData({ ...formData, isOrgDispatcher: v })}
                 />
               </label>
+
+              {editingZitadelUserId && (
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 cursor-pointer hover:bg-destructive/10">
+                  <div className="space-y-0.5">
+                    <span className="text-sm font-medium text-foreground">Системный администратор</span>
+                    <p className="text-[11px] text-muted-foreground">
+                      Полный доступ ко всем организациям и системным настройкам. Привязан к Zitadel-аккаунту, а не к организации.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.isSysAdmin}
+                    onCheckedChange={(v) => setFormData({ ...formData, isSysAdmin: v })}
+                  />
+                </label>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
               <div className="grid gap-2">
                 <Label>Клиника</Label>
-                <Select
+                <SearchableSelect
+                  options={clinics.map((c) => ({ value: c.id, label: c.name }))}
                   value={formData.clinicId}
-                  onValueChange={(v) => setFormData({ ...formData, clinicId: v, departmentId: "" })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Выберите клинику" /></SelectTrigger>
-                  <SelectContent>
-                    {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setFormData({ ...formData, clinicId: v, departmentId: "" })}
+                  placeholder="Выберите клинику"
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Отделение</Label>
-                <Select
+                <SearchableSelect
+                  options={availableDepts.map((d: any) => ({ value: d.id, label: d.name }))}
                   value={formData.departmentId}
-                  onValueChange={(v) => setFormData({ ...formData, departmentId: v })}
+                  onChange={(v) => setFormData({ ...formData, departmentId: v })}
+                  placeholder={formData.clinicId ? "Выберите отделение" : "Сначала выберите клинику"}
                   disabled={!formData.clinicId}
-                >
-                  <SelectTrigger><SelectValue placeholder="Выберите отделение" /></SelectTrigger>
-                  <SelectContent>
-                    {availableDepts.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                  emptyMessage="В клинике нет отделений"
+                />
               </div>
             </div>
           </div>
@@ -627,43 +697,57 @@ export function UsersView() {
 
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label htmlFor="hire-zitadel">Zitadel User ID</Label>
-              <Input
-                id="hire-zitadel"
-                value={hireForm.zitadelUserId}
-                onChange={(e) => setHireForm({ ...hireForm, zitadelUserId: e.target.value })}
-                placeholder="например: 366537916405055493"
-              />
+              <Label>Пользователь Zitadel</Label>
+              {isLoadingCandidates ? (
+                <Skeleton className="h-9 w-full rounded-md" />
+              ) : (
+                <SearchableSelect
+                  options={hireCandidates.map((u) => ({
+                    value: u.zitadelUserId || "",
+                    label:
+                      u.displayName ||
+                      `${u.firstName || ""} ${u.lastName || ""}`.trim() ||
+                      u.email ||
+                      u.zitadelUserId ||
+                      "—",
+                    description: u.email,
+                  }))}
+                  value={hireForm.zitadelUserId}
+                  onChange={(v) => setHireForm({ ...hireForm, zitadelUserId: v })}
+                  placeholder={
+                    hireCandidates.length === 0
+                      ? "Нет свободных аккаунтов в Zitadel"
+                      : "Выберите пользователя..."
+                  }
+                  emptyMessage="Никого не найдено"
+                  disabled={hireCandidates.length === 0}
+                />
+              )}
               <p className="text-[11px] text-muted-foreground">
-                Найти ID можно в админке Zitadel — раздел Users.
+                Показаны только пользователи Zitadel, ещё не нанятые в эту организацию.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Клиника</Label>
-                <Select
+                <SearchableSelect
+                  options={clinics.map((c) => ({ value: c.id, label: c.name }))}
                   value={hireForm.clinicId}
-                  onValueChange={(v) => setHireForm({ ...hireForm, clinicId: v, departmentId: "" })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Выберите клинику" /></SelectTrigger>
-                  <SelectContent>
-                    {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setHireForm({ ...hireForm, clinicId: v, departmentId: "" })}
+                  placeholder="Выберите клинику"
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Отделение</Label>
-                <Select
+                <SearchableSelect
+                  options={hireAvailableDepts.map((d: any) => ({ value: d.id, label: d.name }))}
                   value={hireForm.departmentId}
-                  onValueChange={(v) => setHireForm({ ...hireForm, departmentId: v })}
+                  onChange={(v) => setHireForm({ ...hireForm, departmentId: v })}
+                  placeholder={hireForm.clinicId ? "Выберите отделение" : "Сначала выберите клинику"}
                   disabled={!hireForm.clinicId}
-                >
-                  <SelectTrigger><SelectValue placeholder="Выберите отделение" /></SelectTrigger>
-                  <SelectContent>
-                    {hireAvailableDepts.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                  emptyMessage="В клинике нет отделений"
+                />
               </div>
             </div>
 

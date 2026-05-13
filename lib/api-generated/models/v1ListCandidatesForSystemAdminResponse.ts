@@ -2,9 +2,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { v1EmployeeCardView } from './v1EmployeeCardView';
-export type v1ListEmployeesByDepartmentResponse = {
-    items?: Array<v1EmployeeCardView>;
+import type { v1ZitadelUserView } from './v1ZitadelUserView';
+export type v1ListCandidatesForSystemAdminResponse = {
+    items?: Array<v1ZitadelUserView>;
     nextCursor?: string;
 };
 

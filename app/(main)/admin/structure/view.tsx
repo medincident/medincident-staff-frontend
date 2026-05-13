@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
 import {
   MembershipQueryService,
@@ -57,11 +58,51 @@ import type { v1EmployeeCardView } from "@/lib/api-generated";
 import { cleanText } from "@/lib/text";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 
+// Собирает опции для SearchableSelect руководителя/заместителя:
+// • первый пункт «Не назначен»
+// • дальше — кандидаты из бэка (ListCandidatesFor*)
+// • если уже назначенный сотрудник (currentId) не попал в кандидатов
+//   (бэк его исключает, потому что роль уже занята), добавляем его сверху
+//   списка, иначе SearchableSelect покажет пустое поле
+// • excludeId — id, который нужно исключить (например, чтобы в селекторе
+//   заместителя нельзя было выбрать того же сотрудника, что в селекторе главврача)
+function buildHeadOptions(
+  candidates: v1EmployeeCardView[],
+  fallback: v1EmployeeCardView[],
+  currentId?: string,
+  excludeId?: string,
+): Array<{ value: string; label: string }> {
+  const nameOf = (u: v1EmployeeCardView) =>
+    u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || "—";
+  const map = new Map<string, string>();
+  for (const u of candidates) {
+    if (u.employeeId) map.set(u.employeeId, nameOf(u));
+  }
+  if (currentId && currentId !== "none" && !map.has(currentId)) {
+    const found = fallback.find((u) => u.employeeId === currentId);
+    if (found) map.set(currentId, `${nameOf(found)} (текущий)`);
+  }
+  const items: Array<{ value: string; label: string }> = [
+    { value: "none", label: "Не назначен" },
+  ];
+  for (const [value, label] of map) {
+    if (excludeId && value === excludeId) continue;
+    items.push({ value, label });
+  }
+  return items;
+}
+
 export function StructureView() {
   const { orgId: selectedOrgId, isResolving: isOrgsLoading } = useActiveOrgId();
 
   const [clinics, setClinics] = useState<any[]>([]);
   const [users, setUsers] = useState<v1EmployeeCardView[]>([]);
+  // Кандидаты на роль главврача/заведующего для конкретной открытой
+  // сущности. Бэкенд сам отсекает тех, кого нельзя назначить (уже занимает
+  // роль, не в нужной клинике/отделении и т.п.), поэтому таргетный запрос
+  // лучше общего users-списка.
+  const [headCandidates, setHeadCandidates] = useState<v1EmployeeCardView[]>([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -196,7 +237,7 @@ export function StructureView() {
     }
   };
 
-  const openClinicModal = (clinic?: any) => {
+  const openClinicModal = async (clinic?: any) => {
     if (clinic) {
       setEditingItem({ id: clinic.id, oldHeadId: clinic.headId, oldDeputyId: clinic.deputyId });
       setNewName(clinic.name);
@@ -204,6 +245,26 @@ export function StructureView() {
       setNewAddress(clinic.physicalAddress || "");
       setNewHeadId(clinic.headId || "none");
       setNewDeputyId(clinic.deputyId || "none");
+      setIsClinicDialogOpen(true);
+      // Подгружаем кандидатов на главврача этой клиники. На время загрузки
+      // в селекторе будет скелетон.
+      setIsLoadingCandidates(true);
+      setHeadCandidates([]);
+      try {
+        const res = await MembershipQueryService.membershipQueryListCandidatesForClinicHead(
+          clinic.id,
+          undefined,
+          undefined,
+          200,
+        );
+        if (res && "items" in res && Array.isArray(res.items)) {
+          setHeadCandidates(res.items as v1EmployeeCardView[]);
+        }
+      } catch (e) {
+        notify.apiError(e, "Не удалось загрузить список кандидатов");
+      } finally {
+        setIsLoadingCandidates(false);
+      }
     } else {
       setEditingItem(null);
       setNewName("");
@@ -211,8 +272,9 @@ export function StructureView() {
       setNewAddress("");
       setNewHeadId("none");
       setNewDeputyId("none");
+      setHeadCandidates([]);
+      setIsClinicDialogOpen(true);
     }
-    setIsClinicDialogOpen(true);
   };
 
   const saveClinic = async () => {
@@ -283,7 +345,7 @@ export function StructureView() {
     notify.error("Не поддерживается", "В новом API удаление клиник пока недоступно.");
   };
 
-  const openDeptModal = (clinicId: string, dept?: any) => {
+  const openDeptModal = async (clinicId: string, dept?: any) => {
     setTargetClinicId(clinicId);
     if (dept) {
       setEditingItem({ id: dept.id, parentId: clinicId, oldHeadId: dept.headId, oldDeputyId: dept.deputyId });
@@ -291,14 +353,33 @@ export function StructureView() {
       setNewDescription(dept.description || "");
       setNewHeadId(dept.headId || "none");
       setNewDeputyId(dept.deputyId || "none");
+      setIsDeptDialogOpen(true);
+      setIsLoadingCandidates(true);
+      setHeadCandidates([]);
+      try {
+        const res = await MembershipQueryService.membershipQueryListCandidatesForDeptResponsible(
+          dept.id,
+          undefined,
+          undefined,
+          200,
+        );
+        if (res && "items" in res && Array.isArray(res.items)) {
+          setHeadCandidates(res.items as v1EmployeeCardView[]);
+        }
+      } catch (e) {
+        notify.apiError(e, "Не удалось загрузить список кандидатов");
+      } finally {
+        setIsLoadingCandidates(false);
+      }
     } else {
       setEditingItem(null);
       setNewName("");
       setNewDescription("");
       setNewHeadId("none");
       setNewDeputyId("none");
+      setHeadCandidates([]);
+      setIsDeptDialogOpen(true);
     }
-    setIsDeptDialogOpen(true);
   };
 
   const saveDept = async () => {
@@ -590,56 +671,40 @@ export function StructureView() {
               <Label>Описание (опционально)</Label>
               <Input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Главный филиал..." />
             </div>
-            <div className="grid gap-2">
-              <Label>Главный врач</Label>
-              <Select
-                value={newHeadId}
-                onValueChange={(v) => {
-                  setNewHeadId(v);
-                  if (v === "none") setNewDeputyId("none");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Выберите руководителя" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Не назначен</SelectItem>
-                  {users.map(u => (
-                    <SelectItem key={u.employeeId} value={u.employeeId as string}>
-                      {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label className="flex items-center gap-1.5">
-                <UserCog className="h-3.5 w-3.5" />
-                Заместитель
-              </Label>
-              <Select
-                value={newDeputyId}
-                onValueChange={setNewDeputyId}
-                disabled={newHeadId === "none"}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={newHeadId === "none" ? "Сначала назначьте главврача" : "Выберите заместителя"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Не назначен</SelectItem>
-                  {users
-                    .filter((u) => u.employeeId !== newHeadId)
-                    .map((u) => (
-                      <SelectItem key={u.employeeId} value={u.employeeId as string}>
-                        {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                Замещает главврача на время отпуска или болезни.
-              </p>
-            </div>
+            {/* Главный врач и заместитель назначаются отдельно — после создания клиники, через админку пользователей. */}
+            {editingItem?.id && (
+              <>
+                <div className="grid gap-2">
+                  <Label>Главный врач</Label>
+                  <SearchableSelect
+                    options={buildHeadOptions(headCandidates, users, editingItem.oldHeadId)}
+                    value={newHeadId}
+                    onChange={(v) => {
+                      setNewHeadId(v);
+                      if (v === "none") setNewDeputyId("none");
+                    }}
+                    placeholder={isLoadingCandidates ? "Загрузка кандидатов..." : "Выберите руководителя"}
+                    disabled={isLoadingCandidates}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label className="flex items-center gap-1.5">
+                    <UserCog className="h-3.5 w-3.5" />
+                    Заместитель
+                  </Label>
+                  <SearchableSelect
+                    options={buildHeadOptions(headCandidates, users, editingItem.oldDeputyId, newHeadId)}
+                    value={newDeputyId}
+                    onChange={setNewDeputyId}
+                    placeholder={newHeadId === "none" ? "Сначала назначьте главврача" : "Выберите заместителя"}
+                    disabled={newHeadId === "none" || isLoadingCandidates}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Замещает главврача на время отпуска или болезни.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsClinicDialogOpen(false)}>Отмена</Button>
@@ -665,56 +730,39 @@ export function StructureView() {
               <Label>Описание (опционально)</Label>
               <Input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Дополнительная информация..." />
             </div>
-            <div className="grid gap-2">
-              <Label>Заведующий отделением</Label>
-              <Select
-                value={newHeadId}
-                onValueChange={(v) => {
-                  setNewHeadId(v);
-                  if (v === "none") setNewDeputyId("none");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Выберите заведующего" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Не назначен</SelectItem>
-                  {users.map(u => (
-                    <SelectItem key={u.employeeId} value={u.employeeId as string}>
-                      {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label className="flex items-center gap-1.5">
-                <UserCog className="h-3.5 w-3.5" />
-                Заместитель
-              </Label>
-              <Select
-                value={newDeputyId}
-                onValueChange={setNewDeputyId}
-                disabled={newHeadId === "none"}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={newHeadId === "none" ? "Сначала назначьте заведующего" : "Выберите заместителя"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Не назначен</SelectItem>
-                  {users
-                    .filter((u) => u.employeeId !== newHeadId)
-                    .map((u) => (
-                      <SelectItem key={u.employeeId} value={u.employeeId as string}>
-                        {u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim()}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                Замещает заведующего на время отпуска или болезни.
-              </p>
-            </div>
+            {editingItem?.id && (
+              <>
+                <div className="grid gap-2">
+                  <Label>Заведующий отделением</Label>
+                  <SearchableSelect
+                    options={buildHeadOptions(headCandidates, users, editingItem.oldHeadId)}
+                    value={newHeadId}
+                    onChange={(v) => {
+                      setNewHeadId(v);
+                      if (v === "none") setNewDeputyId("none");
+                    }}
+                    placeholder={isLoadingCandidates ? "Загрузка кандидатов..." : "Выберите заведующего"}
+                    disabled={isLoadingCandidates}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label className="flex items-center gap-1.5">
+                    <UserCog className="h-3.5 w-3.5" />
+                    Заместитель
+                  </Label>
+                  <SearchableSelect
+                    options={buildHeadOptions(headCandidates, users, editingItem.oldDeputyId, newHeadId)}
+                    value={newDeputyId}
+                    onChange={setNewDeputyId}
+                    placeholder={newHeadId === "none" ? "Сначала назначьте заведующего" : "Выберите заместителя"}
+                    disabled={newHeadId === "none" || isLoadingCandidates}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Замещает заведующего на время отпуска или болезни.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeptDialogOpen(false)}>Отмена</Button>

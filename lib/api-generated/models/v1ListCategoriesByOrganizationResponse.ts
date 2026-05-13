@@ -5,5 +5,6 @@
 import type { v1Category } from './v1Category';
 export type v1ListCategoriesByOrganizationResponse = {
     items?: Array<v1Category>;
+    nextCursor?: string;
 };
 

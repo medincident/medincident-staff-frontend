@@ -2,7 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { v1Address } from './v1Address';
+import type { queryOrgstructureV1Address } from './queryOrgstructureV1Address';
 /**
  * Organization mirrors the projections.organizations row returned by
  * GetOrganization. Timestamps are RFC3339 strings.
@@ -11,7 +11,7 @@ export type v1Organization = {
     id?: string;
     name?: string;
     description?: string;
-    legalAddress?: v1Address;
+    legalAddress?: queryOrgstructureV1Address;
     createdAt?: string;
     updatedAt?: string;
 };

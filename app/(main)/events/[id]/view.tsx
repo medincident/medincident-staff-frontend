@@ -81,8 +81,27 @@ function DetailsSection({
   canManage: boolean;
 }) {
   const isCancelled = status === "cancelled";
+  const isFinished = status === "completed" || status === "closed";
+  const reopenedFromId = (event as any).reopenedFromIncidentId as string | undefined;
   return (
     <div className="space-y-6">
+      {reopenedFromId && (
+        <Card className="bg-primary/5 border-primary/20 gap-1">
+          <CardContent className="py-3 px-4 text-sm text-foreground flex items-center gap-2">
+            <RotateCcw className="h-4 w-4 text-primary shrink-0" />
+            <span>
+              Это повторно открытое событие. Оригинал:{" "}
+              <Link
+                href={`/events/${reopenedFromId}`}
+                className="text-primary font-mono font-semibold hover:underline"
+              >
+                #{reopenedFromId.substring(0, 8)}
+              </Link>
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="gap-3 bg-card border">
         <CardHeader>
           <div className="text-xs text-primary font-semibold uppercase tracking-wider mb-1">
@@ -159,7 +178,7 @@ function DetailsSection({
           <Separator className="bg-primary/10" />
 
           <div className="flex flex-col sm:flex-row gap-2">
-            {isCancelled ? (
+            {isFinished ? (
               <Button
                 type="button"
                 variant="outline"
@@ -168,9 +187,9 @@ function DetailsSection({
                 disabled={isMutating}
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Возобновить событие
+                Открыть повторно
               </Button>
-            ) : (
+            ) : !isCancelled ? (
               <Button
                 type="button"
                 variant="outline"
@@ -181,12 +200,17 @@ function DetailsSection({
                 <Ban className="mr-2 h-4 w-4" />
                 Отменить событие
               </Button>
-            )}
+            ) : null}
           </div>
 
           {isCancelled && (
             <p className="text-[11px] text-muted-foreground bg-muted/40 border rounded px-2 py-1.5">
-              Событие отменено. Чтобы менять статус и приоритет — сначала возобновите его.
+              Событие отменено. Изменение статуса и приоритета недоступно.
+            </p>
+          )}
+          {isFinished && (
+            <p className="text-[11px] text-muted-foreground bg-muted/40 border rounded px-2 py-1.5">
+              Событие завершено. Можно открыть повторно — будет создана новая запись со ссылкой на текущую.
             </p>
           )}
         </CardContent>
@@ -413,17 +437,28 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
     }
   };
 
+  // Бэкенд при reopen создаёт НОВОЕ событие, а текущее остаётся в своём
+  // завершённом статусе. У нового события поле reopenedFromIncidentId
+  // указывает на оригинал. После успешного reopen уводим пользователя
+  // на страницу нового события — там и пойдёт дальнейшая работа.
   const handleReopen = async () => {
     if (!event?.id) return;
+    if (!confirm("Создать повторное событие на основе этого? Текущее останется в архивe в статусе завершённого.")) {
+      return;
+    }
     setIsMutating(true);
     try {
-      await IncidentCommandService.incidentCommandReopenIncident(event.id);
-      setStatus("created" as EventStatus);
-      setEvent({ ...event, status: "INCIDENT_STATUS_PENDING" as any });
-      notify.mutationSuccess("Событие возобновлено", "Можно снова менять статус и приоритет.");
+      const res = await IncidentCommandService.incidentCommandReopenIncident(event.id);
+      const reopenedId = res && "reopenedIncidentId" in res ? res.reopenedIncidentId : undefined;
+      notify.mutationSuccess("Событие открыто повторно", "Создана новая запись со ссылкой на оригинал.");
+      if (reopenedId) {
+        router.push(`/events/${reopenedId}`);
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       console.error(error);
-      notify.mutationError("Ошибка", "Не удалось возобновить событие.");
+      notify.apiError(error, "Не удалось открыть событие повторно");
     } finally {
       setIsMutating(false);
     }

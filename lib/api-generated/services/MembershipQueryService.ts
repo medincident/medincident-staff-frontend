@@ -10,6 +10,13 @@ import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetClinicHeadResponse } from '../models/v1GetClinicHeadResponse';
 import type { v1GetDepartmentResponsibleResponse } from '../models/v1GetDepartmentResponsibleResponse';
 import type { v1GetEmployeeResponse } from '../models/v1GetEmployeeResponse';
+import type { v1ListCandidatesForClinicHeadResponse } from '../models/v1ListCandidatesForClinicHeadResponse';
+import type { v1ListCandidatesForDeptResponsibleResponse } from '../models/v1ListCandidatesForDeptResponsibleResponse';
+import type { v1ListCandidatesForHireResponse } from '../models/v1ListCandidatesForHireResponse';
+import type { v1ListCandidatesForOrgAdminResponse } from '../models/v1ListCandidatesForOrgAdminResponse';
+import type { v1ListCandidatesForOrgDispatcherResponse } from '../models/v1ListCandidatesForOrgDispatcherResponse';
+import type { v1ListCandidatesForOrgHeadResponse } from '../models/v1ListCandidatesForOrgHeadResponse';
+import type { v1ListCandidatesForSystemAdminResponse } from '../models/v1ListCandidatesForSystemAdminResponse';
 import type { v1ListEmployeesByClinicResponse } from '../models/v1ListEmployeesByClinicResponse';
 import type { v1ListEmployeesByDepartmentResponse } from '../models/v1ListEmployeesByDepartmentResponse';
 import type { v1ListEmployeesByOrganizationResponse } from '../models/v1ListEmployeesByOrganizationResponse';
@@ -25,8 +32,47 @@ import { request as __request } from '../core/request';
 export class MembershipQueryService {
     /**
      * @param clinicId
+     * @param query Optional substring search (ILIKE %query%) on first_name, last_name,
+     * display_name, email. Trimmed at the handler boundary. Max 256 chars.
+     * @param after
      * @param limit
-     * @param offset
+     * @returns v1ListCandidatesForClinicHeadResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryListCandidatesForClinicHead(
+        clinicId: string,
+        query?: string,
+        after?: string,
+        limit?: number,
+    ): CancelablePromise<v1ListCandidatesForClinicHeadResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/clinics/{clinicId}/candidates:clinic-head',
+            path: {
+                'clinicId': clinicId,
+            },
+            query: {
+                'query': query,
+                'after': after,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid input. Error codes:
+                - \`candidate_search_query_too_long\` — search query exceeds 256 characters.
+                - \`invalid_cursor\` — cursor is malformed.
+                - \`list_limit_out_of_range\` — limit outside [1, 500].`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`candidate_load_failed\` — database query failed.`,
+            },
+        });
+    }
+    /**
+     * @param clinicId
+     * @param limit
+     * @param after
      * @param includeTerminated When false (default), rows with terminated_at IS NOT NULL are
      * hidden. Set true to include offboarded employees.
      * @param onVacation When true, restrict to employees currently on an active vacation
@@ -40,7 +86,7 @@ export class MembershipQueryService {
     public static membershipQueryListEmployeesByClinic(
         clinicId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
@@ -53,13 +99,14 @@ export class MembershipQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -128,8 +175,47 @@ export class MembershipQueryService {
     }
     /**
      * @param departmentId
+     * @param query Optional substring search (ILIKE %query%) on first_name, last_name,
+     * display_name, email. Trimmed at the handler boundary. Max 256 chars.
+     * @param after
      * @param limit
-     * @param offset
+     * @returns v1ListCandidatesForDeptResponsibleResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryListCandidatesForDeptResponsible(
+        departmentId: string,
+        query?: string,
+        after?: string,
+        limit?: number,
+    ): CancelablePromise<v1ListCandidatesForDeptResponsibleResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/departments/{departmentId}/candidates:dept-responsible',
+            path: {
+                'departmentId': departmentId,
+            },
+            query: {
+                'query': query,
+                'after': after,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid input. Error codes:
+                - \`candidate_search_query_too_long\` — search query exceeds 256 characters.
+                - \`invalid_cursor\` — cursor is malformed.
+                - \`list_limit_out_of_range\` — limit outside [1, 500].`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`candidate_load_failed\` — database query failed.`,
+            },
+        });
+    }
+    /**
+     * @param departmentId
+     * @param limit
+     * @param after
      * @param includeTerminated When false (default), rows with terminated_at IS NOT NULL are
      * hidden. Set true to include offboarded employees.
      * @param onVacation When true, restrict to employees currently on an active vacation
@@ -143,7 +229,7 @@ export class MembershipQueryService {
     public static membershipQueryListEmployeesByDepartment(
         departmentId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
@@ -156,13 +242,14 @@ export class MembershipQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -234,7 +321,7 @@ export class MembershipQueryService {
      * @param state Optional state filter. When empty, all states are returned.
      * Valid values: scheduled, active, ended, cancelled.
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListVacationsByEmployeeResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -243,7 +330,7 @@ export class MembershipQueryService {
         employeeId: string,
         state?: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListVacationsByEmployeeResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -254,10 +341,11 @@ export class MembershipQueryService {
             query: {
                 'state': state,
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -321,7 +409,7 @@ export class MembershipQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListOrgAdminsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -329,7 +417,7 @@ export class MembershipQueryService {
     public static membershipQueryListOrgAdmins(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListOrgAdminsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -339,10 +427,11 @@ export class MembershipQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -351,8 +440,164 @@ export class MembershipQueryService {
     }
     /**
      * @param organizationId
+     * @param query Optional substring search (ILIKE %query%) on first_name, last_name,
+     * display_name, email. Trimmed at the handler boundary. Max 256 chars.
+     * @param after Opaque cursor from next_cursor of a previous response. Empty = first page.
+     * @param limit Page size. 0 → default 50. Range [1, 500].
+     * @returns v1ListCandidatesForHireResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryListCandidatesForHire(
+        organizationId: string,
+        query?: string,
+        after?: string,
+        limit?: number,
+    ): CancelablePromise<v1ListCandidatesForHireResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/organizations/{organizationId}/candidates:hire',
+            path: {
+                'organizationId': organizationId,
+            },
+            query: {
+                'query': query,
+                'after': after,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid input. Error codes:
+                - \`candidate_search_query_too_long\` — search query exceeds 256 characters.
+                - \`invalid_cursor\` — cursor is malformed.
+                - \`list_limit_out_of_range\` — limit outside [1, 500].`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`candidate_load_failed\` — database query failed.`,
+            },
+        });
+    }
+    /**
+     * @param organizationId
+     * @param query Optional substring search (ILIKE %query%) on first_name, last_name,
+     * display_name, email. Trimmed at the handler boundary. Max 256 chars.
+     * @param after
      * @param limit
-     * @param offset
+     * @returns v1ListCandidatesForOrgAdminResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryListCandidatesForOrgAdmin(
+        organizationId: string,
+        query?: string,
+        after?: string,
+        limit?: number,
+    ): CancelablePromise<v1ListCandidatesForOrgAdminResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/organizations/{organizationId}/candidates:org-admin',
+            path: {
+                'organizationId': organizationId,
+            },
+            query: {
+                'query': query,
+                'after': after,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid input. Error codes:
+                - \`candidate_search_query_too_long\` — search query exceeds 256 characters.
+                - \`invalid_cursor\` — cursor is malformed.
+                - \`list_limit_out_of_range\` — limit outside [1, 500].`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`candidate_load_failed\` — database query failed.`,
+            },
+        });
+    }
+    /**
+     * @param organizationId
+     * @param query Optional substring search (ILIKE %query%) on first_name, last_name,
+     * display_name, email. Trimmed at the handler boundary. Max 256 chars.
+     * @param after
+     * @param limit
+     * @returns v1ListCandidatesForOrgDispatcherResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryListCandidatesForOrgDispatcher(
+        organizationId: string,
+        query?: string,
+        after?: string,
+        limit?: number,
+    ): CancelablePromise<v1ListCandidatesForOrgDispatcherResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/organizations/{organizationId}/candidates:org-dispatcher',
+            path: {
+                'organizationId': organizationId,
+            },
+            query: {
+                'query': query,
+                'after': after,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid input. Error codes:
+                - \`candidate_search_query_too_long\` — search query exceeds 256 characters.
+                - \`invalid_cursor\` — cursor is malformed.
+                - \`list_limit_out_of_range\` — limit outside [1, 500].`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`candidate_load_failed\` — database query failed.`,
+            },
+        });
+    }
+    /**
+     * @param organizationId
+     * @param query Optional substring search (ILIKE %query%) on first_name, last_name,
+     * display_name, email. Trimmed at the handler boundary. Max 256 chars.
+     * @param after
+     * @param limit
+     * @returns v1ListCandidatesForOrgHeadResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryListCandidatesForOrgHead(
+        organizationId: string,
+        query?: string,
+        after?: string,
+        limit?: number,
+    ): CancelablePromise<v1ListCandidatesForOrgHeadResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/organizations/{organizationId}/candidates:org-head',
+            path: {
+                'organizationId': organizationId,
+            },
+            query: {
+                'query': query,
+                'after': after,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid input. Error codes:
+                - \`candidate_search_query_too_long\` — search query exceeds 256 characters.
+                - \`invalid_cursor\` — cursor is malformed.
+                - \`list_limit_out_of_range\` — limit outside [1, 500].`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`candidate_load_failed\` — database query failed.`,
+            },
+        });
+    }
+    /**
+     * @param organizationId
+     * @param limit
+     * @param after
      * @returns v1ListOrgDispatchersResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -360,7 +605,7 @@ export class MembershipQueryService {
     public static membershipQueryListOrgDispatchers(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListOrgDispatchersResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -370,10 +615,11 @@ export class MembershipQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -383,7 +629,7 @@ export class MembershipQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @param includeTerminated When false (default), rows with terminated_at IS NOT NULL are
      * hidden. Set true to include offboarded employees.
      * @param onVacation When true, restrict to employees currently on an active vacation
@@ -397,7 +643,7 @@ export class MembershipQueryService {
     public static membershipQueryListEmployeesByOrganization(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
@@ -410,13 +656,14 @@ export class MembershipQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -469,7 +716,7 @@ export class MembershipQueryService {
      * length 256 characters; over-long inputs are rejected before the
      * authz round-trip.
      * @param limit
-     * @param offset
+     * @param after
      * @param includeTerminated When false (default), rows with terminated_at IS NOT NULL are
      * hidden. Set true to include offboarded employees.
      * @param onVacation When true, restrict to employees currently on an active vacation
@@ -484,7 +731,7 @@ export class MembershipQueryService {
         organizationId: string,
         query?: string,
         limit?: number,
-        offset?: number,
+        after?: string,
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
@@ -498,13 +745,14 @@ export class MembershipQueryService {
             query: {
                 'query': query,
                 'limit': limit,
-                'offset': offset,
+                'after': after,
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -514,7 +762,7 @@ export class MembershipQueryService {
     /**
      * @param organizationId
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListOrgHeadsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -522,7 +770,7 @@ export class MembershipQueryService {
     public static membershipQueryListOrgHeads(
         organizationId: string,
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListOrgHeadsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -532,10 +780,11 @@ export class MembershipQueryService {
             },
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
@@ -544,27 +793,62 @@ export class MembershipQueryService {
     }
     /**
      * @param limit
-     * @param offset
+     * @param after
      * @returns v1ListSystemAdminsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
     public static membershipQueryListSystemAdmins(
         limit?: number,
-        offset?: number,
+        after?: string,
     ): CancelablePromise<v1ListSystemAdminsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/system-admins',
             query: {
                 'limit': limit,
-                'offset': offset,
+                'after': after,
             },
             errors: {
-                400: `Validation failed or invalid input.`,
+                400: `Validation failed. Error codes:
+                - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
                 500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * @param query Optional substring search (ILIKE %query%) on first_name, last_name,
+     * display_name, email. Trimmed at the handler boundary. Max 256 chars.
+     * @param after
+     * @param limit
+     * @returns v1ListCandidatesForSystemAdminResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryListCandidatesForSystemAdmin(
+        query?: string,
+        after?: string,
+        limit?: number,
+    ): CancelablePromise<v1ListCandidatesForSystemAdminResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/system-admins/candidates',
+            query: {
+                'query': query,
+                'after': after,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid input. Error codes:
+                - \`candidate_search_query_too_long\` — search query exceeds 256 characters.
+                - \`invalid_cursor\` — cursor is malformed.
+                - \`list_limit_out_of_range\` — limit outside [1, 500].`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`candidate_load_failed\` — database query failed.`,
             },
         });
     }
