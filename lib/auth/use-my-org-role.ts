@@ -17,12 +17,25 @@ const EMPTY: MyOrgRole = {
 };
 
 const CACHE_KEY_PREFIX = "myOrgRole:";
+// TTL короткий — компромисс между «лишний запрос на каждый mount» и
+// «друг выдал главврача, а UI не обновляется до закрытия вкладки».
+// 30 сек: при типичной навигации между страницами роль остаётся из кеша,
+// но любое изменение прав видно почти сразу после следующего перехода.
+const CACHE_TTL_MS = 30_000;
+
+type CacheEntry = MyOrgRole & { _t: number };
 
 function readCache(orgId: string): MyOrgRole | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(CACHE_KEY_PREFIX + orgId);
-    return raw ? (JSON.parse(raw) as MyOrgRole) : null;
+    if (!raw) return null;
+    const entry = JSON.parse(raw) as CacheEntry;
+    if (typeof entry._t !== "number" || Date.now() - entry._t > CACHE_TTL_MS) {
+      sessionStorage.removeItem(CACHE_KEY_PREFIX + orgId);
+      return null;
+    }
+    return { isOrgAdmin: entry.isOrgAdmin, isOrgHead: entry.isOrgHead, isOrgDispatcher: entry.isOrgDispatcher };
   } catch {
     return null;
   }
@@ -31,7 +44,8 @@ function readCache(orgId: string): MyOrgRole | null {
 function writeCache(orgId: string, role: MyOrgRole): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(CACHE_KEY_PREFIX + orgId, JSON.stringify(role));
+    const entry: CacheEntry = { ...role, _t: Date.now() };
+    sessionStorage.setItem(CACHE_KEY_PREFIX + orgId, JSON.stringify(entry));
   } catch {}
 }
 

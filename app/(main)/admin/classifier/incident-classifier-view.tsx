@@ -257,7 +257,7 @@ export function IncidentClassifierView() {
     setEditingItem(type ? { id: type.id, name: type.name } : null);
     setNewItemName(type ? type.name : "");
     setNewItemDescription(type?.description || "");
-    setNewItemPatientCanReport(type ? (type.patientAllowed === true) : false);
+    setNewItemPatientCanReport(type ? (type.isAllowedForPatients === true) : false);
     setIsTypeDialogOpen(true);
   };
 
@@ -439,7 +439,7 @@ export function IncidentClassifierView() {
                                     </Badge>
                                   )}
                                   <Badge variant="outline" className="text-[10px]">
-                                    {type.patientAllowed ? "Для пациентов" : "Внутреннее"}
+                                    {type.isAllowedForPatients ? "Для пациентов" : "Внутреннее"}
                                   </Badge>
                                 </div>
                               </div>

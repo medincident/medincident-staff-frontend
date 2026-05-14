@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { OpenAPI } from "@/lib/api-generated";
+import { NotificationsOpenAPI } from "@/lib/notifications-api";
 import { notify } from "@/lib/toast";
 
 type Support = "unknown" | "yes" | "no" | "ios-needs-pwa";
@@ -88,37 +88,21 @@ export function PushNotificationManager() {
         applicationServerKey: urlBase64ToUint8Array(vapidPub) as BufferSource,
       });
 
-      // ⚠️ medincident-backend#149 — endpoint ещё не реализован. Пока бэк
-      // не принимает подписку, оставляем её только локально и предупреждаем
-      // пользователя. После landing'а — заменить на типизированный вызов
-      // PushService.subscribeDevice из @/lib/api-generated.
       const json = sub.toJSON();
-      try {
-        await axios.post(
-          `${OpenAPI.BASE}/push/subscriptions`,
-          {
-            endpoint: json.endpoint,
-            p256dh: json.keys?.p256dh,
-            auth: json.keys?.auth,
-            userAgent: navigator.userAgent,
-          },
-          { headers: await authHeader() },
-        );
-        notify.success(
-          "Уведомления включены",
-          "Вы будете получать оповещения на этом устройстве.",
-        );
-      } catch (err: any) {
-        const status = err?.response?.status;
-        if (status === 404 || status === 501) {
-          notify.warning(
-            "Не подключено к серверу",
-            "Подписка сохранена в браузере. Сервер ещё не умеет принимать push — синхронизируется после фикса (#149).",
-          );
-        } else {
-          throw err;
-        }
-      }
+      await axios.post(
+        `${NotificationsOpenAPI.BASE}/api/v1/push/subscriptions`,
+        {
+          endpoint: json.endpoint,
+          p256dh: json.keys?.p256dh,
+          auth: json.keys?.auth,
+          userAgent: navigator.userAgent,
+        },
+        { headers: await authHeader() },
+      );
+      notify.success(
+        "Уведомления включены",
+        "Вы будете получать оповещения на этом устройстве.",
+      );
 
       setSubscription(sub);
     } catch (err) {
@@ -137,15 +121,15 @@ export function PushNotificationManager() {
     setIsWorking(true);
     try {
       try {
-        await axios.delete(`${OpenAPI.BASE}/push/subscriptions`, {
+        await axios.delete(`${NotificationsOpenAPI.BASE}/api/v1/push/subscriptions`, {
           headers: await authHeader(),
           data: { endpoint: subscription.endpoint },
         });
-      } catch (err: any) {
-        const status = err?.response?.status;
-        if (status !== 404 && status !== 501) {
-          console.warn("Backend unsubscribe failed:", err);
-        }
+      } catch (err) {
+        // Серверная отписка — best-effort: даже если ряд уже удалён или сеть
+        // упала, локальную подписку всё равно отзываем, иначе бейдж "Включено"
+        // продолжит висеть навсегда.
+        console.warn("Backend unsubscribe failed:", err);
       }
       await subscription.unsubscribe();
       setSubscription(null);

@@ -1,0 +1,421 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Medincident Notifications API",
+    "version": "v1"
+  },
+  "tags": [
+    {
+      "name": "NotificationService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/notifications": {
+      "get": {
+        "summary": "ListNotifications returns the caller's notifications with cursor pagination.",
+        "operationId": "NotificationService_ListNotifications",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListNotificationsResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "unreadOnly",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "NotificationService"
+        ]
+      }
+    },
+    "/api/v1/notifications/quiet-hours": {
+      "get": {
+        "summary": "GetQuietHours returns the caller's quiet hours configuration.",
+        "operationId": "NotificationService_GetQuietHours",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetQuietHoursResponse"
+            }
+          }
+        },
+        "tags": [
+          "NotificationService"
+        ]
+      },
+      "put": {
+        "summary": "UpdateQuietHours upserts the caller's quiet hours configuration.",
+        "operationId": "NotificationService_UpdateQuietHours",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UpdateQuietHoursResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UpdateQuietHoursRequest"
+            }
+          }
+        ],
+        "tags": [
+          "NotificationService"
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "summary": "MarkAllAsRead marks all of the caller's notifications as read.",
+        "operationId": "NotificationService_MarkAllAsRead",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1MarkAllAsReadResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1MarkAllAsReadRequest"
+            }
+          }
+        ],
+        "tags": [
+          "NotificationService"
+        ]
+      }
+    },
+    "/api/v1/notifications/settings": {
+      "get": {
+        "summary": "GetSettings returns all notification type settings for the caller.",
+        "operationId": "NotificationService_GetSettings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetSettingsResponse"
+            }
+          }
+        },
+        "tags": [
+          "NotificationService"
+        ]
+      },
+      "put": {
+        "summary": "UpdateSettings upserts notification type settings for the caller.",
+        "operationId": "NotificationService_UpdateSettings",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UpdateSettingsResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UpdateSettingsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "NotificationService"
+        ]
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "summary": "GetUnreadCount returns the count of unread notifications.",
+        "operationId": "NotificationService_GetUnreadCount",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetUnreadCountResponse"
+            }
+          }
+        },
+        "tags": [
+          "NotificationService"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "summary": "MarkAsRead marks a single notification as read.",
+        "operationId": "NotificationService_MarkAsRead",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1MarkAsReadResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NotificationServiceMarkAsReadBody"
+            }
+          }
+        ],
+        "tags": [
+          "NotificationService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "NotificationServiceMarkAsReadBody": {
+      "type": "object"
+    },
+    "protobufNullValue": {
+      "type": "string",
+      "enum": [
+        "NULL_VALUE"
+      ],
+      "default": "NULL_VALUE",
+      "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\nThe JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value."
+    },
+    "v1GetQuietHoursResponse": {
+      "type": "object",
+      "properties": {
+        "quietHours": {
+          "$ref": "#/definitions/v1QuietHours"
+        }
+      }
+    },
+    "v1GetSettingsResponse": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1NotificationTypeSetting"
+          }
+        }
+      }
+    },
+    "v1GetUnreadCountResponse": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "v1ListNotificationsResponse": {
+      "type": "object",
+      "properties": {
+        "notifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Notification"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      }
+    },
+    "v1MarkAllAsReadRequest": {
+      "type": "object"
+    },
+    "v1MarkAllAsReadResponse": {
+      "type": "object"
+    },
+    "v1MarkAsReadResponse": {
+      "type": "object"
+    },
+    "v1Notification": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/v1NotificationType"
+        },
+        "entityType": {
+          "type": "string"
+        },
+        "entityId": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "isSecurity": {
+          "type": "boolean"
+        },
+        "isRead": {
+          "type": "boolean"
+        },
+        "readAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "Notification is a single notification entry."
+    },
+    "v1NotificationType": {
+      "type": "string",
+      "enum": [
+        "NOTIFICATION_TYPE_UNSPECIFIED",
+        "NOTIFICATION_TYPE_INCIDENT_CREATED",
+        "NOTIFICATION_TYPE_INCIDENT_STATUS_CHANGED",
+        "NOTIFICATION_TYPE_INCIDENT_PRIORITY_CHANGED",
+        "NOTIFICATION_TYPE_INCIDENT_DESCRIPTION_UPDATED",
+        "NOTIFICATION_TYPE_SERVICE_REQUEST_CREATED",
+        "NOTIFICATION_TYPE_SERVICE_REQUEST_STATUS_CHANGED",
+        "NOTIFICATION_TYPE_SERVICE_REQUEST_EXECUTOR_ASSIGNED",
+        "NOTIFICATION_TYPE_SERVICE_REQUEST_EXECUTOR_REMOVED",
+        "NOTIFICATION_TYPE_VACATION_SCHEDULED",
+        "NOTIFICATION_TYPE_VACATION_STARTED",
+        "NOTIFICATION_TYPE_VACATION_ENDED",
+        "NOTIFICATION_TYPE_VACATION_CANCELLED",
+        "NOTIFICATION_TYPE_VACATION_END_DATE_CHANGED",
+        "NOTIFICATION_TYPE_EMPLOYEE_HIRED",
+        "NOTIFICATION_TYPE_EMPLOYEE_TERMINATED",
+        "NOTIFICATION_TYPE_EMPLOYEE_DEPARTMENT_CHANGED",
+        "NOTIFICATION_TYPE_EMPLOYEE_POSITION_CHANGED",
+        "NOTIFICATION_TYPE_ROLE_ASSIGNED",
+        "NOTIFICATION_TYPE_ROLE_REVOKED",
+        "NOTIFICATION_TYPE_SYSTEM_ADMIN_GRANTED",
+        "NOTIFICATION_TYPE_SYSTEM_ADMIN_REVOKED",
+        "NOTIFICATION_TYPE_SECURITY_NEW_LOGIN",
+        "NOTIFICATION_TYPE_SECURITY_EMAIL_CHANGED"
+      ],
+      "default": "NOTIFICATION_TYPE_UNSPECIFIED",
+      "description": "NotificationType enumerates all notification types.\n\n - NOTIFICATION_TYPE_INCIDENT_CREATED: Incident\n - NOTIFICATION_TYPE_SERVICE_REQUEST_CREATED: Service request\n - NOTIFICATION_TYPE_VACATION_SCHEDULED: Vacation\n - NOTIFICATION_TYPE_EMPLOYEE_HIRED: Employee\n - NOTIFICATION_TYPE_ROLE_ASSIGNED: Role\n - NOTIFICATION_TYPE_SYSTEM_ADMIN_GRANTED: System admin\n - NOTIFICATION_TYPE_SECURITY_NEW_LOGIN: Security (bypass quiet hours)"
+    },
+    "v1NotificationTypeSetting": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/v1NotificationType"
+        },
+        "pushEnabled": {
+          "type": "boolean"
+        },
+        "emailEnabled": {
+          "type": "boolean"
+        }
+      },
+      "description": "NotificationTypeSetting holds per-type delivery settings."
+    },
+    "v1QuietHours": {
+      "type": "object",
+      "properties": {
+        "startTime": {
+          "type": "string",
+          "title": "start_time in \"HH:MM\" format (24h)"
+        },
+        "endTime": {
+          "type": "string",
+          "title": "end_time in \"HH:MM\" format (24h)"
+        },
+        "timezone": {
+          "type": "string",
+          "title": "timezone is an IANA timezone name, e.g. \"Europe/Moscow\""
+        },
+        "weekendSilent": {
+          "type": "boolean",
+          "title": "weekend_silent: if true, the entire weekend is treated as quiet (not just the time window)"
+        }
+      },
+      "description": "QuietHours holds the user's quiet hours configuration."
+    },
+    "v1UpdateQuietHoursRequest": {
+      "type": "object",
+      "properties": {
+        "quietHours": {
+          "$ref": "#/definitions/v1QuietHours"
+        }
+      }
+    },
+    "v1UpdateQuietHoursResponse": {
+      "type": "object"
+    },
+    "v1UpdateSettingsRequest": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1NotificationTypeSetting"
+          }
+        }
+      }
+    },
+    "v1UpdateSettingsResponse": {
+      "type": "object"
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    }
+  }
+}

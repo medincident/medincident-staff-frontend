@@ -47,14 +47,12 @@ import {
   classifierV1Type
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
-import { useMyIdentity } from "@/lib/auth/use-my-identity";
-import { useMyOrgRole } from "@/lib/auth/use-my-org-role";
+import { usePermissions } from "@/lib/auth/use-permissions";
 
 export function EventsListView() {
   const { data: session } = useSession();
   const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
-  const { identity } = useMyIdentity();
-  const { role } = useMyOrgRole();
+  const perms = usePermissions();
   const [events, setEvents] = useState<v1IncidentView[]>([]);
   const [categories, setCategories] = useState<v1Category[]>([]);
   const [types, setTypes] = useState<classifierV1Type[]>([]);
@@ -64,7 +62,10 @@ export function EventsListView() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    if (isOrgResolving) return;
+    // Ждём, пока подгрузятся разрешения — иначе на первой итерации флаги
+    // EMPTY, и пользователь-главврач уходил бы в ветку «вижу только своё»,
+    // даже если ему положено видеть всю организацию.
+    if (isOrgResolving || perms.isLoading) return;
     const loadData = async () => {
       const userId = (session?.user as any)?.id;
       if (!userId) return;
@@ -73,13 +74,11 @@ export function EventsListView() {
         setIsLoading(true);
         const orgId = activeOrgId ?? "";
 
-        // Загружаем инциденты на основе роли. SystemAdmin/OrgAdmin/Dispatcher
-        // видят все инциденты орги, остальные — только свои (ListMyIncidents).
-        const isDispatcherOrAdmin =
-          !!identity?.isSystemAdmin || role.isOrgAdmin || role.isOrgDispatcher;
-
+        // Кто видит весь журнал — sysadmin / orgAdmin / orgHead / orgDispatcher
+        // (см. canSeeAllIncidents в use-permissions). Главврача раньше
+        // отсутствовал — попадал в else и видел только свои инциденты.
         let incidentsRes;
-        if (isDispatcherOrAdmin && orgId) {
+        if (perms.canSeeAllIncidents && orgId) {
           incidentsRes = await IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100);
         } else {
           incidentsRes = await IncidentQueryService.incidentQueryListMyIncidents(100);
@@ -110,7 +109,7 @@ export function EventsListView() {
       }
     };
     loadData();
-  }, [session, activeOrgId, isOrgResolving, identity, role]);
+  }, [session, activeOrgId, isOrgResolving, perms.isLoading, perms.canSeeAllIncidents]);
 
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const typeMap: Record<string, string> = {};

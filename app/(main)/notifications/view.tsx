@@ -1,65 +1,135 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Info, AlertTriangle, Check, Shield, FileText, UserPlus, Clock, BellOff, CheckCheck, LucideIcon
+  ArrowLeft,
+  BellOff,
+  CheckCheck,
+  Clock,
+  Settings,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Notification } from "@/lib/types";
+import { notify } from "@/lib/toast";
 import { getIntentColors } from "@/lib/status-helper";
+import {
+  NotificationService,
+  type v1Notification,
+} from "@/lib/notifications-api";
+import {
+  displayNotification,
+  notificationDescription,
+} from "@/lib/notifications-api/display";
 
-const ICON_MAP: Record<string, LucideIcon> = {
-  info: Info,
-  warning: AlertTriangle,
-  error: Shield,
-  success: Check,
-  file: FileText,
-  user: UserPlus,
-  default: Info
-};
+const PAGE_SIZE = 50;
+
+function formatDateLabel(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
 
 export function NotificationsView() {
   const router = useRouter();
-  
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // TODO: NotificationQueryService.ListMyNotifications — medincident-backend#149
-        setNotifications([]);
-      } catch (error) {
-        console.error("Failed to load notifications:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
+  const [notifications, setNotifications] = useState<v1Notification[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
+
+  const loadFirstPage = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await NotificationService.notificationListNotifications(
+        undefined,
+        PAGE_SIZE,
+        undefined,
+      );
+      setNotifications(res.notifications ?? []);
+      setNextCursor(res.nextCursor || undefined);
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+      notify.apiError(err, "Не удалось загрузить уведомления");
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    loadFirstPage();
+  }, [loadFirstPage]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || isLoadingMore) return;
+    try {
+      setIsLoadingMore(true);
+      const res = await NotificationService.notificationListNotifications(
+        nextCursor,
+        PAGE_SIZE,
+        undefined,
+      );
+      setNotifications((prev) => [...prev, ...(res.notifications ?? [])]);
+      setNextCursor(res.nextCursor || undefined);
+    } catch (err) {
+      notify.apiError(err, "Не удалось загрузить ещё");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [nextCursor, isLoadingMore]);
+
   const handleMarkAllRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setIsMarkingAll(true);
+    try {
+      await NotificationService.notificationMarkAllAsRead({});
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, isRead: true, readAt: n.readAt ?? new Date().toISOString() })),
+      );
+      notify.mutationSuccess("Все уведомления отмечены прочитанными");
+    } catch (err) {
+      notify.apiError(err, "Не удалось пометить все");
+    } finally {
+      setIsMarkingAll(false);
+    }
   };
 
-  const grouped = notifications.reduce((acc, note) => {
-    if (!acc[note.date]) acc[note.date] = [];
-    acc[note.date].push(note);
+  const handleMarkOneRead = async (id?: string) => {
+    if (!id) return;
+    // Оптимистично переключаем флаг — если бэк ответит ошибкой, откатим.
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n)),
+    );
+    try {
+      await NotificationService.notificationMarkAsRead(id, {});
+    } catch (err) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: false, readAt: undefined } : n)),
+      );
+      notify.apiError(err, "Не удалось отметить уведомление");
+    }
+  };
+
+  // Группировка по дате создания
+  const grouped = notifications.reduce((acc, n) => {
+    const date = n.createdAt ? formatDateLabel(n.createdAt) : "Без даты";
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(n);
     return acc;
-  }, {} as Record<string, Notification[]>);
+  }, {} as Record<string, v1Notification[]>);
+
+  const hasUnread = notifications.some((n) => !n.isRead);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
-
       {/* HEADER */}
       <div className="flex items-center justify-between gap-2 sticky top-0 bg-background/80 backdrop-blur-md py-4 z-10 border-b md:static md:border-none md:bg-transparent md:py-0 px-4 md:px-0 min-w-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -71,171 +141,161 @@ export function NotificationsView() {
             <p className="text-sm text-muted-foreground truncate">История системных сообщений</p>
           </div>
         </div>
-        
-        {!isLoading && notifications.some(n => !n.read) && (
-          <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-primary hover:bg-primary/10 shrink-0">
-            <CheckCheck className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Пометить все</span>
-          </Button>
-        )}
+
+        <div className="flex items-center gap-1 shrink-0">
+          <Link href="/notifications/settings">
+            <Button variant="ghost" size="icon" className="hover:bg-muted" title="Настройки уведомлений">
+              <Settings className="h-5 w-5 text-foreground" />
+            </Button>
+          </Link>
+          {!isLoading && hasUnread && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleMarkAllRead}
+              disabled={isMarkingAll}
+              className="text-primary hover:bg-primary/10"
+            >
+              <CheckCheck className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Пометить все</span>
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* DESKTOP CONTENT */}
-      <div className="hidden md:block space-y-8">
-        {isLoading ? (
-           /* DESKTOP SKELETONS */
-           <div className="space-y-8">
-              {[1, 2].map((group) => (
-                 <div key={`group-skel-${group}`} className="relative">
-                    <div className="flex items-center mb-4">
-                       <Skeleton className="h-6 w-24 rounded-full" /> {/* Date badge */}
-                       <div className="h-px bg-border flex-1 ml-4 opacity-50"></div>
-                    </div>
-                    <div className="space-y-3">
-                       {[1, 2, 3].map((item) => (
-                          <div key={`item-skel-${item}`} className="flex items-start gap-4 p-4 rounded-xl border">
-                             <Skeleton className="h-10 w-10 rounded-full shrink-0" /> {/* Icon */}
-                             <div className="flex-1 min-w-0 space-y-2">
-                                <div className="flex justify-between items-start">
-                                   <Skeleton className="h-4 w-1/3" /> {/* Title */}
-                                   <Skeleton className="h-4 w-16" /> {/* Time */}
-                                </div>
-                                <Skeleton className="h-3 w-3/4" /> {/* Desc line 1 */}
-                                <Skeleton className="h-3 w-1/2" /> {/* Desc line 2 */}
-                             </div>
-                          </div>
-                       ))}
-                    </div>
-                 </div>
-              ))}
-           </div>
-        ) : (
-           Object.entries(grouped).map(([date, items]) => (
-             <div key={date} className="relative">
-               <div className="flex items-center mb-4">
-                  <Badge variant="outline" className="px-3 py-1">{date}</Badge>
-                  <div className="h-px bg-border flex-1 ml-4 opacity-50"></div>
-               </div>
-               <div className="space-y-3">
-                 {items.map((note) => {
-                   const Icon = ICON_MAP[note.type] || ICON_MAP.default;
-                   const colors = getIntentColors(note.type);
-                   return (
-                     <div key={note.id} className={cn(
-                       "flex items-start gap-4 p-4 rounded-xl border bg-card transition-all hover:border-primary/30",
-                       !note.read && "bg-accent/5 border-accent/20",
-                       note.type === 'error' && `border-destructive/30 ${colors.bg}`
-                     )}>
-                       <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0 border", colors.text, colors.bg, colors.border)}>
-                         <Icon className="h-5 w-5" />
-                       </div>
-                       <div className="flex-1 min-w-0">
-                         <div className="flex justify-between items-start">
-                           <h4 className={cn("text-sm font-semibold truncate", note.type === 'error' ? colors.text : 'text-foreground')}>{note.title} {!note.read && <span className="inline-block w-2 h-2 bg-primary rounded-full ml-1" />}</h4>
-                           <span className="text-[10px] text-muted-foreground flex items-center bg-muted px-1.5 py-0.5 rounded"><Clock className="h-3 w-3 mr-1"/>{note.time}</span>
-                         </div>
-                         <p className="text-sm text-muted-foreground mt-1">{note.desc}</p>
-                       </div>
-                     </div>
-                   )
-                 })}
-               </div>
-             </div>
-           ))
-        )}
-      </div>
-
-      {/* MOBILE CONTENT */}
-      <div className="md:hidden space-y-6 px-4">
-         {isLoading ? (
-            /* MOBILE SKELETONS */
-            <div className="space-y-6">
-               {[1, 2].map((group) => (
-                  <div key={`mob-group-${group}`}>
-                     <div className="flex items-center mb-4">
-                        <Skeleton className="h-6 w-20 rounded-full" />
-                        <div className="h-px bg-border flex-1 ml-4 opacity-50"></div>
-                     </div>
-                     <div className="space-y-6">
-                        {[1, 2].map((item) => (
-                           <div key={`mob-item-${item}`} className="relative pl-6">
-                              {/* Timeline line skeleton */}
-                              <div className="absolute left-0 top-3 -bottom-8 w-px bg-border last:bottom-0"></div>
-                              <div className="absolute -left-0.5 top-5 w-1.5 h-1.5 rounded-full bg-border"></div>
-                              
-                              <div className="flex gap-3 p-3 rounded-xl border bg-card">
-                                 <Skeleton className="h-10 w-10 rounded-full shrink-0" />
-                                 <div className="flex-1 min-w-0 space-y-2">
-                                    <div className="flex justify-between">
-                                       <Skeleton className="h-3 w-24" />
-                                       <Skeleton className="h-3 w-10" />
-                                    </div>
-                                    <Skeleton className="h-3 w-full" />
-                                    <Skeleton className="h-3 w-2/3" />
-                                 </div>
-                              </div>
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-               ))}
+      {isLoading ? (
+        <NotificationsSkeleton />
+      ) : notifications.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="space-y-8 px-4 md:px-0">
+          {Object.entries(grouped).map(([date, items]) => (
+            <div key={date}>
+              <div className="flex items-center mb-4">
+                <Badge variant="outline" className="px-3 py-1">{date}</Badge>
+                <div className="h-px bg-border flex-1 ml-4 opacity-50" />
+              </div>
+              <div className="space-y-3">
+                {items.map((n) => (
+                  <NotificationCard
+                    key={n.id}
+                    notification={n}
+                    onMarkRead={() => handleMarkOneRead(n.id)}
+                  />
+                ))}
+              </div>
             </div>
-         ) : (
-            Object.entries(grouped).map(([date, items]) => (
-             <div key={date}>
-                <div className="sticky top-15 z-10 flex items-center mb-4 bg-background py-2">
-                  <Badge variant="outline" className="px-3 py-1 font-normal bg-background">{date}</Badge>
-                  <div className="h-px bg-border flex-1 ml-4 opacity-50"></div>
-                </div>
-                
-                <div className="space-y-6">
-                  {items.map((note) => {
-                    const Icon = ICON_MAP[note.type] || ICON_MAP.default;
-                    const colors = getIntentColors(note.type);
-                    return (
-                      <div key={note.id} className="relative pl-6">
-                          <div className="absolute left-0 top-3 -bottom-8 w-px bg-border last:bottom-0"></div>
-                          <div className="absolute -left-0.5 top-5 w-1.5 h-1.5 rounded-full bg-border"></div>
+          ))}
 
-                          <div className={cn(
-                            "flex gap-3 p-3 rounded-xl border bg-card transition-all",
-                            !note.read && "bg-accent/5 border-accent/20",
-                            note.type === 'error' && `border-destructive/30 ${colors.bg}`
-                          )}>
-                             <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0 border", colors.text, colors.bg, colors.border)}>
-                                <Icon className="h-4 w-4" />
-                             </div>
-                             <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start gap-1">
-                                   <h4 className={cn("text-sm font-semibold line-clamp-2 break-words leading-tight min-w-0", note.type === 'error' ? colors.text : 'text-foreground')}>
-                                     {note.title}
-                                     {!note.read && <span className="inline-block w-1.5 h-1.5 bg-primary rounded-full ml-1 align-top" />}
-                                   </h4>
-                                   <span className="text-[10px] text-muted-foreground shrink-0">{note.time}</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">{note.desc}</p>
-                             </div>
-                          </div>
-                      </div>
-                    )
-                  })}
-                </div>
-             </div>
-            ))
-         )}
-      </div>
-
-      {!isLoading && notifications.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4">
-          <div className="h-24 w-24 bg-muted/30 rounded-full flex items-center justify-center mb-6">
-            <BellOff className="h-10 w-10 text-muted-foreground/40" />
-          </div>
-          <h3 className="text-lg font-medium text-foreground">Здесь пока тихо</h3>
-          <p className="text-muted-foreground mt-2 max-w-xs">
-            Новые уведомления о событиях и заявках появятся здесь.
-          </p>
+          {nextCursor && (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" onClick={loadMore} disabled={isLoadingMore}>
+                {isLoadingMore ? "Загрузка..." : "Показать ещё"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function NotificationCard({
+  notification,
+  onMarkRead,
+}: {
+  notification: v1Notification;
+  onMarkRead: () => void;
+}) {
+  const { title, intent, icon: Icon, href } = displayNotification(notification);
+  const description = notificationDescription(notification);
+  const colors = getIntentColors(intent);
+  const time = notification.createdAt ? formatTime(notification.createdAt) : "";
+  const unread = !notification.isRead;
+
+  const content = (
+    <div
+      className={cn(
+        "flex items-start gap-4 p-4 rounded-xl border bg-card transition-all hover:border-primary/30",
+        unread && "bg-accent/5 border-accent/20",
+        intent === "error" && `border-destructive/30 ${colors.bg}`,
+      )}
+    >
+      <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0 border", colors.text, colors.bg, colors.border)}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start gap-2">
+          <h4 className={cn("text-sm font-semibold leading-tight line-clamp-2 break-words", intent === "error" ? colors.text : "text-foreground")}>
+            {title}
+            {unread && <span className="inline-block w-2 h-2 bg-primary rounded-full ml-1.5 align-middle" />}
+          </h4>
+          <span className="text-[10px] text-muted-foreground flex items-center bg-muted px-1.5 py-0.5 rounded shrink-0">
+            <Clock className="h-3 w-3 mr-1" />
+            {time}
+          </span>
+        </div>
+        {description && (
+          <p className="text-sm text-muted-foreground mt-1 line-clamp-2 break-words">{description}</p>
+        )}
+      </div>
+    </div>
+  );
+
+  // Клик по уведомлению должен и переводить на сущность, и помечать как прочитанное.
+  if (href) {
+    return (
+      <Link href={href} onClick={() => unread && onMarkRead()} className="block">
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <div onClick={() => unread && onMarkRead()} className={unread ? "cursor-pointer" : ""}>
+      {content}
+    </div>
+  );
+}
+
+function NotificationsSkeleton() {
+  return (
+    <div className="space-y-8 px-4 md:px-0">
+      {[1, 2].map((g) => (
+        <div key={g}>
+          <div className="flex items-center mb-4">
+            <Skeleton className="h-6 w-32 rounded-full" />
+            <div className="h-px bg-border flex-1 ml-4 opacity-50" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-start gap-4 p-4 rounded-xl border">
+                <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4">
+      <div className="h-24 w-24 bg-muted/30 rounded-full flex items-center justify-center mb-6">
+        <BellOff className="h-10 w-10 text-muted-foreground/40" />
+      </div>
+      <h3 className="text-lg font-medium text-foreground">Здесь пока тихо</h3>
+      <p className="text-muted-foreground mt-2 max-w-xs">
+        Новые уведомления о событиях, заявках и изменениях появятся здесь.
+      </p>
     </div>
   );
 }

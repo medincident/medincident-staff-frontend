@@ -161,7 +161,16 @@ export function ProfileView() {
     user.name ||
     "Пользователь";
   const displayEmail = employee?.email || user.email;
-  const roleName = isAdmin ? "Администратор" : "Сотрудник";
+
+  // Сотрудник может иметь несколько ролей одновременно (см. backend assign-rpc).
+  // Собираем все активные, в бейдже на профиле показываем «главную» —
+  // sys-admin > главврач > админ > диспетчер — а ниже выводим все остальные.
+  const myRoles: string[] = [];
+  if (identity?.isSystemAdmin) myRoles.push("Системный администратор");
+  if (role.isOrgHead) myRoles.push("Главврач");
+  if (role.isOrgAdmin) myRoles.push("Администратор");
+  if (role.isOrgDispatcher) myRoles.push("Диспетчер");
+  const roleName = myRoles[0] ?? "Сотрудник";
   const positionName = employee?.position || "Сотрудник";
   const clinicName = employee?.clinicName || "Клиника не указана";
   const departmentName = employee?.departmentName || "Отделение не указано";
@@ -195,9 +204,16 @@ export function ProfileView() {
                     {getInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
-                <Badge variant={isAdmin ? "default" : "secondary"} className="mb-2">
-                  {roleName}
-                </Badge>
+                <div className="mb-2 flex flex-wrap gap-1 justify-end">
+                  <Badge variant={isAdmin ? "default" : "secondary"}>
+                    {roleName}
+                  </Badge>
+                  {myRoles.slice(1).map((r) => (
+                    <Badge key={r} variant="secondary">
+                      {r}
+                    </Badge>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-4">

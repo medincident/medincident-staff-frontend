@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { notify } from "@/lib/toast";
 import {
   MembershipQueryService,
@@ -130,16 +130,19 @@ export function UsersView() {
         setUsers(usersListRes.items as v1EmployeeCardView[]);
       }
 
+      // ListOrg{Admins,Heads,Dispatchers} возвращают RoleAssignment{ holder, deputy }
+      // — где employeeId зашит внутри holder. Раньше брали a.employeeId напрямую,
+      // из-за чего все ряды получали undefined и в UI у каждого светилось «Сотрудник».
       if (adminsRes && "items" in adminsRes && adminsRes.items) {
-        setAdmins((adminsRes.items as any[]).map((a: any) => a.employeeId));
+        setAdmins((adminsRes.items as any[]).map((a: any) => a.holder?.employeeId).filter(Boolean));
       }
 
       if (headsRes && "items" in headsRes && headsRes.items) {
-        setOrgHeads((headsRes.items as any[]).map((a: any) => a.employeeId));
+        setOrgHeads((headsRes.items as any[]).map((a: any) => a.holder?.employeeId).filter(Boolean));
       }
 
       if (dispatchersRes && "items" in dispatchersRes && dispatchersRes.items) {
-        setOrgDispatchers((dispatchersRes.items as any[]).map((a: any) => a.employeeId));
+        setOrgDispatchers((dispatchersRes.items as any[]).map((a: any) => a.holder?.employeeId).filter(Boolean));
       }
 
       if (sysAdminsRes && "items" in sysAdminsRes && sysAdminsRes.items) {
@@ -599,58 +602,37 @@ export function UsersView() {
             </div>
 
             <div className="grid gap-3 border-t pt-4">
-              <Label className="text-muted-foreground">Роли в организации</Label>
-              <p className="text-xs text-muted-foreground -mt-2">
-                Можно назначать несколько одновременно. Каждая роль даёт свои права в системе.
-              </p>
-
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
-                <div className="space-y-0.5">
-                  <span className="text-sm font-medium text-foreground">Главврач</span>
-                  <p className="text-[11px] text-muted-foreground">Руководитель медицинской организации.</p>
-                </div>
-                <Switch
-                  checked={formData.isOrgHead}
-                  onCheckedChange={(v) => setFormData({ ...formData, isOrgHead: v })}
+              <div>
+                <Label className="text-muted-foreground">Роли в организации</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Можно назначить несколько одновременно — клик по чипу переключает роль.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <RoleChip
+                  label="Главврач"
+                  active={formData.isOrgHead}
+                  onClick={() => setFormData({ ...formData, isOrgHead: !formData.isOrgHead })}
                 />
-              </label>
-
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
-                <div className="space-y-0.5">
-                  <span className="text-sm font-medium text-foreground">Администратор</span>
-                  <p className="text-[11px] text-muted-foreground">Управление пользователями, структурой и справочниками.</p>
-                </div>
-                <Switch
-                  checked={formData.isAdmin}
-                  onCheckedChange={(v) => setFormData({ ...formData, isAdmin: v })}
+                <RoleChip
+                  label="Администратор"
+                  active={formData.isAdmin}
+                  onClick={() => setFormData({ ...formData, isAdmin: !formData.isAdmin })}
                 />
-              </label>
-
-              <label className="flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
-                <div className="space-y-0.5">
-                  <span className="text-sm font-medium text-foreground">Диспетчер</span>
-                  <p className="text-[11px] text-muted-foreground">Распределяет заявки и инциденты на исполнителей.</p>
-                </div>
-                <Switch
-                  checked={formData.isOrgDispatcher}
-                  onCheckedChange={(v) => setFormData({ ...formData, isOrgDispatcher: v })}
+                <RoleChip
+                  label="Диспетчер"
+                  active={formData.isOrgDispatcher}
+                  onClick={() => setFormData({ ...formData, isOrgDispatcher: !formData.isOrgDispatcher })}
                 />
-              </label>
-
-              {editingZitadelUserId && (
-                <label className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 cursor-pointer hover:bg-destructive/10">
-                  <div className="space-y-0.5">
-                    <span className="text-sm font-medium text-foreground">Системный администратор</span>
-                    <p className="text-[11px] text-muted-foreground">
-                      Полный доступ ко всем организациям и системным настройкам. Привязан к Zitadel-аккаунту, а не к организации.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.isSysAdmin}
-                    onCheckedChange={(v) => setFormData({ ...formData, isSysAdmin: v })}
+                {editingZitadelUserId && (
+                  <RoleChip
+                    label="Системный администратор"
+                    active={formData.isSysAdmin}
+                    onClick={() => setFormData({ ...formData, isSysAdmin: !formData.isSysAdmin })}
+                    variant="destructive"
                   />
-                </label>
-              )}
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
@@ -785,5 +767,47 @@ export function UsersView() {
         }
       />
     </div>
+  );
+}
+
+function RoleChip({
+  label,
+  active,
+  onClick,
+  variant = "default",
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  variant?: "default" | "destructive";
+}) {
+  const isDestructive = variant === "destructive";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? isDestructive
+            ? "bg-destructive text-destructive-foreground border-destructive"
+            : "bg-primary text-primary-foreground border-primary"
+          : isDestructive
+            ? "bg-card text-destructive border-destructive/40 hover:bg-destructive/10"
+            : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground",
+      )}
+    >
+      <span
+        className={cn(
+          "h-2 w-2 rounded-full",
+          active
+            ? "bg-primary-foreground"
+            : isDestructive
+              ? "bg-destructive/30"
+              : "bg-muted-foreground/30",
+        )}
+      />
+      {label}
+    </button>
   );
 }

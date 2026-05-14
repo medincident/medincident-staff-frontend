@@ -7,7 +7,9 @@
     "build": "next build --debug-prerender --webpack",
     "start": "next start",
     "lint": "eslint",
-    "codegen": "node scripts/codegen.mjs"
+    "codegen": "node scripts/codegen.mjs",
+    "codegen:notifications": "node scripts/codegen.mjs notifications",
+    "codegen:all": "node scripts/codegen.mjs && node scripts/codegen.mjs notifications"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

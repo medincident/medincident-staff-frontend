@@ -5,7 +5,10 @@
 // превращаются в классы `XxxQueryServiceService` — лишний `Service`
 // уезжает в имя класса при генерации.
 //
-// Использование: node scripts/codegen.mjs
+// Использование:
+//   node scripts/codegen.mjs                                 # дефолт — medincident-backend
+//   node scripts/codegen.mjs --src=notifications.swagger.json --out=lib/notifications-api-generated
+//   node scripts/codegen.mjs notifications                   # alias для notifications
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -14,10 +17,40 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
-const SRC = resolve(ROOT, "medincident.swagger.json");
+
+// Парсим аргументы. Поддерживаем `--src=...` `--out=...` `--tmp-name=...`,
+// плюс preset-алиасы (медицинский бэкенд по умолчанию или "notifications").
+const args = process.argv.slice(2);
+const flags = Object.fromEntries(
+  args
+    .filter((a) => a.startsWith("--"))
+    .map((a) => {
+      const [k, ...rest] = a.replace(/^--/, "").split("=");
+      return [k, rest.join("=") || true];
+    }),
+);
+const positional = args.filter((a) => !a.startsWith("--"));
+const preset = positional[0];
+
+const presets = {
+  default: {
+    src: "medincident.swagger.json",
+    out: "lib/api-generated",
+    tmpName: "swagger.sanitized.json",
+  },
+  notifications: {
+    src: "notifications.swagger.json",
+    out: "lib/notifications-api-generated",
+    tmpName: "notifications.sanitized.json",
+  },
+};
+
+const config = { ...(presets[preset] ?? presets.default), ...flags };
+
+const SRC = resolve(ROOT, config.src);
 const TMP_DIR = resolve(ROOT, "node_modules/.cache/codegen");
-const TMP = resolve(TMP_DIR, "swagger.sanitized.json");
-const OUT = resolve(ROOT, "lib/api-generated");
+const TMP = resolve(TMP_DIR, config.tmpName ?? "swagger.sanitized.json");
+const OUT = resolve(ROOT, config.out);
 
 const stripService = (name) =>
   typeof name === "string" && name.endsWith("Service") && name !== "Service"

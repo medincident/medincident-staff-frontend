@@ -5,6 +5,7 @@ import { useSession, signOut, getSession } from "next-auth/react";
 import axios from "axios";
 import type { AxiosRequestConfig } from "axios";
 import { OpenAPI } from "@/lib/api-generated";
+import { NotificationsOpenAPI } from "@/lib/notifications-api";
 
 function pickToken(session: any): string {
   const accessToken = session?.accessToken as string | undefined;
@@ -20,6 +21,10 @@ if (typeof window !== "undefined") {
   OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
   OpenAPI.WITH_CREDENTIALS = true;
   OpenAPI.TOKEN = async () => pickToken(await getSession());
+
+  // Тот же JWT валиден и для notifications-сервиса (общий Zitadel).
+  // BASE для notifications уже выставлен в lib/notifications-api/index.ts.
+  NotificationsOpenAPI.TOKEN = async () => pickToken(await getSession());
 }
 
 export function ApiProvider({ children }: { children: ReactNode }) {

@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useMyEmployee } from "@/lib/auth/use-my-employee";
 import { OrgScopePicker } from "@/components/layout/org-scope-picker";
 import { LogoutDialog } from "@/components/auth/logout-dialog";
 import {
-  Bell, User as UserIcon, Settings, LogOut, Check, Info, AlertTriangle, CheckCheck, Shield, Loader2
+  Bell, User as UserIcon, Settings, LogOut, CheckCheck, Loader2,
 } from "lucide-react";
 
 import {
@@ -23,24 +24,29 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getIconColor } from "@/lib/status-helper";
 import { APP_CONFIG } from "@/lib/constants";
 import { MedIncidentLogo } from "@/components/icons/med-incident-logo";
-import { Notification } from "@/lib/types";
+import {
+  NotificationService,
+  type v1Notification,
+} from "@/lib/notifications-api";
+import {
+  displayNotification,
+  notificationDescription,
+} from "@/lib/notifications-api/display";
 
-const NOTIFICATION_ICONS: Record<string, any> = {
-  info: Info,
-  warning: AlertTriangle,
-  error: Shield,
-  success: Check,
-  default: Info
-};
+// Сколько свежих уведомлений показываем в дроп-дауне шапки.
+const HEADER_PREVIEW_LIMIT = 5;
+// Периодичность поллинга бейджа непрочитанных (мс). Мини-нагрузка, но без
+// SSE/WebSocket пока нет другого способа узнать о новых уведомлениях.
+const UNREAD_POLL_INTERVAL_MS = 30_000;
 
 export function Header() {
+  const router = useRouter();
   const { data: session } = useSession();
   const { employee, isLoading: isEmpLoading } = useMyEmployee();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  // Уведомления пока замоканы — реального эндпоинта нет.
-  const isLoading = false;
-
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [previewItems, setPreviewItems] = useState<v1Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
 
   const getUserInitials = (name: string) => {
     if (!name) return "U";
@@ -53,14 +59,70 @@ export function Header() {
       .toUpperCase();
   };
 
-  useEffect(() => {
-    // TODO: NotificationQueryService.ListMyNotifications — medincident-backend#149
-    setNotifications([]);
+  const refreshUnread = useCallback(async () => {
+    try {
+      const res = await NotificationService.notificationGetUnreadCount();
+      const c = Number(res.count ?? 0);
+      setUnreadCount(Number.isFinite(c) ? c : 0);
+    } catch {
+      // Тихо игнорируем — бейдж не критичен.
+    }
   }, []);
 
-  const handleMarkAllRead = (e: React.MouseEvent) => {
+  const loadPreview = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await NotificationService.notificationListNotifications(
+        undefined,
+        HEADER_PREVIEW_LIMIT,
+        undefined,
+      );
+      setPreviewItems(res.notifications ?? []);
+    } catch {
+      setPreviewItems([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshUnread();
+    loadPreview();
+    const id = window.setInterval(refreshUnread, UNREAD_POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [refreshUnread, loadPreview]);
+
+  const handleMarkAllRead = async (e: React.MouseEvent) => {
     e.preventDefault();
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    e.stopPropagation();
+    if (isMarkingAll) return;
+    setIsMarkingAll(true);
+    try {
+      await NotificationService.notificationMarkAllAsRead({});
+      setUnreadCount(0);
+      setPreviewItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } finally {
+      setIsMarkingAll(false);
+    }
+  };
+
+  const handleItemClick = async (n: v1Notification) => {
+    // Помечаем прочитанным оптимистично и переходим на сущность, если есть.
+    if (!n.isRead && n.id) {
+      setPreviewItems((prev) =>
+        prev.map((it) => (it.id === n.id ? { ...it, isRead: true } : it)),
+      );
+      setUnreadCount((c) => Math.max(0, c - 1));
+      NotificationService.notificationMarkAsRead(n.id, {}).catch(() => {
+        // откатываем при ошибке
+        setPreviewItems((prev) =>
+          prev.map((it) => (it.id === n.id ? { ...it, isRead: false } : it)),
+        );
+        setUnreadCount((c) => c + 1);
+      });
+    }
+    const { href } = displayNotification(n);
+    if (href) router.push(href);
   };
 
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
@@ -99,8 +161,10 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
               <Bell size={20} />
-              {unreadCount > 0 && !isLoading && (
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full border-2 border-card" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-destructive text-destructive-foreground text-[10px] leading-none font-bold rounded-full border-2 border-card flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
               )}
             </Button>
           </DropdownMenuTrigger>
@@ -113,6 +177,7 @@ export function Header() {
                   size="sm"
                   className="h-auto py-1 px-2 text-[10px] text-primary hover:bg-primary/10"
                   onClick={handleMarkAllRead}
+                  disabled={isMarkingAll}
                 >
                   <CheckCheck className="w-3 h-3 mr-1" />
                   Пометить все
@@ -123,25 +188,34 @@ export function Header() {
             <div className="max-h-[300px] overflow-y-auto">
               {isLoading ? (
                 <div className="p-4 flex justify-center"><Loader2 className="animate-spin h-5 w-5 text-muted-foreground" /></div>
-              ) : notifications.length > 0 ? (
-                notifications.slice(0, 3).map((note) => {
-                  const Icon = NOTIFICATION_ICONS[note.type] || NOTIFICATION_ICONS.default;
-                  const iconColorClass = getIconColor(note.type);
-
+              ) : previewItems.length > 0 ? (
+                previewItems.map((n) => {
+                  const { title, icon: Icon, intent } = displayNotification(n);
+                  const desc = notificationDescription(n);
+                  const iconColor = getIconColor(intent);
+                  const time = n.createdAt
+                    ? new Date(n.createdAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+                    : "";
                   return (
-                    <DropdownMenuItem key={note.id} className="flex items-start gap-3 p-3 cursor-pointer focus:bg-muted/50 border-b border-border/50 last:border-0">
-                      <div className={`mt-1 shrink-0 ${iconColorClass}`}>
+                    <DropdownMenuItem
+                      key={n.id}
+                      onClick={() => handleItemClick(n)}
+                      className="flex items-start gap-3 p-3 cursor-pointer focus:bg-muted/50 border-b border-border/50 last:border-0"
+                    >
+                      <div className={`mt-1 shrink-0 ${iconColor}`}>
                         <Icon size={16} />
                       </div>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex justify-between items-start">
-                          <p className="text-sm font-medium leading-none text-foreground">{note.title}</p>
-                          {!note.read && (
-                            <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0" />
+                      <div className="flex-1 space-y-1 min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                          <p className="text-sm font-medium leading-none text-foreground line-clamp-2 break-words">
+                            {title}
+                          </p>
+                          {!n.isRead && (
+                            <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0 mt-1" />
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{note.desc}</p>
-                        <p className="text-[10px] text-muted-foreground/60">{note.time}</p>
+                        {desc && <p className="text-xs text-muted-foreground line-clamp-2">{desc}</p>}
+                        <p className="text-[10px] text-muted-foreground/60">{time}</p>
                       </div>
                     </DropdownMenuItem>
                   );
