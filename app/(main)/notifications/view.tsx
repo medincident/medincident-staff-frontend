@@ -25,6 +25,7 @@ import {
   displayNotification,
   notificationDescription,
 } from "@/lib/notifications-api/display";
+import { useNotificationsStore } from "@/lib/notifications-api/store";
 
 const PAGE_SIZE = 50;
 
@@ -40,6 +41,11 @@ function formatTime(iso: string): string {
 
 export function NotificationsView() {
   const router = useRouter();
+
+  // Единый стор: пишем сюда, шапка сразу гасит/обновляет красную метку.
+  const storeMarkAllRead = useNotificationsStore((s) => s.markAllRead);
+  const storeDecrement = useNotificationsStore((s) => s.decrementUnread);
+  const storeRefresh = useNotificationsStore((s) => s.refreshUnread);
 
   const [notifications, setNotifications] = useState<v1Notification[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
@@ -90,12 +96,14 @@ export function NotificationsView() {
   const handleMarkAllRead = async () => {
     setIsMarkingAll(true);
     try {
+      storeMarkAllRead(); // оптимистично гасим метку в шапке
       await NotificationService.notificationMarkAllAsRead({});
       setNotifications((prev) =>
         prev.map((n) => ({ ...n, isRead: true, readAt: n.readAt ?? new Date().toISOString() })),
       );
       notify.mutationSuccess("Все уведомления отмечены прочитанными");
     } catch (err) {
+      storeRefresh(); // ресинк, если бэк не принял
       notify.apiError(err, "Не удалось пометить все");
     } finally {
       setIsMarkingAll(false);
@@ -108,12 +116,14 @@ export function NotificationsView() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n)),
     );
+    storeDecrement(1); // оптимистично уменьшаем счётчик в шапке
     try {
       await NotificationService.notificationMarkAsRead(id, {});
     } catch (err) {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: false, readAt: undefined } : n)),
       );
+      storeRefresh(); // ресинк счётчика с сервером
       notify.apiError(err, "Не удалось отметить уведомление");
     }
   };

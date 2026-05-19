@@ -1,0 +1,100 @@
+"use client";
+
+import { useEffect } from "react";
+import { create } from "zustand";
+
+import {
+  IncidentClassifierQueryService,
+  v1Category,
+  classifierV1Type,
+} from "@/lib/api-generated";
+
+// Кеш справочника НС (категории + активные типы) — единый на всё приложение.
+// Раньше Dashboard и журнал событий тянули его независимо и параллельно при
+// каждом маунте/навигации. Данные статические (меняются только через админку),
+// поэтому кешируем по orgId; админка вызывает invalidate() после мутаций.
+
+interface OrgClassifier {
+  categories: v1Category[];
+  types: classifierV1Type[];
+}
+
+type OrgId = string | null | undefined;
+
+interface State {
+  byOrg: Record<string, OrgClassifier>;
+  // orgId, по которым запрос сейчас в полёте — для дедупа параллельных вызовов.
+  inflight: Record<string, Promise<void> | undefined>;
+  ensureLoaded: (orgId: OrgId) => Promise<void>;
+  /** Сбросить кеш: всё (без аргумента) или конкретную организацию. */
+  invalidate: (orgId?: OrgId) => void;
+}
+
+export const useIncidentClassifierStore = create<State>((set, get) => ({
+  byOrg: {},
+  inflight: {},
+
+  ensureLoaded: async (orgId) => {
+    if (!orgId) return;
+    const s = get();
+    if (s.byOrg[orgId]) return; // уже в кеше
+    const running = s.inflight[orgId];
+    if (running) return running; // запрос уже идёт — переиспользуем
+
+    const p = (async () => {
+      try {
+        const [catsRes, typesRes] = await Promise.all([
+          IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 100),
+          IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(orgId, 100),
+        ]);
+        const categories =
+          catsRes && "items" in catsRes && catsRes.items ? catsRes.items : [];
+        const types =
+          typesRes && "items" in typesRes && typesRes.items ? typesRes.items : [];
+        set((st) => ({ byOrg: { ...st.byOrg, [orgId]: { categories, types } } }));
+      } finally {
+        set((st) => ({ inflight: { ...st.inflight, [orgId]: undefined } }));
+      }
+    })();
+
+    set((st) => ({ inflight: { ...st.inflight, [orgId]: p } }));
+    return p;
+  },
+
+  invalidate: (orgId) =>
+    set((st) =>
+      orgId
+        ? { byOrg: { ...st.byOrg, [orgId]: undefined as unknown as OrgClassifier } }
+        : { byOrg: {} },
+    ),
+}));
+
+const EMPTY: OrgClassifier = { categories: [], types: [] };
+
+// Хук-обёртка: подтягивает справочник для активной орги (один раз на orgId),
+// возвращает категории/типы и флаг загрузки.
+export function useIncidentClassifier(orgId: OrgId) {
+  const ensureLoaded = useIncidentClassifierStore((s) => s.ensureLoaded);
+  const data = useIncidentClassifierStore((s) =>
+    orgId ? s.byOrg[orgId] : undefined,
+  );
+  const inflight = useIncidentClassifierStore((s) =>
+    orgId ? !!s.inflight[orgId] : false,
+  );
+
+  useEffect(() => {
+    if (orgId) void ensureLoaded(orgId);
+  }, [orgId, ensureLoaded]);
+
+  return {
+    categories: data?.categories ?? EMPTY.categories,
+    types: data?.types ?? EMPTY.types,
+    isLoading: !data && (inflight || !!orgId),
+  };
+}
+
+// Хелпер для админки/мутаций: сбросить кеш, чтобы Dashboard/журнал
+// подтянули свежий справочник при следующем заходе.
+export function invalidateIncidentClassifier(orgId?: OrgId) {
+  useIncidentClassifierStore.getState().invalidate(orgId);
+}

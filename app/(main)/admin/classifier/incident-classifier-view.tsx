@@ -23,6 +23,7 @@ import {
   IncidentClassifierCommandService,
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { invalidateIncidentClassifier } from "@/lib/classifiers/incident-classifier-store";
 import { cleanText } from "@/lib/text";
 import { getBadgeColor } from "@/lib/status-helper";
 
@@ -85,6 +86,9 @@ export function IncidentClassifierView() {
       const newTypesMap: Record<string, any[]> = {};
       typesResults.forEach(res => { newTypesMap[res.id] = res.types; });
       setTypesMap(newTypesMap);
+      // Админ зашёл/изменил справочник — сбрасываем общий кеш, чтобы
+      // Dashboard/журнал подтянули свежие категории/типы при след. заходе.
+      invalidateIncidentClassifier(organizationId);
     } catch (error) {
       console.error(error);
       notify.error("Ошибка", "Не удалось загрузить справочник категорий.");
@@ -213,6 +217,7 @@ export function IncidentClassifierView() {
 
       const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(targetCategoryId, 100);
       setTypesMap(prev => ({ ...prev, [targetCategoryId!]: (typesResult as any).items || [] }));
+      invalidateIncidentClassifier(organizationId);
 
       notify.mutationSuccess("Сохранено", "Тип события сохранён в справочнике.");
       setIsTypeDialogOpen(false);
@@ -234,6 +239,7 @@ export function IncidentClassifierView() {
       }
       const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
       setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
+      invalidateIncidentClassifier(organizationId);
     } catch (e) {
       notify.apiError(e, "Не удалось обновить статус типа");
     }
@@ -245,6 +251,7 @@ export function IncidentClassifierView() {
         await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentType(typeId);
         const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
         setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
+        invalidateIncidentClassifier(organizationId);
         notify.mutationSuccess("Тип удалён", "Запись типа события удалена из справочника.");
       } catch (e) {
         notify.apiError(e, "Не удалось удалить тип события");

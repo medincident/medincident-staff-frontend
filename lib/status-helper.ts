@@ -9,6 +9,8 @@ type ColorIntent =
 const STATUS_INTENTS: Record<string, ColorIntent> = {
   // --- Нейтральные (Синие/Серые) ---
   created: "muted",
+  pending: "muted", // НС: зарегистрировано, ждёт рассмотрения
+  low: "muted", // приоритет: низкий
   minor: "muted",
 
   // --- Информационные (Синие) ---
@@ -19,6 +21,8 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
   // --- Внимание (Желтые) ---
   in_work: "warning",
   investigation: "warning",
+  in_progress: "warning", // НС: в работе
+  high: "warning", // приоритет: высокий
   urgent: "warning",
   moderate: "warning",
 
@@ -29,6 +33,7 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
   // --- Успех (Зеленые) ---
   completed: "success",
   closed: "success",
+  done: "success", // НС: решено
 
   // --- Статусы активности ---
   active: "success",
@@ -37,6 +42,7 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
 
   // --- Опасность/Отказ (Красные) ---
   refused: "destructive",
+  rejected: "destructive", // НС: отклонено
   cancelled: "destructive",
   critical: "destructive",
   severe: "destructive",

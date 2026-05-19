@@ -49,6 +49,29 @@ function writeCache(orgId: string, role: MyOrgRole): void {
   } catch {}
 }
 
+// Дедуп параллельных запросов: Sidebar+BottomNav+layout+view одновременно
+// (через usePermissions) при истёкшем 30-сек TTL иначе шлют N одинаковых
+// GET /role. Один промис на orgId — остальные переиспользуют.
+const inflight = new Map<string, Promise<MyOrgRole>>();
+
+function fetchOrgRole(orgId: string): Promise<MyOrgRole> {
+  const existing = inflight.get(orgId);
+  if (existing) return existing;
+  const p = SelfQueryService.selfQueryGetMyOrganizationRole(orgId)
+    .then((res) => {
+      const next: MyOrgRole = {
+        isOrgAdmin: !!(res as any)?.isOrgAdmin,
+        isOrgHead: !!(res as any)?.isOrgHead,
+        isOrgDispatcher: !!(res as any)?.isOrgDispatcher,
+      };
+      writeCache(orgId, next);
+      return next;
+    })
+    .finally(() => inflight.delete(orgId));
+  inflight.set(orgId, p);
+  return p;
+}
+
 // Возвращает роли текущего юзера в АКТИВНОЙ организации.
 // Источник — `GET /v1/me/organizations/{id}/role` (medincident-backend#155).
 export function useMyOrgRole() {
@@ -73,16 +96,9 @@ export function useMyOrgRole() {
 
     let cancelled = false;
     setIsLoading(true);
-    SelfQueryService.selfQueryGetMyOrganizationRole(orgId)
-      .then((res) => {
-        if (cancelled) return;
-        const next: MyOrgRole = {
-          isOrgAdmin: !!(res as any)?.isOrgAdmin,
-          isOrgHead: !!(res as any)?.isOrgHead,
-          isOrgDispatcher: !!(res as any)?.isOrgDispatcher,
-        };
-        writeCache(orgId, next);
-        setRole(next);
+    fetchOrgRole(orgId)
+      .then((next) => {
+        if (!cancelled) setRole(next);
       })
       .catch(() => {
         if (!cancelled) setRole(EMPTY);

@@ -40,18 +40,18 @@ import { STATUS_MAP } from "@/lib/constants";
 
 import {
   ServiceRequestQueryService,
-  RequestClassifierQueryService,
   v1ServiceRequest,
-  v1RequestType
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { useRequestClassifier } from "@/lib/classifiers/request-classifier-store";
 
 export function RequestsListView() {
   const { data: session } = useSession();
   const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
   
   const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
-  const [requestTypes, setRequestTypes] = useState<v1RequestType[]>([]);
+  // Типы заявок — из общего zustand-кеша (не дёргаем эндпоинт повторно).
+  const { types: requestTypes } = useRequestClassifier(orgId);
   const [isLoading, setIsLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -67,16 +67,14 @@ export function RequestsListView() {
         setIsLoading(true);
         if (!orgId) {
           setRequests([]);
-          setRequestTypes([]);
           return;
         }
-        const [reqRes, typeRes] = await Promise.all([
-          ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 100),
-          RequestClassifierQueryService.requestClassifierQueryListActiveRequestTypesByOrganization(orgId, 100),
-        ]);
+        // Типы заявок тянет useRequestClassifier (общий кеш) — здесь
+        // запрашиваем только сами заявки.
+        const reqRes =
+          await ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 100);
 
         if (reqRes && "items" in reqRes && reqRes.items) setRequests(reqRes.items);
-        if (typeRes && "items" in typeRes && typeRes.items) setRequestTypes(typeRes.items);
       } catch (error) {
         console.error("Failed to load requests:", error);
       } finally {

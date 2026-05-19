@@ -27,6 +27,25 @@ function writeCache(deptId: string, role: MyDeptRole): void {
   } catch {}
 }
 
+// Дедуп параллельных запросов (см. use-my-clinic-role): один промис на deptId.
+const inflight = new Map<string, Promise<MyDeptRole>>();
+
+function fetchDeptRole(deptId: string): Promise<MyDeptRole> {
+  const existing = inflight.get(deptId);
+  if (existing) return existing;
+  const p = SelfQueryService.selfQueryGetMyDepartmentRole(deptId)
+    .then((res) => {
+      const next: MyDeptRole = {
+        isDepartmentResponsible: !!(res as any)?.isDepartmentResponsible,
+      };
+      writeCache(deptId, next);
+      return next;
+    })
+    .finally(() => inflight.delete(deptId));
+  inflight.set(deptId, p);
+  return p;
+}
+
 // Возвращает роль текущего юзера в указанном отделении.
 // Источник — `GET /v1/me/departments/{id}/role` (medincident-backend#155).
 export function useMyDeptRole(deptId: string | null | undefined) {
@@ -49,14 +68,9 @@ export function useMyDeptRole(deptId: string | null | undefined) {
 
     let cancelled = false;
     setIsLoading(true);
-    SelfQueryService.selfQueryGetMyDepartmentRole(deptId)
-      .then((res) => {
-        if (cancelled) return;
-        const next: MyDeptRole = {
-          isDepartmentResponsible: !!(res as any)?.isDepartmentResponsible,
-        };
-        writeCache(deptId, next);
-        setRole(next);
+    fetchDeptRole(deptId)
+      .then((next) => {
+        if (!cancelled) setRole(next);
       })
       .catch(() => {
         if (!cancelled) setRole(EMPTY);

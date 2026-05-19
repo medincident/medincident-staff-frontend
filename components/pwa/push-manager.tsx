@@ -52,6 +52,9 @@ export function PushNotificationManager() {
   const [support, setSupport] = useState<Support>("unknown");
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [isWorking, setIsWorking] = useState(false);
+  // Текущее разрешение браузера на уведомления: default (ещё не спрашивали),
+  // granted (разрешено), denied (заблокировано пользователем).
+  const [permission, setPermission] = useState<NotificationPermission>("default");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -65,6 +68,7 @@ export function PushNotificationManager() {
       return;
     }
     setSupport("yes");
+    if ("Notification" in window) setPermission(Notification.permission);
 
     (async () => {
       const reg = await navigator.serviceWorker.ready;
@@ -79,6 +83,31 @@ export function PushNotificationManager() {
       const vapidPub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPub) {
         notify.error("Ошибка", "VAPID-ключ не настроен на сервере.");
+        return;
+      }
+
+      // Явно запрашиваем разрешение у браузера — это и есть тот самый
+      // системный запрос «Сайт хочет показывать уведомления». Без явного
+      // вызова он раньше прятался внутри pushManager.subscribe() и при
+      // отказе/блокировке не было понятной обратной связи.
+      if (!("Notification" in window)) {
+        notify.error("Уведомления не поддерживаются", "Ваш браузер не умеет показывать уведомления.");
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      setPermission(perm);
+      if (perm === "denied") {
+        notify.error(
+          "Уведомления заблокированы",
+          "Вы запретили уведомления для этого сайта. Откройте значок замка слева от адреса → «Уведомления» → «Разрешить», затем повторите.",
+        );
+        return;
+      }
+      if (perm !== "granted") {
+        notify.warning(
+          "Разрешение не выдано",
+          "Чтобы получать push, нажмите «Разрешить» в запросе браузера.",
+        );
         return;
       }
 
@@ -167,11 +196,27 @@ export function PushNotificationManager() {
     );
   }
 
+  // Разрешение заблокировано в браузере — кнопка «Включить» тут не поможет,
+  // системный запрос больше не покажется. Объясняем, как разблокировать.
+  if (permission === "denied" && !subscription) {
+    return (
+      <PushCard
+        icon={<BellOff className="h-5 w-5 text-destructive" />}
+        title="Push-уведомления заблокированы"
+        description="Вы запретили уведомления для этого сайта в браузере. Нажмите значок замка (или ⓘ) слева от адреса страницы → «Уведомления» → «Разрешить», затем обновите страницу и нажмите «Включить»."
+      />
+    );
+  }
+
   return (
     <PushCard
       icon={<Bell className="h-5 w-5 text-primary" />}
       title="Push-уведомления"
-      description="Оповещения о новых инцидентах, заявках и объявлениях — даже когда вкладка закрыта."
+      description={
+        subscription
+          ? "Включены на этом устройстве. Оповещения приходят даже когда вкладка закрыта."
+          : "Оповещения о новых инцидентах, заявках и объявлениях — даже когда вкладка закрыта. По нажатию «Включить» браузер спросит разрешение."
+      }
       action={
         subscription ? (
           <Button variant="outline" onClick={unsubscribe} disabled={isWorking}>

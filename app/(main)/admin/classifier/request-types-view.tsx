@@ -42,6 +42,7 @@ import {
   v1RequestType,
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { invalidateRequestClassifier } from "@/lib/classifiers/request-classifier-store";
 import { cleanText } from "@/lib/text";
 
 const getDeclension = (n: number, words: string[]) => {
@@ -80,6 +81,9 @@ export function RequestTypesView() {
       } else {
         setTypes([]);
       }
+      // Все мутации типов заявок проходят через loadTypes — сбрасываем
+      // общий кеш, чтобы список заявок подтянул свежие типы.
+      invalidateRequestClassifier(orgId);
     } catch (e) {
       console.error("Failed to load request types", e);
       notify.error("Ошибка", "Не удалось загрузить список типов заявок.");

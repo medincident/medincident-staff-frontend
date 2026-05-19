@@ -35,27 +35,42 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PermissionGate } from "@/components/auth/permission-gate";
 
-import { EVENT_STATUS_MAP } from "@/lib/constants";
+import { EVENT_STATUS_MAP, INCIDENT_PRIORITY_MAP } from "@/lib/constants";
 import { getBadgeColor, getCardBorderColor } from "@/lib/status-helper";
 import { EventStatus } from "@/lib/types";
 
 import {
   IncidentQueryService,
-  IncidentClassifierQueryService,
   v1IncidentView,
-  v1Category,
-  classifierV1Type
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
+import { useIncidentClassifier } from "@/lib/classifiers/incident-classifier-store";
+
+// Бейдж приоритета НС. unspecified/пусто → приглушённый прочерк, чтобы
+// колонка/ряд не «прыгали».
+function PriorityBadge({ priority }: { priority?: string }) {
+  const key = (priority || "").toLowerCase().replace("incident_priority_", "");
+  if (!key || key === "unspecified") {
+    return <span className="text-xs text-muted-foreground/50">—</span>;
+  }
+  return (
+    <Badge
+      variant="outline"
+      className={`whitespace-nowrap text-[10px] h-5 px-2 font-medium ${getBadgeColor(key)}`}
+    >
+      {INCIDENT_PRIORITY_MAP[key] || key}
+    </Badge>
+  );
+}
 
 export function EventsListView() {
   const { data: session } = useSession();
   const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
   const perms = usePermissions();
   const [events, setEvents] = useState<v1IncidentView[]>([]);
-  const [categories, setCategories] = useState<v1Category[]>([]);
-  const [types, setTypes] = useState<classifierV1Type[]>([]);
+  // Категории/типы НС — из общего zustand-кеша (см. incident-classifier-store).
+  const { categories, types } = useIncidentClassifier(activeOrgId);
   const [isLoading, setIsLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,20 +103,8 @@ export function EventsListView() {
           setEvents(incidentsRes.items);
         }
 
-        // Загружаем классификаторы
-        if (orgId) {
-          const [catsRes, typesRes] = await Promise.all([
-            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 100),
-            IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(orgId, 100)
-          ]);
-
-          if (catsRes && "items" in catsRes && catsRes.items) {
-            setCategories(catsRes.items);
-          }
-          if (typesRes && "items" in typesRes && typesRes.items) {
-            setTypes(typesRes.items);
-          }
-        }
+        // Классификаторы тянет useIncidentClassifier (общий кеш) — здесь
+        // больше не запрашиваем.
       } catch (error) {
         console.error("Failed to load events:", error);
       } finally {
@@ -213,8 +216,9 @@ export function EventsListView() {
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[120px] text-muted-foreground font-semibold">Код</TableHead>
               <TableHead className="text-muted-foreground font-semibold">Событие</TableHead>
-              <TableHead className="text-muted-foreground font-semibold">Категория</TableHead>
+              <TableHead className="text-muted-foreground font-semibold max-w-[280px]">Категория</TableHead>
               <TableHead className="text-muted-foreground font-semibold">Статус</TableHead>
+              <TableHead className="text-muted-foreground font-semibold">Приоритет</TableHead>
               <TableHead className="text-center text-muted-foreground font-semibold">Дата</TableHead>
               <TableHead className="text-right text-muted-foreground font-semibold w-[80px]"></TableHead>
             </TableRow>
@@ -232,6 +236,7 @@ export function EventsListView() {
                    </TableCell>
                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                    <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                   <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
                    <TableCell><Skeleton className="h-4 w-24 mx-auto" /></TableCell>
                    <TableCell><Skeleton className="h-8 w-8 ml-auto rounded-md" /></TableCell>
                  </TableRow>
@@ -260,12 +265,20 @@ export function EventsListView() {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {categoryNamesMap[event.categoryId || ""] || event.categoryId}
+                      <div
+                        className="max-w-[280px] truncate"
+                        title={categoryNamesMap[event.categoryId || ""] || event.categoryId}
+                      >
+                        {categoryNamesMap[event.categoryId || ""] || event.categoryId}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`whitespace-nowrap font-medium ${getBadgeColor(evtStatusStr as any)}`}>
                         {EVENT_STATUS_MAP[evtStatusStr as EventStatus] || event.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <PriorityBadge priority={event.priority} />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs whitespace-nowrap">
@@ -291,7 +304,7 @@ export function EventsListView() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center py-4">
                     <Search className="h-8 w-8 mb-2 opacity-20" />
                     События не найдены
@@ -358,6 +371,7 @@ export function EventsListView() {
                         <Badge variant="outline" className={`text-[10px] h-5 px-2 font-medium ${getBadgeColor(evtStatusStr as any)}`}>
                           {EVENT_STATUS_MAP[evtStatusStr as EventStatus] || event.status}
                         </Badge>
+                        <PriorityBadge priority={event.priority} />
                         <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border">
                           {categoryNamesMap[event.categoryId || ""] || event.categoryId}
                         </span>

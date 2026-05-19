@@ -34,13 +34,12 @@ import {
   IncidentQueryService,
   ServiceRequestQueryService,
   AnnouncementQueryService,
-  IncidentClassifierQueryService,
   v1IncidentView,
   v1ServiceRequest,
   v1AnnouncementView,
-  v1Category
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { useIncidentClassifier } from "@/lib/classifiers/incident-classifier-store";
 
 const safeDate = (dateString?: string) => {
   if (!dateString) return "—";
@@ -68,7 +67,9 @@ export function DashboardView() {
   const [events, setEvents] = useState<v1IncidentView[]>([]);
   const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
   const [announcements, setAnnouncements] = useState<v1AnnouncementView[]>([]);
-  const [classifier, setClassifier] = useState<v1Category[]>([]);
+  // Справочник категорий — из общего zustand-кеша (не дёргаем эндпоинт
+  // повторно на каждый заход на дашборд / журнал событий).
+  const { categories: classifier } = useIncidentClassifier(orgId);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -82,17 +83,15 @@ export function DashboardView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [eventsRes, reqsRes, annRes, classRes] = await Promise.all([
+        const [eventsRes, reqsRes, annRes] = await Promise.all([
           IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
           ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 50),
           AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
-          IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 100),
         ]);
 
         if (eventsRes && "items" in eventsRes && eventsRes.items) setEvents(eventsRes.items);
         if (reqsRes && "items" in reqsRes && reqsRes.items) setRequests(reqsRes.items);
         if (annRes && "items" in annRes && annRes.items) setAnnouncements(annRes.items);
-        if (classRes && "items" in classRes && classRes.items) setClassifier(classRes.items);
       } catch (error) {
         console.error("Dashboard data load failed:", error);
       } finally {

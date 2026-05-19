@@ -27,6 +27,24 @@ function writeCache(zitadelUserId: string, identity: MyIdentity): void {
   } catch {}
 }
 
+// Дедуп параллельных GET /v1/me: Dashboard/Profile/RolesGuard/usePermissions
+// на холодном кеше иначе шлют его одновременно. Один промис на userId.
+const inflight = new Map<string, Promise<MyIdentity>>();
+
+function fetchIdentity(userId: string): Promise<MyIdentity> {
+  const existing = inflight.get(userId);
+  if (existing) return existing;
+  const p = SelfQueryService.selfQueryGetMyIdentity()
+    .then((res) => {
+      const next: MyIdentity = { isSystemAdmin: !!(res as any)?.isSystemAdmin };
+      writeCache(userId, next);
+      return next;
+    })
+    .finally(() => inflight.delete(userId));
+  inflight.set(userId, p);
+  return p;
+}
+
 export function clearMyIdentityCache(): void {
   if (typeof window === "undefined") return;
   for (let i = sessionStorage.length - 1; i >= 0; i--) {
@@ -64,14 +82,9 @@ export function useMyIdentity() {
 
     let cancelled = false;
     setIsLoading(true);
-    SelfQueryService.selfQueryGetMyIdentity()
-      .then((res) => {
-        if (cancelled) return;
-        const next: MyIdentity = {
-          isSystemAdmin: !!(res as any)?.isSystemAdmin,
-        };
-        writeCache(userId, next);
-        setIdentity(next);
+    fetchIdentity(userId)
+      .then((next) => {
+        if (!cancelled) setIdentity(next);
       })
       .catch(() => {
         if (!cancelled) setIdentity(null);

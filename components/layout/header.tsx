@@ -32,6 +32,7 @@ import {
   displayNotification,
   notificationDescription,
 } from "@/lib/notifications-api/display";
+import { useNotificationsStore } from "@/lib/notifications-api/store";
 
 // Сколько свежих уведомлений показываем в дроп-дауне шапки.
 const HEADER_PREVIEW_LIMIT = 5;
@@ -43,7 +44,12 @@ export function Header() {
   const router = useRouter();
   const { data: session } = useSession();
   const { employee, isLoading: isEmpLoading } = useMyEmployee();
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Единый источник правды — zustand-стор. Страница уведомлений пишет туда
+  // же, поэтому метка гаснет мгновенно, без 30-сек поллинга.
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const refreshUnread = useNotificationsStore((s) => s.refreshUnread);
+  const setUnreadCount = useNotificationsStore((s) => s.setUnreadCount);
+  const decrementUnread = useNotificationsStore((s) => s.decrementUnread);
   const [previewItems, setPreviewItems] = useState<v1Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
@@ -58,16 +64,6 @@ export function Header() {
       .substring(0, 2)
       .toUpperCase();
   };
-
-  const refreshUnread = useCallback(async () => {
-    try {
-      const res = await NotificationService.notificationGetUnreadCount();
-      const c = Number(res.count ?? 0);
-      setUnreadCount(Number.isFinite(c) ? c : 0);
-    } catch {
-      // Тихо игнорируем — бейдж не критичен.
-    }
-  }, []);
 
   const loadPreview = useCallback(async () => {
     try {
@@ -98,9 +94,11 @@ export function Header() {
     if (isMarkingAll) return;
     setIsMarkingAll(true);
     try {
-      await NotificationService.notificationMarkAllAsRead({});
-      setUnreadCount(0);
+      setUnreadCount(0); // оптимистично — единый стор гасит метку сразу
       setPreviewItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      await NotificationService.notificationMarkAllAsRead({});
+    } catch {
+      refreshUnread(); // ресинк, если бэк не принял
     } finally {
       setIsMarkingAll(false);
     }
@@ -112,13 +110,13 @@ export function Header() {
       setPreviewItems((prev) =>
         prev.map((it) => (it.id === n.id ? { ...it, isRead: true } : it)),
       );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      decrementUnread(1);
       NotificationService.notificationMarkAsRead(n.id, {}).catch(() => {
         // откатываем при ошибке
         setPreviewItems((prev) =>
           prev.map((it) => (it.id === n.id ? { ...it, isRead: false } : it)),
         );
-        setUnreadCount((c) => c + 1);
+        refreshUnread(); // ресинк с сервером вместо ручного +1
       });
     }
     const { href } = displayNotification(n);

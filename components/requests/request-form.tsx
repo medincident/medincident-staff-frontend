@@ -48,6 +48,7 @@ import {
 } from "@/lib/api-generated";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
+import { useIncidentClassifier } from "@/lib/classifiers/incident-classifier-store";
 import { useRequirePermission } from "@/lib/auth/use-require-permission";
 import { cleanText } from "@/lib/text";
 
@@ -150,12 +151,31 @@ function RequestFormContent({ requestId }: RequestFormProps) {
     loadContext();
   }, [session, requestId, form, activeOrgId, isOrgResolving]);
 
+  // Имя типа НС из общего кеша классификатора (без лишнего запроса) —
+  // у многих инцидентов description пустой, и подпись была «undefined…».
+  const { types: incidentTypes } = useIncidentClassifier(activeOrgId);
+  const incidentTypeNames = useMemo(() => {
+    const m: Record<string, string> = {};
+    incidentTypes.forEach((t) => {
+      if (t.id && t.name) m[t.id] = t.name;
+    });
+    return m;
+  }, [incidentTypes]);
+
   const eventOptions = useMemo(() => {
-    return incidents.map(e => ({
-      value: e.id || "",
-      label: `#{${e.id?.substring(0,8)}} — ${e.description?.substring(0, 50)}...`,
-    })).filter(o => o.value);
-  }, [incidents]);
+    return incidents
+      .map((e) => {
+        const shortId = e.id?.substring(0, 8) ?? "";
+        const desc = e.description?.trim();
+        const typeName = e.typeId ? incidentTypeNames[e.typeId] : undefined;
+        const title = typeName || desc || "Без описания";
+        const label = `#${shortId} — ${
+          title.length > 50 ? title.slice(0, 50) + "…" : title
+        }`;
+        return { value: e.id || "", label };
+      })
+      .filter((o) => o.value);
+  }, [incidents, incidentTypeNames]);
 
   const typeOptions = useMemo(() => {
     return requestTypes.map(t => ({

@@ -27,6 +27,25 @@ function writeCache(clinicId: string, role: MyClinicRole): void {
   } catch {}
 }
 
+// Дедуп параллельных запросов: 8 потребителей usePermissions при холодном
+// кеше иначе шлют 8 одинаковых GET. Один промис на clinicId — остальные
+// переиспользуют его.
+const inflight = new Map<string, Promise<MyClinicRole>>();
+
+function fetchClinicRole(clinicId: string): Promise<MyClinicRole> {
+  const existing = inflight.get(clinicId);
+  if (existing) return existing;
+  const p = SelfQueryService.selfQueryGetMyClinicRole(clinicId)
+    .then((res) => {
+      const next: MyClinicRole = { isClinicHead: !!(res as any)?.isClinicHead };
+      writeCache(clinicId, next);
+      return next;
+    })
+    .finally(() => inflight.delete(clinicId));
+  inflight.set(clinicId, p);
+  return p;
+}
+
 // Возвращает роль текущего юзера в указанной клинике.
 // Источник — `GET /v1/me/clinics/{id}/role` (medincident-backend#155).
 export function useMyClinicRole(clinicId: string | null | undefined) {
@@ -49,14 +68,9 @@ export function useMyClinicRole(clinicId: string | null | undefined) {
 
     let cancelled = false;
     setIsLoading(true);
-    SelfQueryService.selfQueryGetMyClinicRole(clinicId)
-      .then((res) => {
-        if (cancelled) return;
-        const next: MyClinicRole = {
-          isClinicHead: !!(res as any)?.isClinicHead,
-        };
-        writeCache(clinicId, next);
-        setRole(next);
+    fetchClinicRole(clinicId)
+      .then((next) => {
+        if (!cancelled) setRole(next);
       })
       .catch(() => {
         if (!cancelled) setRole(EMPTY);

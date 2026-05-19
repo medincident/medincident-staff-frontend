@@ -205,11 +205,17 @@ export function ProfileView() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="mb-2 flex flex-wrap gap-1 justify-end">
-                  <Badge variant={isAdmin ? "default" : "secondary"}>
+                  {/* Самая старшая роль (myRoles отсортирован: sysadmin >
+                      главврач > админ > диспетчер) — всегда выделена. */}
+                  <Badge variant="default">
                     {roleName}
                   </Badge>
                   {myRoles.slice(1).map((r) => (
-                    <Badge key={r} variant="secondary">
+                    <Badge
+                      key={r}
+                      variant="secondary"
+                      className="opacity-80"
+                    >
                       {r}
                     </Badge>
                   ))}

@@ -11,9 +11,11 @@ import {
 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { INCIDENT_PRIORITY_MAP } from "@/lib/constants";
+import { INCIDENT_PRIORITY_MAP, EVENT_STATUS_MAP, STATUS_MAP } from "@/lib/constants";
+import { getBadgeColor } from "@/lib/status-helper";
 import {
   IncidentQueryService,
   ServiceRequestQueryService,
@@ -30,33 +32,53 @@ type HistoryItem = {
   detail: React.ReactNode;
 };
 
-// Дружественные подписи статусов и действий — без зависимости от UI-карт
-// (которые местами используют другие ключи). Ключи в нижнем регистре,
-// сравниваем после удаления префикса вида INCIDENT_STATUS_.
-const INCIDENT_STATUS_LABEL: Record<string, string> = {
-  pending: "Принята",
-  in_progress: "В работе",
-  done: "Завершено",
-  rejected: "Отклонено",
-  cancelled: "Отменено",
-  unspecified: "—",
-};
-
-const REQUEST_STATUS_LABEL: Record<string, string> = {
-  created: "Создана",
-  in_work: "В работе",
-  purchase: "Закупка",
-  completed: "Выполнена",
-  refused: "Отказ",
-  cancelled: "Отменена",
-  unspecified: "—",
-};
+// Подписи статусов берём из общих карт приложения (EVENT_STATUS_MAP /
+// STATUS_MAP) — раньше тут был свой словарь и история расходилась с
+// бейджами на странице («Принята» vs «Ожидает»).
+function statusLabel(entityType: EntityType, key: string): string {
+  if (!key || key === "unspecified") return "—";
+  const map = entityType === "incident" ? EVENT_STATUS_MAP : STATUS_MAP;
+  return map[key] ?? key;
+}
 
 const EXECUTOR_ACTION_LABEL: Record<string, string> = {
   assigned: "назначен исполнителем",
   unassigned: "снят с заявки",
   replaced: "заменён",
 };
+
+const isCreation = (fromKey: string) => !fromKey || fromKey === "unspecified";
+
+// Цветная «пилюля» статуса (цвет — по интенту из status-helper).
+function StatusPill({ k, label }: { k: string; label: string }) {
+  return (
+    <Badge variant="outline" className={cn("font-medium", getBadgeColor(k))}>
+      {label}
+    </Badge>
+  );
+}
+
+// Переход статуса: при создании сущности (from = unspecified) показываем
+// одну пилюлю, а не невнятное «— → X».
+function StatusTransition({
+  entityType,
+  fromKey,
+  toKey,
+}: {
+  entityType: EntityType;
+  fromKey: string;
+  toKey: string;
+}) {
+  const to = <StatusPill k={toKey} label={statusLabel(entityType, toKey)} />;
+  if (isCreation(fromKey)) return to;
+  return (
+    <span className="inline-flex items-center gap-1.5 flex-wrap">
+      <StatusPill k={fromKey} label={statusLabel(entityType, fromKey)} />
+      <ArrowRight className="h-3.5 w-3.5 opacity-50 shrink-0" />
+      {to}
+    </span>
+  );
+}
 
 function stripPrefix(value: string | undefined, prefix: string): string {
   return (value ?? "").toLowerCase().replace(prefix, "") || "unspecified";
@@ -111,13 +133,9 @@ export function EntityHistory({
                 changedAt: e.changedAt ?? "",
                 actorName: e.actor?.displayName ?? "—",
                 type: "status",
-                title: "Изменён статус",
+                title: isCreation(fromKey) ? "Зарегистрировано" : "Изменён статус",
                 detail: (
-                  <span>
-                    <b>{INCIDENT_STATUS_LABEL[fromKey] ?? fromKey}</b>{" "}
-                    <ArrowRight className="inline h-3 w-3 align-text-bottom mx-0.5 opacity-60" />{" "}
-                    <b>{INCIDENT_STATUS_LABEL[toKey] ?? toKey}</b>
-                  </span>
+                  <StatusTransition entityType="incident" fromKey={fromKey} toKey={toKey} />
                 ),
               });
             }
@@ -134,10 +152,10 @@ export function EntityHistory({
                 type: "priority",
                 title: "Изменён приоритет",
                 detail: (
-                  <span>
-                    <b>{INCIDENT_PRIORITY_MAP[fromKey] ?? fromKey}</b>{" "}
-                    <ArrowRight className="inline h-3 w-3 align-text-bottom mx-0.5 opacity-60" />{" "}
-                    <b>{INCIDENT_PRIORITY_MAP[toKey] ?? toKey}</b>
+                  <span className="inline-flex items-center gap-1.5 flex-wrap">
+                    <StatusPill k={fromKey} label={INCIDENT_PRIORITY_MAP[fromKey] ?? fromKey} />
+                    <ArrowRight className="h-3.5 w-3.5 opacity-50 shrink-0" />
+                    <StatusPill k={toKey} label={INCIDENT_PRIORITY_MAP[toKey] ?? toKey} />
                   </span>
                 ),
               });
@@ -160,13 +178,9 @@ export function EntityHistory({
                 changedAt: e.changedAt ?? "",
                 actorName: e.actorName ?? "—",
                 type: "status",
-                title: "Изменён статус",
+                title: isCreation(fromKey) ? "Создана" : "Изменён статус",
                 detail: (
-                  <span>
-                    <b>{REQUEST_STATUS_LABEL[fromKey] ?? fromKey}</b>{" "}
-                    <ArrowRight className="inline h-3 w-3 align-text-bottom mx-0.5 opacity-60" />{" "}
-                    <b>{REQUEST_STATUS_LABEL[toKey] ?? toKey}</b>
-                  </span>
+                  <StatusTransition entityType="request" fromKey={fromKey} toKey={toKey} />
                 ),
               });
             }
