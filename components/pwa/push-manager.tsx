@@ -121,9 +121,11 @@ export function PushNotificationManager() {
     setIsWorking(true);
     try {
       try {
+        // endpoint идёт query-параметром: grpc-gateway не принимает тело
+        // у DELETE (см. notification.proto, UnsubscribeDevice).
         await axios.delete(`${NotificationsOpenAPI.BASE}/api/v1/push/subscriptions`, {
           headers: await authHeader(),
-          data: { endpoint: subscription.endpoint },
+          params: { endpoint: subscription.endpoint },
         });
       } catch (err) {
         // Серверная отписка — best-effort: даже если ряд уже удалён или сеть
