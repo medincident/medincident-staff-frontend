@@ -15,7 +15,10 @@ import {
   ChevronRight,
   ArrowRight,
   Clock,
-  FileText
+  FileText,
+  Users,
+  Plane,
+  Building2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +37,8 @@ import {
   IncidentQueryService,
   ServiceRequestQueryService,
   AnnouncementQueryService,
+  AnalyticsQueryService,
+  StatsQueryService,
   v1IncidentView,
   v1ServiceRequest,
   v1AnnouncementView,
@@ -67,6 +72,20 @@ export function DashboardView() {
   const [events, setEvents] = useState<v1IncidentView[]>([]);
   const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
   const [announcements, setAnnouncements] = useState<v1AnnouncementView[]>([]);
+  // Берём агрегаты с бэка — .filter() по локальной странице из 50 НС
+  // показывал бы неверные KPI при пагинации.
+  const [summary, setSummary] = useState<{
+    incPending: number;
+    incInProgress: number;
+    reqActive: number;
+    reqInWork: number;
+  } | null>(null);
+  const [orgStats, setOrgStats] = useState<{
+    employees: number;
+    onVacation: number;
+    departments: number;
+    clinics: number;
+  } | null>(null);
   // Справочник категорий — из общего zustand-кеша (не дёргаем эндпоинт
   // повторно на каждый заход на дашборд / журнал событий).
   const { categories: classifier } = useIncidentClassifier(orgId);
@@ -83,15 +102,60 @@ export function DashboardView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [eventsRes, reqsRes, annRes] = await Promise.all([
-          IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
-          ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 50),
-          AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
-        ]);
+        const now = Date.now();
+        const from = new Date(now - 90 * 86_400_000).toISOString();
+        const to = new Date(now).toISOString();
 
-        if (eventsRes && "items" in eventsRes && eventsRes.items) setEvents(eventsRes.items);
-        if (reqsRes && "items" in reqsRes && reqsRes.items) setRequests(reqsRes.items);
-        if (annRes && "items" in annRes && annRes.items) setAnnouncements(annRes.items);
+        // allSettled — у не-админов нет прав на stats, не должно валить весь экран.
+        const [eventsRes, reqsRes, annRes, summaryRes, orgStatsRes] =
+          await Promise.allSettled([
+            IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),
+            ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 50),
+            AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(orgId, false, 'ANNOUNCEMENT_PRIORITY_UNSPECIFIED', 10),
+            AnalyticsQueryService.analyticsQueryGetSummary(orgId, from, to),
+            StatsQueryService.statsQueryGetOrganizationStats(orgId),
+          ]);
+
+        if (eventsRes.status === "fulfilled" && eventsRes.value && "items" in eventsRes.value && eventsRes.value.items) {
+          setEvents(eventsRes.value.items);
+        }
+        if (reqsRes.status === "fulfilled" && reqsRes.value && "items" in reqsRes.value && reqsRes.value.items) {
+          setRequests(reqsRes.value.items);
+        }
+        if (annRes.status === "fulfilled" && annRes.value && "items" in annRes.value && annRes.value.items) {
+          setAnnouncements(annRes.value.items);
+        }
+
+        if (summaryRes.status === "fulfilled" && summaryRes.value && !("code" in summaryRes.value)) {
+          const s = summaryRes.value as Record<string, unknown>;
+          const inc = (s.incidents as Record<string, unknown> | undefined) ?? {};
+          const incBy = (inc.byStatus as Record<string, unknown> | undefined) ?? {};
+          const req = (s.requests as Record<string, unknown> | undefined) ?? {};
+          const reqBy = (req.byStatus as Record<string, unknown> | undefined) ?? {};
+          const num = (v: unknown) =>
+            typeof v === "number" ? v : typeof v === "string" ? Number(v) || 0 : 0;
+          const reqInWork = num(reqBy.inWork);
+          setSummary({
+            incPending: num(incBy.pending),
+            incInProgress: num(incBy.inProgress),
+            reqActive:
+              num(reqBy.created) + reqInWork + num(reqBy.onHold) + num(reqBy.pendingReview),
+            reqInWork,
+          });
+        }
+
+        if (orgStatsRes.status === "fulfilled" && orgStatsRes.value && !("code" in orgStatsRes.value)) {
+          const s = orgStatsRes.value as Record<string, unknown>;
+          const stats = (s.stats as Record<string, unknown> | undefined) ?? s;
+          const num = (v: unknown) =>
+            typeof v === "number" ? v : typeof v === "string" ? Number(v) || 0 : 0;
+          setOrgStats({
+            employees: num(stats.employeesTotal),
+            onVacation: num(stats.employeesOnVacation),
+            departments: num(stats.departmentsTotal),
+            clinics: num(stats.clinicsTotal),
+          });
+        }
       } catch (error) {
         console.error("Dashboard data load failed:", error);
       } finally {
@@ -110,17 +174,11 @@ export function DashboardView() {
     return cats;
   }, [classifier]);
 
-  // FIXME: Active items logic based on actual status enums
-  const activeEvents = events.filter(e => {
-      const s = (e.status || "").toLowerCase();
-      return !s.includes("closed") && !s.includes("completed");
-  });
-  
   const activeRequests = requests.filter(r => {
       const s = (r.status || "").toLowerCase();
       return !s.includes("completed") && !s.includes("cancelled") && !s.includes("refused");
   });
-  
+
   const recentEvents = events.slice(0, 3);
   const myActiveRequests = activeRequests.slice(0, 3);
 
@@ -171,32 +229,77 @@ export function DashboardView() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatsCard
-          title="В расследовании (НС)"
-          value={isLoading ? <Skeleton className="h-8 w-12" /> : activeEvents.length}
-          desc="Требуют внимания"
+          title="Открытые НС"
+          value={
+            isLoading || !summary
+              ? <Skeleton className="h-8 w-12" />
+              : summary.incPending + summary.incInProgress
+          }
+          desc="В работе и ожидают рассмотрения"
           icon={ShieldAlert}
           iconColor="text-primary"
           iconBg="bg-primary/10"
         />
-        
+
         <StatsCard
           title="Активные заявки"
-          value={isLoading ? <Skeleton className="h-8 w-12" /> : activeRequests.length}
-          desc="Всего в системе"
+          value={
+            isLoading || !summary ? <Skeleton className="h-8 w-12" /> : summary.reqActive
+          }
+          desc="Не закрытые / не отменённые"
           icon={FileText}
           iconColor="text-info"
           iconBg="bg-info/10"
         />
 
         <StatsCard
-          title="Всего в работе"
-          value={isLoading ? <Skeleton className="h-8 w-12" /> : requests.filter(r => (r.status || "").toLowerCase().includes("in_work")).length}
-          desc="Выполняются сейчас"
+          title="В работе"
+          value={
+            isLoading || !summary ? <Skeleton className="h-8 w-12" /> : summary.reqInWork
+          }
+          desc="Заявки выполняются сейчас"
           icon={Wrench}
           iconColor="text-muted-foreground"
           iconBg="bg-muted"
         />
       </div>
+
+      {orgStats ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatsCard
+            title="Сотрудников"
+            value={orgStats.employees}
+            desc="Всего в организации"
+            icon={Users}
+            iconColor="text-info"
+            iconBg="bg-info/10"
+          />
+          <StatsCard
+            title="На отпуске"
+            value={orgStats.onVacation}
+            desc="Прямо сейчас"
+            icon={Plane}
+            iconColor="text-warning"
+            iconBg="bg-warning/10"
+          />
+          <StatsCard
+            title="Отделений"
+            value={orgStats.departments}
+            desc="В структуре"
+            icon={Building2}
+            iconColor="text-muted-foreground"
+            iconBg="bg-muted"
+          />
+          <StatsCard
+            title="Клиник"
+            value={orgStats.clinics}
+            desc="В составе"
+            icon={Building2}
+            iconColor="text-muted-foreground"
+            iconBg="bg-muted"
+          />
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 

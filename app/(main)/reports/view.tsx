@@ -54,6 +54,13 @@ import {
 } from "@/lib/api-generated";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useRequirePermission } from "@/lib/auth/use-require-permission";
+import { useMyEmployee } from "@/lib/auth/use-my-employee";
+import {
+  exportPdf,
+  type ExportPayload,
+  type ExportSummary,
+  type ExportTimeSeriesBucket,
+} from "@/lib/reports/export";
 import { forecastHolt, type ForecastResult } from "@/lib/analytics/forecast";
 import {
   detectChangePoints,
@@ -87,6 +94,85 @@ const ACTIVE_EVENT_STATUSES: EventStatus[] = [
 
 const DAY_MS = 86_400_000;
 const ANOMALY_Z_THRESHOLD = 2;
+
+// Бэк отдаёт int64 в JSON как строку (grpc-gateway), приводим к числу.
+function toNum(v: unknown): number {
+  if (v == null) return 0;
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function mapSummary(raw: Record<string, unknown>): ExportSummary | undefined {
+  const inc = (raw.incidents as Record<string, unknown> | undefined) ?? undefined;
+  if (!inc) return undefined;
+  const bs = (inc.byStatus as Record<string, unknown> | undefined) ?? {};
+  const bp = (inc.byPriority as Record<string, unknown> | undefined) ?? {};
+  const bso = (inc.bySource as Record<string, unknown> | undefined) ?? {};
+  const r = (inc.resolution as Record<string, unknown> | undefined) ?? undefined;
+  return {
+    total: toNum(inc.total),
+    byStatus: {
+      pending: toNum(bs.pending),
+      inProgress: toNum(bs.inProgress),
+      done: toNum(bs.done),
+      rejected: toNum(bs.rejected),
+      cancelled: toNum(bs.cancelled),
+    },
+    byPriority: {
+      low: toNum(bp.low),
+      normal: toNum(bp.normal),
+      high: toNum(bp.high),
+      critical: toNum(bp.critical),
+    },
+    bySource: {
+      staff: toNum(bso.staff),
+      patient: toNum(bso.patient),
+    },
+    reopened: toNum(inc.reopened),
+    withLinkedRequests: toNum(inc.withLinkedRequests),
+    resolution: r
+      ? {
+          avgMinutes: typeof r.avgMinutes === "number" ? r.avgMinutes : toNum(r.avgMinutes),
+          minMinutes: typeof r.minMinutes === "number" ? r.minMinutes : toNum(r.minMinutes),
+          maxMinutes: typeof r.maxMinutes === "number" ? r.maxMinutes : toNum(r.maxMinutes),
+          p50Minutes: typeof r.p50Minutes === "number" ? r.p50Minutes : toNum(r.p50Minutes),
+          p90Minutes: typeof r.p90Minutes === "number" ? r.p90Minutes : toNum(r.p90Minutes),
+          p95Minutes: typeof r.p95Minutes === "number" ? r.p95Minutes : toNum(r.p95Minutes),
+        }
+      : undefined,
+    topCategories: ((inc.topCategories as Array<Record<string, unknown>> | undefined) ?? []).map((c) => ({
+      categoryName: (c.categoryName as string) ?? "—",
+      count: toNum(c.count),
+    })),
+    topTypes: ((inc.topTypes as Array<Record<string, unknown>> | undefined) ?? []).map((t) => ({
+      typeName: (t.typeName as string) ?? "—",
+      count: toNum(t.count),
+    })),
+    topDepartments: ((inc.topDepartments as Array<Record<string, unknown>> | undefined) ?? []).map((d) => ({
+      departmentName: (d.departmentName as string) ?? "—",
+      count: toNum(d.count),
+    })),
+  };
+}
+
+function mapTimeSeries(raw: Record<string, unknown>): ExportTimeSeriesBucket[] | undefined {
+  const buckets = raw.buckets as Array<Record<string, unknown>> | undefined;
+  if (!buckets) return undefined;
+  return buckets.map((b) => {
+    const i = (b.incidents as Record<string, unknown> | undefined) ?? {};
+    return {
+      bucketStart: (b.bucketStart as string) ?? "",
+      total: toNum(i.total),
+      done: toNum(i.done),
+      highCritical: toNum(i.highCritical),
+      patientSource: toNum(i.patientSource),
+    };
+  });
+}
 
 function pctChange(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? null : 0;
@@ -127,6 +213,10 @@ export function ReportsView() {
   const { data: session } = useSession();
   const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
   useRequirePermission("canViewReports");
+  // Для шапки экспорта (организация / автор). Имена категорий/типов в
+  // snapshot'е приходят уже строками — отдельная карта не нужна.
+  const { employee } = useMyEmployee();
+  const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodValue>("30d");
   const [forecastMethod, setForecastMethod] = useState<"holt" | "lstm">("holt");
@@ -162,8 +252,30 @@ export function ReportsView() {
         if (!userId) return;
 
         if (orgId) {
-          // Fetch the full historical snapshot without date limits to support LSTM
-          const snapshotRes = await AnalyticsQueryService.analyticsQueryGetSnapshot(orgId);
+          // Бэк требует from/to как RFC3339, иначе analytics_period_invalid.
+          // Грузим двойное окно — нужно для сравнения «к пред. периоду».
+          const now = Date.now();
+          let fromMs: number;
+          let toMs: number = now;
+          if (period === "custom") {
+            const cf = customRange?.from?.getTime();
+            const ct = customRange?.to?.getTime() ?? customRange?.from?.getTime() ?? now;
+            if (cf == null) {
+              fromMs = now - 30 * DAY_MS;
+            } else {
+              const len = Math.max(ct - cf, DAY_MS);
+              fromMs = cf - len;
+              toMs = ct;
+            }
+          } else if (period === "all") {
+            fromMs = now - 5 * 365 * DAY_MS;
+          } else {
+            const cfg = PERIODS.find((p) => p.value === period)!;
+            fromMs = now - 2 * cfg.days * DAY_MS;
+          }
+          const from = new Date(fromMs).toISOString();
+          const to = new Date(toMs).toISOString();
+          const snapshotRes = await AnalyticsQueryService.analyticsQueryGetSnapshot(orgId, from, to);
           if (snapshotRes && !("code" in snapshotRes)) {
             const snap = snapshotRes as any;
             const mappedEvents = (snap.incidents || []).map((i: any) => ({
@@ -190,7 +302,15 @@ export function ReportsView() {
     };
     
     loadData();
-  }, [session, orgId, isOrgResolving]);
+    // Примитивные deps по getTime() — иначе DateRange меняет ссылку каждый рендер.
+  }, [
+    session,
+    orgId,
+    isOrgResolving,
+    period,
+    customRange?.from?.getTime(),
+    customRange?.to?.getTime(),
+  ]);
 
   const { startMs, endMs, prevStartMs, prevEndMs, effectiveDays } = useMemo(() => {
     const now = Date.now();
@@ -258,6 +378,103 @@ export function ReportsView() {
       prevRequests: within(seedData.requests, prevStartMs, prevEndMs),
     };
   }, [seedData, startMs, endMs, prevStartMs, prevEndMs]);
+
+  const exportPayload = useMemo<ExportPayload>(() => {
+    const events = filtered.events;
+    const periodLabel =
+      PERIODS.find((p) => p.value === period)?.label ?? "Период";
+    const generatedBy =
+      employee?.displayName ||
+      [employee?.firstName, employee?.lastName].filter(Boolean).join(" ") ||
+      (session?.user as { name?: string } | undefined)?.name ||
+      "—";
+
+    return {
+      organization: employee?.organizationName || "—",
+      periodLabel,
+      fromIso: new Date(startMs).toISOString(),
+      toIso: new Date(endMs).toISOString(),
+      generatedAtIso: new Date().toISOString(),
+      generatedBy,
+      events: events.map((e: {
+        createdAt?: string;
+        occurredAt?: string;
+        closedAt?: string;
+        status?: string;
+        priority?: string;
+        categoryName?: string;
+        typeName?: string;
+        clinicId?: string;
+        departmentId?: string;
+        isPatientSource?: boolean;
+        isReopened?: boolean;
+        linkedRequestsCount?: number;
+      }) => ({
+        createdAt: e.createdAt,
+        occurredAt: e.occurredAt,
+        closedAt: e.closedAt,
+        status: e.status,
+        priority: e.priority,
+        categoryName: e.categoryName,
+        typeName: e.typeName,
+        clinicId: e.clinicId,
+        departmentId: e.departmentId,
+        isPatientSource: e.isPatientSource,
+        isReopened: e.isReopened,
+        linkedRequestsCount: e.linkedRequestsCount,
+      })),
+    };
+  }, [filtered.events, period, startMs, endMs, employee, session]);
+
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      // Без укрупнения бакетов на длинных окнах столбцы превратятся в каркас.
+      let granularity:
+        | "TIME_SERIES_GRANULARITY_DAY"
+        | "TIME_SERIES_GRANULARITY_WEEK"
+        | "TIME_SERIES_GRANULARITY_MONTH" = "TIME_SERIES_GRANULARITY_DAY";
+      const lengthDays = Math.max(1, Math.ceil((endMs - startMs) / DAY_MS));
+      if (lengthDays > 365) granularity = "TIME_SERIES_GRANULARITY_MONTH";
+      else if (lengthDays > 60) granularity = "TIME_SERIES_GRANULARITY_WEEK";
+
+      const fromIso = new Date(startMs).toISOString();
+      const toIso = new Date(endMs).toISOString();
+
+      const [summaryRes, tsRes] = orgId
+        ? await Promise.allSettled([
+            AnalyticsQueryService.analyticsQueryGetSummary(orgId, fromIso, toIso),
+            AnalyticsQueryService.analyticsQueryGetTimeSeries(
+              orgId,
+              fromIso,
+              toIso,
+              undefined,
+              undefined,
+              granularity,
+            ),
+          ])
+        : [];
+
+      const summary =
+        summaryRes && summaryRes.status === "fulfilled" && summaryRes.value && !("code" in summaryRes.value)
+          ? mapSummary(summaryRes.value as Record<string, unknown>)
+          : undefined;
+
+      const timeseries =
+        tsRes && tsRes.status === "fulfilled" && tsRes.value && !("code" in tsRes.value)
+          ? mapTimeSeries(tsRes.value as Record<string, unknown>)
+          : undefined;
+
+      await exportPdf(
+        { ...exportPayload, summary, timeseries },
+        "journal-ns-medincident",
+      );
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const kpi = useMemo(() => {
     const { events, requests, prevEvents, prevRequests } = filtered;
@@ -686,11 +903,17 @@ export function ReportsView() {
             </Select>
           </div>
           <Button
-            disabled={isLoading}
+            disabled={isLoading || isExporting || exportPayload.events.length === 0}
+            onClick={handleExportPdf}
             variant="outline"
             className="shrink-0 w-10 sm:w-auto px-0 sm:px-4 justify-center"
+            title="Журнал НС в PDF (приказ Минздрава № 785н)"
           >
-            <Download className="h-4 w-4 sm:mr-2" />
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 sm:mr-2" />
+            )}
             <span className="hidden sm:inline">Экспорт (PDF)</span>
           </Button>
         </div>

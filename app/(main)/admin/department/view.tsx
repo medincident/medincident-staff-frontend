@@ -6,6 +6,8 @@ import {
   ShieldAlert,
   Loader2,
   UserCheck,
+  Users,
+  Plane,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import {
   MembershipQueryService,
   MembershipCommandService,
   OrgStructureQueryService,
+  StatsQueryService,
   v1EmployeeCardView,
 } from "@/lib/api-generated";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
@@ -37,6 +40,8 @@ export function DepartmentView() {
   const [departmentName, setDepartmentName] = useState("");
   const [staff, setStaff] = useState<v1EmployeeCardView[]>([]);
   const [departmentId, setDepartmentId] = useState<string | null>(null);
+  // Считаем staff.length нельзя — list пагинируется (limit 100), KPI уехало бы.
+  const [stats, setStats] = useState<{ employees: number; onVacation: number } | null>(null);
 
   // Сохраняем оригинальные значения, чтобы корректно вычислять diff при сохранении.
   const [origHeadId, setOrigHeadId] = useState("");
@@ -68,20 +73,37 @@ export function DepartmentView() {
 
         setDepartmentId(emp.departmentId);
 
-        // Загружаем данные отделения
-        const deptRes = await OrgStructureQueryService.orgStructureQueryGetDepartment(emp.departmentId);
-        const deptData = (deptRes as any).department;
-        setDepartmentName(deptData?.name || "Настройки отделения");
+        // allSettled — у не-админа 403 на stats не должен валить весь экран.
+        const [deptRes, staffRes, statsRes, headRes] = await Promise.allSettled([
+          OrgStructureQueryService.orgStructureQueryGetDepartment(emp.departmentId),
+          MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId, 100),
+          StatsQueryService.statsQueryGetDepartmentStats(emp.departmentId),
+          MembershipQueryService.membershipQueryGetDepartmentResponsible(emp.departmentId),
+        ]);
 
-        // Загружаем сотрудников отделения
-        const staffRes = await MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId, 100);
-        const staffItems = (staffRes as any).items as v1EmployeeCardView[] || [];
-        setStaff(staffItems);
+        if (deptRes.status === "fulfilled") {
+          const deptData = (deptRes.value as any).department;
+          setDepartmentName(deptData?.name || "Настройки отделения");
+        }
 
-        // Загружаем ответственного за отделение и его заместителя
-        try {
-          const headRes = await MembershipQueryService.membershipQueryGetDepartmentResponsible(emp.departmentId);
-          const assignment = (headRes as any).assignment;
+        if (staffRes.status === "fulfilled") {
+          const staffItems = (staffRes.value as any).items as v1EmployeeCardView[] || [];
+          setStaff(staffItems);
+        }
+
+        if (statsRes.status === "fulfilled" && statsRes.value && !("code" in statsRes.value)) {
+          const s = (statsRes.value as any).stats ?? {};
+          const num = (v: unknown) =>
+            typeof v === "number" ? v : typeof v === "string" ? Number(v) || 0 : 0;
+          setStats({
+            employees: num(s.employeesTotal),
+            onVacation: num(s.employeesOnVacation),
+          });
+        }
+
+        // Если руководитель не назначен — эндпоинт падает, просто пропускаем.
+        if (headRes.status === "fulfilled") {
+          const assignment = (headRes.value as any).assignment;
           const holderId = assignment?.holder?.employeeId ?? "";
           const deputyId = assignment?.deputy?.employeeId ?? "";
 
@@ -92,10 +114,8 @@ export function DepartmentView() {
             setIsActingEnabled(true);
             setActingId(deputyId);
           }
-        } catch {
-          // Руководитель не назначен — ок
         }
-      } catch (error) {
+      } catch {
         notify.error("Ошибка", "Не удалось загрузить данные отделения.");
       } finally {
         setIsLoading(false);
@@ -177,12 +197,41 @@ export function DepartmentView() {
         </div>
 
         <div className="flex w-full sm:w-auto items-center gap-2">
+          {stats ? (
+            <div className="hidden md:flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-info/10 text-info border border-info/20 text-xs font-medium">
+                <Users className="h-3.5 w-3.5" />
+                <b className="text-foreground">{stats.employees}</b> сотр.
+              </span>
+              {stats.onVacation > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-warning/10 text-warning border border-warning/20 text-xs font-medium">
+                  <Plane className="h-3.5 w-3.5" />
+                  <b className="text-foreground">{stats.onVacation}</b> в отпуске
+                </span>
+              )}
+            </div>
+          ) : null}
           <Button onClick={handleSave} disabled={isSaving || isLoading} className="w-full sm:w-auto">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Сохранить
           </Button>
         </div>
       </div>
+
+      {stats ? (
+        <div className="flex md:hidden flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-info/10 text-info border border-info/20 text-xs font-medium">
+            <Users className="h-3.5 w-3.5" />
+            <b className="text-foreground">{stats.employees}</b> сотр.
+          </span>
+          {stats.onVacation > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-warning/10 text-warning border border-warning/20 text-xs font-medium">
+              <Plane className="h-3.5 w-3.5" />
+              <b className="text-foreground">{stats.onVacation}</b> в отпуске
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="max-w-4xl space-y-6">

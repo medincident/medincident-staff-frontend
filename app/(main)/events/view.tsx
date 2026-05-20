@@ -77,9 +77,8 @@ export function EventsListView() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    // Ждём, пока подгрузятся разрешения — иначе на первой итерации флаги
-    // EMPTY, и пользователь-главврач уходил бы в ветку «вижу только своё»,
-    // даже если ему положено видеть всю организацию.
+    // Ждём perms.isLoading — иначе главврач при пустых флагах попал бы
+    // в ветку ListMyIncidents и не увидел чужие события.
     if (isOrgResolving || perms.isLoading) return;
     const loadData = async () => {
       const userId = (session?.user as any)?.id;
@@ -89,12 +88,29 @@ export function EventsListView() {
         setIsLoading(true);
         const orgId = activeOrgId ?? "";
 
-        // Кто видит весь журнал — sysadmin / orgAdmin / orgHead / orgDispatcher
-        // (см. canSeeAllIncidents в use-permissions). Главврача раньше
-        // отсутствовал — попадал в else и видел только свои инциденты.
+        // Прокидываем фильтр на бэк — клиентский .filter() по странице из 100
+        // мог бы не показать события, отфильтрованные за пределами окна.
+        const statusesParam =
+          statusFilter !== "all"
+            ? [`INCIDENT_STATUS_${statusFilter.toUpperCase()}`]
+            : undefined;
+
+        // ListMyIncidents серверного фильтра не имеет — статус-фильтр там
+        // остаётся клиентским ниже, в filteredEvents.
         let incidentsRes;
         if (perms.canSeeAllIncidents && orgId) {
-          incidentsRes = await IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100);
+          incidentsRes = await IncidentQueryService.incidentQueryListIncidents(
+            orgId,
+            statusesParam,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            100,
+          );
         } else {
           incidentsRes = await IncidentQueryService.incidentQueryListMyIncidents(100);
         }
@@ -102,9 +118,6 @@ export function EventsListView() {
         if (incidentsRes && "items" in incidentsRes && incidentsRes.items) {
           setEvents(incidentsRes.items);
         }
-
-        // Классификаторы тянет useIncidentClassifier (общий кеш) — здесь
-        // больше не запрашиваем.
       } catch (error) {
         console.error("Failed to load events:", error);
       } finally {
@@ -112,7 +125,7 @@ export function EventsListView() {
       }
     };
     loadData();
-  }, [session, activeOrgId, isOrgResolving, perms.isLoading, perms.canSeeAllIncidents]);
+  }, [session, activeOrgId, isOrgResolving, perms.isLoading, perms.canSeeAllIncidents, statusFilter]);
 
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const typeMap: Record<string, string> = {};
@@ -133,19 +146,23 @@ export function EventsListView() {
     return events.filter((event) => {
       const typeNameRu = typeNamesMap[event.typeId || ""] || event.typeId || "";
       const categoryNameRu = categoryNamesMap[event.categoryId || ""] || event.categoryId || "";
-      
-      // Идентификатором инцидента в новом API служит просто ID (или можно использовать обрезанный UUID для отображения как "Код")
+
       const shortId = event.id ? event.id.substring(0, 8) : "";
 
       const searchString = `${shortId} ${typeNameRu} ${categoryNameRu} ${event.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchQuery.toLowerCase());
-      
+
+      // Для админской ветки фильтр уже применён на бэке; добивает клиент
+      // только для ListMyIncidents, у которого серверного фильтра нет.
       const evtStatus = (event.status || "").toLowerCase().replace("incident_status_", "");
-      const matchesStatus = statusFilter === "all" || evtStatus === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" || perms.canSeeAllIncidents
+          ? true
+          : evtStatus === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
-  }, [events, searchQuery, statusFilter, typeNamesMap, categoryNamesMap]);
+  }, [events, searchQuery, statusFilter, typeNamesMap, categoryNamesMap, perms.canSeeAllIncidents]);
 
   return (
     <div className="space-y-6 pb-20">
