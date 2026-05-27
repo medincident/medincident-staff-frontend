@@ -203,10 +203,18 @@ self.addEventListener("push", (event: PushEvent) => {
   if (event.data) {
     const data = event.data.json();
 
+    // iOS Safari молча отбрасывает уведомление, если body пустой.
+    // На Chrome/FCM пустой body допустим — там видно только title.
+    const body =
+      (typeof data.body === "string" && data.body.trim()) ||
+      "Открыть приложение для деталей";
+
     const options: ExtendedNotificationOptions = {
-      body: data.body,
-      icon: "/icon-192.webp",
-      badge: "/icon-192.webp",
+      body,
+      // PNG, не WebP: iOS Safari в Service Worker context не всегда декодирует
+      // WebP корректно — известная причина «доставка прошла, иконки нет».
+      icon: "/apple-icon.png",
+      badge: "/apple-icon.png",
       vibrate: [100, 50, 100],
       data: {
         url: data.url || "/",

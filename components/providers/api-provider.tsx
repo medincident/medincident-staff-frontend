@@ -25,6 +25,10 @@ if (typeof window !== "undefined") {
   // Тот же JWT валиден и для notifications-сервиса (общий Zitadel).
   // BASE для notifications уже выставлен в lib/notifications-api/index.ts.
   NotificationsOpenAPI.TOKEN = async () => pickToken(await getSession());
+
+  // Без timeout fetch в офлайне на iOS Safari висит десятки секунд,
+  // и UI стоит со спиннером. 10 секунд — компромисс между slow-3G и UX.
+  axios.defaults.timeout = 10000;
 }
 
 export function ApiProvider({ children }: { children: ReactNode }) {
