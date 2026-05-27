@@ -146,7 +146,10 @@ export function PushPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:bottom-4 md:w-96 z-40 rounded-xl border bg-card shadow-lg p-4 flex items-start gap-3">
+    <div
+      className="fixed left-4 right-4 md:left-auto md:right-4 md:w-96 z-40 rounded-xl border bg-card shadow-lg p-4 flex items-start gap-3 bottom-20 md:bottom-4"
+      style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="shrink-0 rounded-full bg-primary/10 text-primary p-2">
         <Bell className="h-5 w-5" />
       </div>
