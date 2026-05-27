@@ -15,9 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { logout } from "@/lib/auth/logout";
 
-// При `session.error === "RefreshAccessTokenError"` куки NextAuth ещё
-// валидны, но любой запрос вернёт 401. Блокируем UI до перелогина:
-// продолжать без свежего токена бессмысленно.
+// При RefreshAccessTokenError куки валидны, но запросы вернут 401.
 export function SessionExpiredBanner() {
   const { data: session } = useSession();
   const [isReauthing, setIsReauthing] = useState(false);

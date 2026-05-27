@@ -34,6 +34,13 @@ export const metadata: Metadata = {
     default: APP_CONFIG.name,
   },
   description: APP_CONFIG.description,
+  icons: {
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.webp", sizes: "192x192", type: "image/webp" },
+    ],
+    apple: [{ url: "/icons/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

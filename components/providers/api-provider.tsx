@@ -15,19 +15,15 @@ function pickToken(session: any): string {
   return "";
 }
 
-// Конфигурируем клиент на уровне модуля: useEffect срабатывает уже после
-// первого commit'а, и ранние запросы успевают уйти без Authorization.
+// Конфиг на уровне модуля — useEffect срабатывает позже первых запросов.
 if (typeof window !== "undefined") {
   OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
   OpenAPI.WITH_CREDENTIALS = true;
   OpenAPI.TOKEN = async () => pickToken(await getSession());
-
-  // Тот же JWT валиден и для notifications-сервиса (общий Zitadel).
-  // BASE для notifications уже выставлен в lib/notifications-api/index.ts.
+  // Общий Zitadel — тот же JWT валиден для notifications-сервиса.
   NotificationsOpenAPI.TOKEN = async () => pickToken(await getSession());
 
-  // Без timeout fetch в офлайне на iOS Safari висит десятки секунд,
-  // и UI стоит со спиннером. 10 секунд — компромисс между slow-3G и UX.
+  // Без timeout fetch в офлайне на iOS висит десятки секунд.
   axios.defaults.timeout = 10000;
 }
 

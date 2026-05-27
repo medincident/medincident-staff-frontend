@@ -72,8 +72,7 @@ export function DashboardView() {
   const [events, setEvents] = useState<v1IncidentView[]>([]);
   const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
   const [announcements, setAnnouncements] = useState<v1AnnouncementView[]>([]);
-  // Берём агрегаты с бэка — .filter() по локальной странице из 50 НС
-  // показывал бы неверные KPI при пагинации.
+  // KPI читаем из summary, не из локальной страницы — иначе цифры уедут при пагинации.
   const [summary, setSummary] = useState<{
     incPending: number;
     incInProgress: number;
@@ -106,7 +105,7 @@ export function DashboardView() {
         const from = new Date(now - 90 * 86_400_000).toISOString();
         const to = new Date(now).toISOString();
 
-        // allSettled — у не-админов нет прав на stats, не должно валить весь экран.
+        // allSettled: 403 на stats для не-админа не должен валить экран.
         const [eventsRes, reqsRes, annRes, summaryRes, orgStatsRes] =
           await Promise.allSettled([
             IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 50),

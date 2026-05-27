@@ -32,9 +32,7 @@ type HistoryItem = {
   detail: React.ReactNode;
 };
 
-// Подписи статусов берём из общих карт приложения (EVENT_STATUS_MAP /
-// STATUS_MAP) — раньше тут был свой словарь и история расходилась с
-// бейджами на странице («Принята» vs «Ожидает»).
+// Подписи из общих EVENT_STATUS_MAP / STATUS_MAP, чтобы не расходились с бейджами.
 function statusLabel(entityType: EntityType, key: string): string {
   if (!key || key === "unspecified") return "—";
   const map = entityType === "incident" ? EVENT_STATUS_MAP : STATUS_MAP;

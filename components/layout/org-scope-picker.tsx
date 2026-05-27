@@ -20,9 +20,7 @@ import {
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { cn } from "@/lib/utils";
 
-// Picker всегда виден (для всех ролей). Список доступных орг приходит
-// из ActiveOrgProvider — для сотрудника это его employments, для
-// sysadmin'а — все организации.
+// Виден всегда. Список орг — из ActiveOrgProvider (employments / все для sysadmin).
 export function OrgScopePicker() {
   const { orgId, setOrgId, isResolving, availableOrgs } = useActiveOrgId();
   const [open, setOpen] = useState(false);

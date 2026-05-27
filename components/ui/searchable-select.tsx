@@ -92,9 +92,7 @@ export function SearchableSelect({
               <SelectItem
                 key={String(option.value)}
                 value={String(option.value)}
-                // Галку-индикатор переносим слева — для единообразия с
-                // combobox-режимом. Радикс рендерит индикатор как первый
-                // <span> SelectItem с absolute-позиционированием.
+                // Индикатор-галка слева для единообразия с combobox.
                 className="cursor-pointer items-start whitespace-normal focus:bg-accent focus:text-accent-foreground pl-8 pr-2 [&>span:first-child]:left-2 [&>span:first-child]:right-auto [&>span:first-child]:top-1/2 [&>span:first-child]:-translate-y-1/2"
               >
                 <div className="flex flex-col min-w-0 w-full text-left gap-0.5">

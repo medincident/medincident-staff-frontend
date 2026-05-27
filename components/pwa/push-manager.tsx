@@ -52,8 +52,6 @@ export function PushNotificationManager() {
   const [support, setSupport] = useState<Support>("unknown");
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [isWorking, setIsWorking] = useState(false);
-  // Текущее разрешение браузера на уведомления: default (ещё не спрашивали),
-  // granted (разрешено), denied (заблокировано пользователем).
   const [permission, setPermission] = useState<NotificationPermission>("default");
 
   useEffect(() => {
@@ -86,10 +84,7 @@ export function PushNotificationManager() {
         return;
       }
 
-      // Явно запрашиваем разрешение у браузера — это и есть тот самый
-      // системный запрос «Сайт хочет показывать уведомления». Без явного
-      // вызова он раньше прятался внутри pushManager.subscribe() и при
-      // отказе/блокировке не было понятной обратной связи.
+      // Явный requestPermission даёт понятную обратную связь при отказе.
       if (!("Notification" in window)) {
         notify.error("Уведомления не поддерживаются", "Ваш браузер не умеет показывать уведомления.");
         return;
@@ -150,16 +145,13 @@ export function PushNotificationManager() {
     setIsWorking(true);
     try {
       try {
-        // endpoint идёт query-параметром: grpc-gateway не принимает тело
-        // у DELETE (см. notification.proto, UnsubscribeDevice).
+        // grpc-gateway не принимает body у DELETE, endpoint в query.
         await axios.delete(`${NotificationsOpenAPI.BASE}/api/v1/push/subscriptions`, {
           headers: await authHeader(),
           params: { endpoint: subscription.endpoint },
         });
       } catch (err) {
-        // Серверная отписка — best-effort: даже если ряд уже удалён или сеть
-        // упала, локальную подписку всё равно отзываем, иначе бейдж "Включено"
-        // продолжит висеть навсегда.
+        // Best-effort: локальную подписку отзываем даже при ошибке сервера.
         console.warn("Backend unsubscribe failed:", err);
       }
       await subscription.unsubscribe();
@@ -196,8 +188,7 @@ export function PushNotificationManager() {
     );
   }
 
-  // Разрешение заблокировано в браузере — кнопка «Включить» тут не поможет,
-  // системный запрос больше не покажется. Объясняем, как разблокировать.
+  // Permission denied — нужна разблокировка в настройках браузера.
   if (permission === "denied" && !subscription) {
     return (
       <PushCard

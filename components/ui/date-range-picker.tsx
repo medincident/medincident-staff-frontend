@@ -41,9 +41,7 @@ export function DateRangePicker({
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
 
-  // Staging-стейт: при открытии попапа начинаем с текущего значения.
-  // Пользователь тыкает даты в календаре — меняется только staging, реальный
-  // onChange вызывается только по «Применить».
+  // Staging: реальный onChange срабатывает только по «Применить».
   const [staged, setStaged] = React.useState<DateRange | undefined>(value);
 
   React.useEffect(() => {
@@ -64,10 +62,7 @@ export function DateRangePicker({
     setOpen(false);
   };
 
-  // Поведение клика по календарю. Если у нас уже выбран полный диапазон
-  // (from + to), то новый клик не «двигает» один из концов — а сбрасывает
-  // выделение и начинает новый диапазон от только что выбранной даты.
-  // Так удобнее: одно тапание = новая стартовая точка.
+  // Клик при полном диапазоне сбрасывает выделение и стартует новый.
   const handleSelect = (
     range: DateRange | undefined,
     selectedDay: Date,

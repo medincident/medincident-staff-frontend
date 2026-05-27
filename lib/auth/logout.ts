@@ -1,12 +1,9 @@
 import { signOut } from "next-auth/react";
 import { clearMyEmployeeCache } from "./get-my-employee";
 
-// keepSession=true — soft logout: чистим только NextAuth-куки, SSO в
-// Zitadel остаётся, юзер уходит на свой профиль в Zitadel.
-// keepSession=false — full logout через end_session_endpoint, гасит SSO.
-// Для full logout в Zitadel Application → Redirect URIs → Post Logout
-// должен быть добавлен `${origin}/login`, иначе Zitadel покажет свой
-// логаут-экран без редиректа обратно.
+// keepSession=true — soft logout (только NextAuth-куки, Zitadel SSO остаётся).
+// keepSession=false — full logout через end_session_endpoint.
+// Для full logout в Zitadel Post Logout URI должен включать `${origin}/login`.
 
 export interface LogoutOptions {
   keepSession: boolean;

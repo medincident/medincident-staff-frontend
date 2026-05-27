@@ -3,8 +3,6 @@
 import { useSyncExternalStore } from "react";
 import { WifiOff } from "lucide-react";
 
-// useSyncExternalStore без лишнего ре-рендера после mount: hydration сразу
-// видит реальное значение navigator.onLine (на SSR — true).
 function subscribe(callback: () => void): () => void {
   window.addEventListener("online", callback);
   window.addEventListener("offline", callback);
@@ -22,8 +20,6 @@ function getServerSnapshot(): boolean {
   return true;
 }
 
-// Глобальный баннер «нет сети». Без него интерфейс молчит, а запросы либо
-// валятся на timeout, либо висят со спиннером.
 export function OfflineBanner() {
   const isOnline = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 

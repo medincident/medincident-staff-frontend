@@ -95,16 +95,14 @@ function RequestFormContent({ requestId }: RequestFormProps) {
     },
   });
 
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+
   useEffect(() => {
     if (isOrgResolving) return;
+    if (!userId) return;
     const loadContext = async () => {
-      if (!(session?.user as any)?.id) return;
       try {
-        const userId = (session?.user as any)?.id;
-        if (!userId) return;
-        // Ищем employee в активной организации — у мульти-орг сотрудника
-        // в каждой орге своё отделение, заявку создаём именно от своего
-        // отделения активной орги.
+        // У мульти-орг сотрудника в каждой орге своё отделение.
         const emp = await getMyEmployeeInOrg(userId, activeOrgId);
         const orgId = emp?.organizationId ?? activeOrgId ?? null;
         const deptId = emp?.departmentId ?? null;
@@ -149,7 +147,8 @@ function RequestFormContent({ requestId }: RequestFormProps) {
       }
     };
     loadContext();
-  }, [session, requestId, form, activeOrgId, isOrgResolving]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, requestId, activeOrgId, isOrgResolving]);
 
   // Имя типа НС из общего кеша классификатора (без лишнего запроса) —
   // у многих инцидентов description пустой, и подпись была «undefined…».

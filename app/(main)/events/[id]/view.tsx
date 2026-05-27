@@ -304,11 +304,12 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const [notFound, setNotFound] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
 
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+
   useEffect(() => {
+    if (!userId) return;
+
     const loadData = async () => {
-      const userId = (session?.user as any)?.id;
-      if (!userId) return;
-      
       try {
         setIsLoading(true);
 
@@ -362,7 +363,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
     };
 
     loadData();
-  }, [eventId, session]);
+  }, [eventId, userId]);
 
   const handleStatusChange = async (newStatus: EventStatus) => {
     if (!event || !event.id) return;

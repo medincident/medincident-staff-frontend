@@ -27,9 +27,7 @@ function writeCache(clinicId: string, role: MyClinicRole): void {
   } catch {}
 }
 
-// Дедуп параллельных запросов: 8 потребителей usePermissions при холодном
-// кеше иначе шлют 8 одинаковых GET. Один промис на clinicId — остальные
-// переиспользуют его.
+// Дедуп: один inflight-промис на clinicId.
 const inflight = new Map<string, Promise<MyClinicRole>>();
 
 function fetchClinicRole(clinicId: string): Promise<MyClinicRole> {

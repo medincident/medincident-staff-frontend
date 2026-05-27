@@ -17,10 +17,7 @@ const EMPTY: MyOrgRole = {
 };
 
 const CACHE_KEY_PREFIX = "myOrgRole:";
-// TTL короткий — компромисс между «лишний запрос на каждый mount» и
-// «друг выдал главврача, а UI не обновляется до закрытия вкладки».
-// 30 сек: при типичной навигации между страницами роль остаётся из кеша,
-// но любое изменение прав видно почти сразу после следующего перехода.
+// 30s: компромисс между запросом на каждый mount и видимостью смены роли.
 const CACHE_TTL_MS = 30_000;
 
 type CacheEntry = MyOrgRole & { _t: number };
@@ -72,8 +69,7 @@ function fetchOrgRole(orgId: string): Promise<MyOrgRole> {
   return p;
 }
 
-// Возвращает роли текущего юзера в АКТИВНОЙ организации.
-// Источник — `GET /v1/me/organizations/{id}/role` (medincident-backend#155).
+// Роли в активной организации (GET /v1/me/organizations/{id}/role).
 export function useMyOrgRole() {
   const { orgId, isResolving } = useActiveOrgId();
   const [role, setRole] = useState<MyOrgRole>(EMPTY);

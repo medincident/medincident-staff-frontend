@@ -211,10 +211,10 @@ function stdDev(arr: number[]): number {
 
 export function ReportsView() {
   const { data: session } = useSession();
+  const sessionUserName = (session?.user as { name?: string } | undefined)?.name;
   const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
   useRequirePermission("canViewReports");
-  // Для шапки экспорта (организация / автор). Имена категорий/типов в
-  // snapshot'е приходят уже строками — отдельная карта не нужна.
+  // Для шапки экспорта. Имена категорий/типов приходят строками в snapshot.
   const { employee } = useMyEmployee();
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -252,8 +252,7 @@ export function ReportsView() {
         if (!userId) return;
 
         if (orgId) {
-          // Бэк требует from/to как RFC3339, иначе analytics_period_invalid.
-          // Грузим двойное окно — нужно для сравнения «к пред. периоду».
+          // Бэк требует RFC3339. Грузим двойное окно для сравнения с пред. периодом.
           const now = Date.now();
           let fromMs: number;
           let toMs: number = now;
@@ -302,7 +301,7 @@ export function ReportsView() {
     };
     
     loadData();
-    // Примитивные deps по getTime() — иначе DateRange меняет ссылку каждый рендер.
+    // DateRange меняет ссылку каждый рендер, поэтому deps по getTime().
   }, [
     session,
     orgId,
@@ -386,7 +385,7 @@ export function ReportsView() {
     const generatedBy =
       employee?.displayName ||
       [employee?.firstName, employee?.lastName].filter(Boolean).join(" ") ||
-      (session?.user as { name?: string } | undefined)?.name ||
+      sessionUserName ||
       "—";
 
     return {
@@ -424,12 +423,12 @@ export function ReportsView() {
         linkedRequestsCount: e.linkedRequestsCount,
       })),
     };
-  }, [filtered.events, period, startMs, endMs, employee, session]);
+  }, [filtered.events, period, startMs, endMs, employee, sessionUserName]);
 
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
-      // Без укрупнения бакетов на длинных окнах столбцы превратятся в каркас.
+      // На длинных окнах укрупняем бакеты, иначе график выродится в каркас.
       let granularity:
         | "TIME_SERIES_GRANULARITY_DAY"
         | "TIME_SERIES_GRANULARITY_WEEK"
@@ -500,8 +499,7 @@ export function ReportsView() {
         ? withDuration.reduce((a, b) => a + b, 0) / withDuration.length
         : 0;
 
-    // Повторно открытые НС: бэк помечает событие isReopened=true,
-    // если оно создано через :reopen из ранее завершённого инцидента.
+    // isReopened=true приходит из :reopen-команды бэка.
     const reopenedEvt = events.filter((e: any) => e.isReopened === true).length;
     const prevReopenedEvt = prevEvents.filter((e: any) => e.isReopened === true).length;
 
@@ -557,16 +555,7 @@ export function ReportsView() {
     return { buckets, useWeekly, bucketSizeMs };
   }, [filtered, startMs, endMs, effectiveDays]);
 
-  // --- АНОМАЛИИ ---
-  //   1. Смотрим, сколько заявок/НС регистрируется в типичный день (или неделю).
-  //   2. Если в какой-то конкретный день пришло ЗАМЕТНО больше или меньше, чем
-  //      обычно, — это и есть аномалия. Значит, что-то произошло: авария,
-  //      праздник, внешнее ЧП и т.п. — имеет смысл разобраться.
-  //   3. «Заметно» — это когда отклонение превышает порог в 2σ (две стандартные
-  //      отклонения). Если нагляднее: это такой скачок, который случается сам
-  //      по себе примерно в 1 случае из 20 — нормой считать уже нельзя.
-  //   4. Метрика «±Nσ» рядом — просто во сколько раз скачок больше обычного
-  //      разброса. Чем больше это число, тем ярче всплеск.
+  // Аномалии: бакет, где значение отклоняется от среднего более чем на ANOMALY_Z_THRESHOLD σ.
   const anomalies = useMemo(() => {
     const reqs = frequencyData.buckets.map((b) => b["Заявки"]);
     const evts = frequencyData.buckets.map((b) => b["Инциденты"]);
@@ -642,8 +631,7 @@ export function ReportsView() {
   }, [frequencyData]);
 
   const forecastSeriesKey = useMemo(() => {
-    // Стабильный ключ для сравнения: меняется, когда меняются исходные ряды.
-    // Нужно, чтобы LSTM не переобучалась при каждом ререндере.
+    // Ключ для кеша LSTM — меняется только при изменении рядов.
     return (
       frequencyData.useWeekly + ":" +
       frequencyData.buckets
@@ -817,10 +805,7 @@ export function ReportsView() {
       value,
     }));
 
-    // Динамика НС по категориям: для каждого временного бакета считаем
-    // количество событий по топ-N категорий, остальные сваливаем в «Прочее».
-    // Используется stacked bar-vertical чтобы видеть и общее количество,
-    // и разбивку по категориям одновременно.
+    // Stacked bar по топ-N категориям, остальные в «Прочее».
     const TOP_CATEGORIES_LIMIT = 5;
     const topCategoryNames = byEventCat.slice(0, TOP_CATEGORIES_LIMIT).map((c) => c.name);
     const useWeeklyCat = effectiveDays > 60;
@@ -845,7 +830,7 @@ export function ReportsView() {
       const key = topCategoryNames.includes(cat) ? cat : "Прочее";
       catBuckets[idx][key] = (catBuckets[idx][key] ?? 0) + 1;
     }
-    // Если «Прочее» во всех бакетах = 0 — серию убираем, чтобы не висеть в легенде.
+    // Убираем «Прочее» из легенды, если по всем бакетам нули.
     const hasOther = catBuckets.some((b) => b["Прочее"] > 0);
     const eventCatSeries = hasOther ? [...topCategoryNames, "Прочее"] : topCategoryNames;
     if (!hasOther) catBuckets.forEach((b) => delete b["Прочее"]);

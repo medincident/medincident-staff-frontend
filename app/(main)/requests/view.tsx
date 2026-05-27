@@ -57,12 +57,12 @@ export function RequestsListView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+
   useEffect(() => {
     if (isOrgResolving) return;
+    if (!userId) return;
     const fetchRequests = async () => {
-      const userId = (session?.user as any)?.id;
-      if (!userId) return;
-
       try {
         setIsLoading(true);
         if (!orgId) {
@@ -83,7 +83,7 @@ export function RequestsListView() {
     };
 
     fetchRequests();
-  }, [session, orgId, isOrgResolving]);
+  }, [userId, orgId, isOrgResolving]);
 
   const filteredData = useMemo(() => {
     return requests.filter((req) => {

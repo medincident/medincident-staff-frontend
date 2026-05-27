@@ -6,9 +6,7 @@ import { getMyEmployeeInOrg, getMyEmployee } from "./get-my-employee";
 import { useActiveOrgId } from "./active-org-context";
 import type { v1EmployeeCardView } from "@/lib/api-generated";
 
-// Возвращает employee-карточку для активной организации.
-// Если активной нет (sysadmin без выбора) — fallback на любую найденную,
-// чтобы шапка / профиль могли показать ФИО.
+// Employee-карточка активной орги; fallback на любую найденную для sysadmin.
 export function useMyEmployee() {
   const { data: session, status } = useSession();
   const { orgId, isResolving: isOrgResolving } = useActiveOrgId();

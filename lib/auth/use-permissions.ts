@@ -9,11 +9,8 @@ import { useMyClinicRole } from "./use-my-clinic-role";
 import { useMyDeptRole } from "./use-my-dept-role";
 import { getMyEmployeeInOrg } from "./get-my-employee";
 
-// Единый источник ролевых флагов и производных permission'ов для UI.
-// Композиция поверх SelfQueryService-хуков:
-//   GetMyIdentity, GetMyOrganizationRole, GetMyClinicRole, GetMyDepartmentRole
-// плюс employment в активной орге (чтобы знать, в какой клинике/отделении
-// проверять clinic-/dept-роли).
+// Ролевые флаги и permissions для UI.
+// Композиция: SelfQuery {Identity, OrgRole, ClinicRole, DeptRole} + employment в активной орге.
 //
 // Сопоставление с моделью продуктовых ролей:
 //   System admin                 → isSystemAdmin

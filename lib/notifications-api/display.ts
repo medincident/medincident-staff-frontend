@@ -1,9 +1,4 @@
-// Маппинг типа уведомления (из бэка) на отображаемые данные UI:
-// человеко-читаемое название, intent-цвет (warning/info/success/error/muted),
-// иконка и URL-перехода на сущность.
-//
-// Бэк отдаёт `entityType` (incident | service_request | vacation | employee | …)
-// и `entityId`. Для перехода используем главные маршруты фронта.
+// Маппинг типа уведомления → title/intent/icon/href.
 
 import type { LucideIcon } from "lucide-react";
 import {

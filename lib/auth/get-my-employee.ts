@@ -3,11 +3,8 @@ import {
   v1EmployeeCardView,
 } from "@/lib/api-generated";
 
-// Источник данных — `SelfQueryService` бэка (PR medincident-backend#155):
-// `ListMyOrganizations` отдаёт орги, в которых юзер реально нанят, а
-// `GetMyEmployment(orgId)` — карточку сотрудника в конкретной орге.
-// Мы кэшируем карточки в sessionStorage по zitadelUserId, чтобы хук
-// useMyEmployee не дёргал сеть при каждом маунте.
+// SelfQueryService.ListMyOrganizations + GetMyEmployment по каждой orgId.
+// Кэш в sessionStorage по zitadelUserId.
 
 const CACHE_KEY_PREFIX = "myEmployees:";
 
@@ -32,8 +29,7 @@ function writeCache(zitadelUserId: string, items: v1EmployeeCardView[]): void {
 
 export function clearMyEmployeeCache(): void {
   if (typeof window === "undefined") return;
-  // Чистим всё связанное с identity/ролями/employees при logout — иначе
-  // следующий юзер на той же машине попадёт на чужой кэш.
+  // На общем компьютере без чистки следующий юзер получит чужой кэш.
   const PREFIXES = [CACHE_KEY_PREFIX, "myEmployee:", "myIdentity:", "myOrgRole:"];
   for (let i = sessionStorage.length - 1; i >= 0; i--) {
     const key = sessionStorage.key(i);
@@ -59,9 +55,7 @@ export async function getMyEmployees(
       const orgsRes = await SelfQueryService.selfQueryListMyOrganizations();
       const orgs = ((orgsRes as any)?.items ?? []) as Array<{ id?: string }>;
 
-      // По одной orgId дёргаем GetMyEmployment — так возвращается полная
-      // карточка с departmentId/clinicId/position. Параллельно через
-      // Promise.all, чтобы не пилить N+1 последовательно.
+      // Параллельный fan-out, чтобы не пилить N+1 последовательно.
       const employments = await Promise.all(
         orgs
           .filter((o) => o.id)

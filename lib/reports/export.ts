@@ -1,8 +1,7 @@
 "use client";
 
-// Экспорт журнала НС в PDF — приказ Минздрава России № 785н от 31.07.2020.
-// pdfmake грузим динамически: ~250 КБ + Roboto VFS не должны попадать в
-// основной бандл — нужны только когда юзер реально нажал «Экспорт».
+// Экспорт журнала НС в PDF (приказ № 785н).
+// pdfmake грузим динамически: ~250 КБ ни к чему в основном бандле.
 
 import { EVENT_STATUS_MAP, INCIDENT_PRIORITY_MAP } from "@/lib/constants";
 
@@ -21,8 +20,7 @@ export interface ExportEvent {
   linkedRequestsCount?: number;
 }
 
-// Не зависим напрямую от сгенерённых моделей: грубее, зато вьюха не
-// перепривязывается при каждом codegen-е.
+// Подмножество v1IncidentSummary, чтобы вьюха не перепривязывалась после codegen.
 export interface ExportSummary {
   total?: number;
   byStatus?: {
@@ -73,8 +71,7 @@ export interface ExportPayload {
   generatedAtIso: string;
   generatedBy: string;
   events: ExportEvent[];
-  // Если переданы — PDF использует их вместо подсчётов по events
-  // (и добавляет разделы «Динамика», «Топ отделений»).
+  // Опциональные агрегаты с бэка — если есть, считаются разделы «Динамика» и «Топ отделений».
   summary?: ExportSummary;
   timeseries?: ExportTimeSeriesBucket[];
 }
@@ -87,8 +84,7 @@ export async function exportPdf(
     import("pdfmake/build/pdfmake"),
     import("pdfmake/build/vfs_fonts"),
   ]);
-  // pdfmake 0.3.x делает `module.exports = vfs` напрямую — словарь лежит
-  // в vfsMod.default, без обёртки .vfs. В 0.2.x — обратное. Поддерживаем оба.
+  // Поддержка обоих форматов vfs_fonts: 0.2.x (.vfs) и 0.3.x (default).
   const vfsAny = vfsMod as unknown as {
     default?: Record<string, string> | { vfs?: Record<string, string> };
     vfs?: Record<string, string>;
@@ -126,7 +122,7 @@ function priorityLabel(k?: string): string {
   return INCIDENT_PRIORITY_MAP[k] || k;
 }
 
-// HEX вместо tailwind-токенов — pdfmake canvas работает только с HEX.
+// pdfmake canvas требует HEX.
 const STATUS_COLOR: Record<string, string> = {
   pending: "#94a3b8",
   in_progress: "#f59e0b",
@@ -190,7 +186,7 @@ function countBy<T>(items: T[], keyFn: (it: T) => string): Array<[string, number
   return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
 }
 
-// Бэк отдаёт ResolutionStats в минутах, приводим к читаемой единице.
+// ResolutionStats приходит в минутах.
 function fmtMinutes(min?: number): string {
   if (min == null || !Number.isFinite(min) || min <= 0) return "—";
   if (min < 60) return `${Math.round(min)} мин`;
@@ -294,7 +290,7 @@ function buildTimeseriesChart(buckets: ExportTimeSeriesBucket[]) {
     });
   });
 
-  // Метки по X разрежаем, иначе при 90 бакетах надписи наезжают друг на друга.
+  // Прореживаем метки X — на длинных окнах подписи наезжают.
   const stride = Math.max(1, Math.ceil(n / 10));
   const xLabels = buckets
     .map((b, idx) => {

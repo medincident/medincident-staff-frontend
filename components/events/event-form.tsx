@@ -73,12 +73,12 @@ export function EventForm({ eventId }: EventFormProps) {
     },
   });
 
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+
   useEffect(() => {
     if (isOrgResolving) return;
+    if (!userId) return;
     const loadData = async () => {
-      const userId = (session?.user as any)?.id;
-      if (!userId) return;
-
       try {
         setIsLoading(true);
 
@@ -127,7 +127,8 @@ export function EventForm({ eventId }: EventFormProps) {
     };
 
     loadData();
-  }, [eventId, isEditMode, form, session, activeOrgId, isOrgResolving]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, isEditMode, userId, activeOrgId, isOrgResolving]);
 
   const selectedCategoryId = form.watch("categoryId");
 

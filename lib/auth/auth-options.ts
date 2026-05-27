@@ -40,9 +40,7 @@ export const authOptions: NextAuthOptions = {
     ZitadelProvider({
       issuer: process.env.NEXT_PUBLIC_ZITADEL_ISSUER as string,
       clientId: process.env.ZITADEL_CLIENT_ID as string,
-      // Public-client + PKCE: secret в Zitadel выключен (Auth Method: None).
-      // NextAuth тип требует строку, а token_endpoint_auth_method=none
-      // отключает её передачу при обмене кода.
+      // Public-client + PKCE. Auth Method=None в Zitadel, secret не передаётся.
       clientSecret: "",
       client: { token_endpoint_auth_method: "none" },
       authorization: {
@@ -58,9 +56,7 @@ export const authOptions: NextAuthOptions = {
       if (account) {
         const p = profile as Record<string, any> | undefined;
 
-        // name/email/picture в id_token приходят только при включённом
-        // "Include user's profile info in the ID Token". Чтобы не зависеть
-        // от настроек проекта Zitadel, тянем userinfo руками.
+        // Userinfo дёргаем явно, чтобы не зависеть от Zitadel-флага "include profile in ID token".
         const ac = new AbortController();
         const timer = setTimeout(() => ac.abort(), 10_000);
         let info: Record<string, any> = {};
@@ -79,8 +75,7 @@ export const authOptions: NextAuthOptions = {
           clearTimeout(timer);
         }
 
-        // Claim `name` у админских аккаунтов часто остаётся служебным
-        // ("ZITADEL Admin"), поэтому при наличии given/family собираем сами.
+        // У админов name часто "ZITADEL Admin", собираем из given+family если есть.
         const givenName = info.given_name ?? p?.given_name;
         const familyName = info.family_name ?? p?.family_name;
         const composed = [givenName, familyName].filter(Boolean).join(" ");
@@ -114,9 +109,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.sub as string;
-        // Шлём оба токена: бэк валидирует id_token (JWT), а access_token
-        // в Zitadel может прийти opaque. Доменные роли больше не лежат
-        // в session — фронт спрашивает их у бэка через SelfQueryService.
+        // Шлём оба токена: бэк валидирует id_token (JWT), access_token в Zitadel бывает opaque.
         (session as any).idToken = token.idToken;
         (session as any).accessToken = token.accessToken;
         (session as any).error = token.error;

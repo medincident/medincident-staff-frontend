@@ -43,9 +43,7 @@ export default function AdminLayout({
     [perms],
   );
 
-  // Если юзер на admin-маршруте, на который у него нет прав, или вообще
-  // не имеет ни одной admin-роли — отправляем на дашборд. Префетч-ссылки
-  // ниже всё равно отрисуются, но навигация заблокирована.
+  // Без прав на текущий admin-маршрут — редирект на /dashboard.
   useEffect(() => {
     if (perms.isLoading) return;
     const currentTab = adminTabs.find((t) => t.href === pathname);
@@ -69,9 +67,7 @@ export default function AdminLayout({
   const currentTab =
     adminTabs.find((t) => t.href === pathname) ?? visibleTabs[0];
   if (!currentTab) {
-    // У юзера нет прав ни на одну admin-страницу — редирект сработает в
-    // useEffect выше; пока показываем пустой блок, чтобы не упасть.
-    return null;
+    return null; // редирект сработает в useEffect выше
   }
   const CurrentIcon = currentTab.icon;
 

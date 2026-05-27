@@ -36,9 +36,7 @@ export const INCIDENT_PRIORITY_MAP: Record<string, string> = {
   critical: "Критический",
 };
 
-// Ключи — нормализованный enum бэка (INCIDENT_STATUS_* → lower, без префикса
-// incident_status_). Бэкенд сменил словарь статусов НС на pending/in_progress/
-// done/rejected/cancelled; старые created/in_work/... больше не приходят.
+// Ключи нормализованы из INCIDENT_STATUS_* (lower, без префикса).
 export const EVENT_STATUS_MAP: Record<EventStatus | string, string> = {
   pending: "Ожидает",
   in_progress: "В работе",

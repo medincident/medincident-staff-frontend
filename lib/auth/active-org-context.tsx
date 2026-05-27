@@ -11,11 +11,7 @@ import { useSession } from "next-auth/react";
 import { getMyEmployees } from "./get-my-employee";
 import { OrgStructureQueryService } from "@/lib/api-generated";
 
-// Активная организация для админ-страниц и дашборда. Переключатель
-// доступен всем — сотруднику с несколькими employments он показывает
-// только его орги, sysadmin'у без employments — все организации
-// (ListOrganizations). В обоих случаях провайдер автоматически
-// выбирает первую доступную, если в sessionStorage ничего нет.
+// Активная организация: employments для сотрудника, все орги для sysadmin.
 
 const STORAGE_KEY = "activeOrgId";
 
@@ -28,11 +24,8 @@ interface ActiveOrgContextValue {
   orgId: string | null;
   setOrgId: (id: string | null) => void;
   isResolving: boolean;
-  // Орги, доступные текущему юзеру для переключения. Для сотрудника —
-  // только его employments; для sysadmin'а без employments — все орги.
   availableOrgs: ActiveOrg[];
-  // true, если юзер не привязан ни к одной организации (sysadmin) —
-  // используется для UI-подсказок и контроля доступа в setOrgId.
+  // sysadmin без employments → isUnscoped: true.
   isUnscoped: boolean;
 }
 

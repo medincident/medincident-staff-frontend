@@ -8,10 +8,7 @@ import {
   v1RequestType,
 } from "@/lib/api-generated";
 
-// Кеш справочника типов заявок (активные) — единый на приложение.
-// Раньше список заявок тянул его при каждом маунте. Данные статические
-// (меняются только через админку), кешируем по orgId; админка дёргает
-// invalidateRequestClassifier() после мутаций.
+// Общий кеш активных типов заявок по orgId. invalidateRequestClassifier() после мутаций.
 
 type OrgId = string | null | undefined;
 

@@ -21,9 +21,7 @@ interface Props {
   children: ReactNode;
 }
 
-// Универсальный гейт для скрытия UI в зависимости от роли.
-// Не используется для защиты маршрутов — для этого есть useRequirePermission
-// (рендерит редирект). Здесь — просто условный рендер фрагмента.
+// Скрывает UI по роли. Для защиты маршрутов используется useRequirePermission.
 export function PermissionGate({
   can,
   all,

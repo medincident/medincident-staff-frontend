@@ -76,27 +76,24 @@ export function EventsListView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  useEffect(() => {
-    // Ждём perms.isLoading — иначе главврач при пустых флагах попал бы
-    // в ветку ListMyIncidents и не увидел чужие события.
-    if (isOrgResolving || perms.isLoading) return;
-    const loadData = async () => {
-      const userId = (session?.user as any)?.id;
-      if (!userId) return;
+  const userId = (session?.user as { id?: string } | undefined)?.id;
 
+  useEffect(() => {
+    // Ждём perms.isLoading — главврач с пустыми флагами попал бы в «вижу только своё».
+    if (isOrgResolving || perms.isLoading) return;
+    if (!userId) return;
+    const loadData = async () => {
       try {
         setIsLoading(true);
         const orgId = activeOrgId ?? "";
 
-        // Прокидываем фильтр на бэк — клиентский .filter() по странице из 100
-        // мог бы не показать события, отфильтрованные за пределами окна.
+        // Фильтр на бэк, иначе при пагинации часть событий уйдёт за окно.
         const statusesParam =
           statusFilter !== "all"
             ? [`INCIDENT_STATUS_${statusFilter.toUpperCase()}`]
             : undefined;
 
-        // ListMyIncidents серверного фильтра не имеет — статус-фильтр там
-        // остаётся клиентским ниже, в filteredEvents.
+        // У ListMyIncidents серверного фильтра нет, статус доберём в filteredEvents.
         let incidentsRes;
         if (perms.canSeeAllIncidents && orgId) {
           incidentsRes = await IncidentQueryService.incidentQueryListIncidents(
@@ -125,7 +122,7 @@ export function EventsListView() {
       }
     };
     loadData();
-  }, [session, activeOrgId, isOrgResolving, perms.isLoading, perms.canSeeAllIncidents, statusFilter]);
+  }, [userId, activeOrgId, isOrgResolving, perms.isLoading, perms.canSeeAllIncidents, statusFilter]);
 
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const typeMap: Record<string, string> = {};
@@ -152,8 +149,7 @@ export function EventsListView() {
       const searchString = `${shortId} ${typeNameRu} ${categoryNameRu} ${event.description || ""}`.toLowerCase();
       const matchesSearch = searchString.includes(searchQuery.toLowerCase());
 
-      // Для админской ветки фильтр уже применён на бэке; добивает клиент
-      // только для ListMyIncidents, у которого серверного фильтра нет.
+      // Для админов фильтр уже на бэке; клиент добивает только ListMyIncidents.
       const evtStatus = (event.status || "").toLowerCase().replace("incident_status_", "");
       const matchesStatus =
         statusFilter === "all" || perms.canSeeAllIncidents

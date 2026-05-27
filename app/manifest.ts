@@ -14,23 +14,23 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["medical", "health"],
     icons: [
       {
-        src: "/icon.svg",
+        src: "/icons/icon.svg",
         sizes: "any",
         type: "image/svg+xml",
       },
       {
-        src: "/icon-192.webp",
+        src: "/icons/icon-192.webp",
         sizes: "192x192",
         type: "image/webp",
       },
       {
-        src: "/icon-512.webp",
+        src: "/icons/icon-512.webp",
         sizes: "512x512",
         type: "image/webp",
         purpose: "maskable",
       },
       {
-        src: "/apple-icon.png",
+        src: "/icons/apple-icon.png",
         sizes: "180x180",
         type: "image/png",
       },

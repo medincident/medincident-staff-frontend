@@ -1,19 +1,17 @@
-// Custom Service Worker addon for @ducanh2912/next-pwa.
-// next-pwa автоматически подхватывает worker/index.ts и склеивает с основным
-// Workbox sw.js через importScripts. Здесь живут push-обработчики и
-// notificationclick — основной sw.js их не имеет.
+// next-pwa склеивает этот файл с основным sw.js через importScripts.
 
 /// <reference lib="webworker" />
 
-// `self` в SW-контексте — это ServiceWorkerGlobalScope. tsconfig глобально
-// объявляет его как Window, поэтому делаем локальный alias через unknown-cast.
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 interface PushPayload {
   title?: string;
   body?: string;
   tag?: string;
-  data?: { url?: string };
+  data?: {
+    url?: string;
+    is_security?: boolean;
+  };
   url?: string;
 }
 
@@ -31,18 +29,19 @@ sw.addEventListener("push", (event: PushEvent) => {
     payload = { title: "MedIncident", body: event.data.text() || "Новое уведомление" };
   }
 
-  // iOS Safari молча отбрасывает уведомление, если title или body пустые.
+  // iOS Safari молча режет уведомления с пустым title или body.
   const title = (typeof payload.title === "string" && payload.title.trim()) || "MedIncident";
   const body =
     (typeof payload.body === "string" && payload.body.trim()) ||
-    "Открыть приложение для деталей";
+    "Откройте приложение, чтобы увидеть детали.";
 
-  // PNG, не WebP: iOS Safari в SW context не всегда декодирует WebP.
+  // WebP в Service Worker context на iOS декодируется ненадёжно, используем PNG.
   const options: ExtendedNotificationOptions = {
     body,
-    icon: "/apple-icon.png",
-    badge: "/apple-icon.png",
+    icon: "/icons/apple-icon.png",
+    badge: "/icons/apple-icon.png",
     tag: payload.tag,
+    requireInteraction: payload.data?.is_security === true,
     data: {
       url: payload.data?.url || payload.url || "/",
     },

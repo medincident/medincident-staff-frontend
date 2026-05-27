@@ -32,10 +32,7 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        // styles.root — хешированный класс из calendar.module.css; служит
-        // якорем для локальных CSS-правил, которые добивают скругления
-        // концов диапазона (см. файл рядом). Не полагаемся на дефолтный
-        // rdp-root v9 — он может не дойти до DOM при кастомном className-пропе.
+        // Якорь для CSS-правил из calendar.module.css (добивают скругления концов диапазона).
         styles.root,
         "relative px-4 pb-4 bg-popover text-popover-foreground",
         className,
@@ -45,17 +42,13 @@ function Calendar({
         months: "flex flex-col sm:flex-row gap-6",
         month: "flex flex-col gap-3",
 
-        // Шапка: фиксированная высота 54px, контент центрирован по вертикали
-        // (items-center). -mx-4 + px-4 растягивает border-b во всю ширину
-        // поповера — линия зеркалит border-t у футера Применить/Отмена.
+        // Шапка фиксированной высоты, border-b зеркалит футер «Применить/Отмена».
         month_caption:
           "h-[54px] flex items-center -mx-4 px-4 border-b border-border",
         caption_label:
           "text-primary text-sm font-bold uppercase tracking-wider select-none",
 
-        // Nav. Та же высота 54px и items-center → круглые кнопки навигации
-        // лежат строго по центру шапки на одной горизонтали с заголовком.
-        // top-0 → корень не имеет pt, шапка начинается с нулевой Y.
+        // Nav: та же высота, что у шапки — кнопки центрируются с заголовком.
         nav: "absolute top-0 right-4 z-10 flex items-center gap-1.5 h-[54px]",
         button_previous: cn(
           "inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-full",
@@ -83,10 +76,7 @@ function Calendar({
         // Ячейка дня. rdp-day сохраняем как селектор-хук для CSS в globals.css.
         day: "rdp-day relative w-9 h-9 p-0 text-center text-sm",
 
-        // Кнопка дня по дефолту — БЕЗ скругления (квадрат). Ховер заливает
-        // всю ячейку primary/30 — это та же primary что и у range_middle
-        // (primary/15), только ярче, чтобы хорошо читалась подсветка
-        // потенциального следующего клика на фоне уже выбранного диапазона.
+        // По дефолту квадрат. Ховер ярче range_middle, чтобы читался на фоне диапазона.
         day_button: cn(
           "rdp-day_button",
           "w-9 h-9 p-0 font-normal text-foreground",
@@ -96,30 +86,19 @@ function Calendar({
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         ),
 
-        // Выбранный день / концы диапазона — solid primary, скругление со
-        // всех сторон. Hover оставляет тот же bg-primary, чтобы на уже
-        // выбранных днях ховер ничего не менял (как просил пользователь).
+        // Выбранный / концы диапазона: solid primary, на ховере не меняется.
         selected: cn(
           "rdp-selected",
           "bg-primary! text-primary-foreground! rounded-md!",
           "hover:bg-primary! hover:text-primary-foreground!",
         ),
-        // Промежуточные дни диапазона — та же primary, но «разбавленная»,
-        // без скругления (соседние ячейки сливаются в полосу). На ховере
-        // эти дни тоже не меняются (это «выбранные» дни).
+        // Середина диапазона: разбавленная primary без скругления.
         range_middle: cn(
           "rdp-range_middle",
           "bg-primary/15! text-foreground! rounded-none!",
           "hover:bg-primary/15! hover:text-foreground!",
         ),
-        // Концы диапазона. Tailwind-утилиты пишутся прямо в classNames
-        // модификатора → попадут на тот элемент, куда v9 повесит сам
-        // модификатор-класс (button или td). Если на button — утилита
-        // сработает напрямую; если на td — её добьёт CSS-фоллбек в
-        // globals.css через нисходящий селектор `.rdp-day.rdp-range_* > .rdp-day_button`.
-        // Кейс from===to (single-day range) обрабатывается отдельным CSS-правилом
-        // в globals.css, которое возвращает rounded-md когда оба класса висят
-        // на одном элементе.
+        // Концы диапазона. Случай from===to (single-day) добивается CSS-правилом в globals.css.
         range_start: cn("rdp-range_start", "rounded-r-none!"),
         range_end: cn("rdp-range_end", "rounded-l-none!"),
 

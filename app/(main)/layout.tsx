@@ -4,6 +4,7 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SessionExpiredBanner } from "@/components/auth/session-expired-banner";
 import { OfflineBanner } from "@/components/pwa/offline-banner";
+import { PushPrompt } from "@/components/pwa/push-prompt";
 import { RolesGuard } from "@/components/auth/roles-guard";
 import { ActiveOrgProvider } from "@/lib/auth/active-org-context";
 
@@ -30,6 +31,7 @@ export default function MainLayout({
               <BottomNav />
             </div>
           </div>
+          <PushPrompt />
         </div>
       </ActiveOrgProvider>
     </RolesGuard>

@@ -40,7 +40,7 @@ export function DepartmentView() {
   const [departmentName, setDepartmentName] = useState("");
   const [staff, setStaff] = useState<v1EmployeeCardView[]>([]);
   const [departmentId, setDepartmentId] = useState<string | null>(null);
-  // Считаем staff.length нельзя — list пагинируется (limit 100), KPI уехало бы.
+  // staff пагинируется (limit 100), staff.length для KPI ненадёжен.
   const [stats, setStats] = useState<{ employees: number; onVacation: number } | null>(null);
 
   // Сохраняем оригинальные значения, чтобы корректно вычислять diff при сохранении.
@@ -50,16 +50,14 @@ export function DepartmentView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+
   useEffect(() => {
     if (isOrgResolving) return;
+    if (!userId) return;
     const loadData = async () => {
-      if (!session) return;
-
       try {
         setIsLoading(true);
-
-        const userId = (session.user as any)?.id;
-        if (!userId) return;
 
         // Берём employee именно для активной организации — у мульти-орг
         // юзера в каждой орге своё отделение.
@@ -73,7 +71,7 @@ export function DepartmentView() {
 
         setDepartmentId(emp.departmentId);
 
-        // allSettled — у не-админа 403 на stats не должен валить весь экран.
+        // allSettled: 403 на stats для не-админа не должен валить экран.
         const [deptRes, staffRes, statsRes, headRes] = await Promise.allSettled([
           OrgStructureQueryService.orgStructureQueryGetDepartment(emp.departmentId),
           MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId, 100),
@@ -101,7 +99,7 @@ export function DepartmentView() {
           });
         }
 
-        // Если руководитель не назначен — эндпоинт падает, просто пропускаем.
+        // Если руководитель не назначен — эндпоинт падает, пропускаем.
         if (headRes.status === "fulfilled") {
           const assignment = (headRes.value as any).assignment;
           const holderId = assignment?.holder?.employeeId ?? "";
@@ -123,7 +121,7 @@ export function DepartmentView() {
     };
 
     loadData();
-  }, [session, orgId, isOrgResolving]);
+  }, [userId, orgId, isOrgResolving]);
 
   const handleSave = async () => {
     if (!departmentId) return;

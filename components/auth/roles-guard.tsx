@@ -9,10 +9,7 @@ import { LogoutDialog } from "@/components/auth/logout-dialog";
 import { useMyIdentity } from "@/lib/auth/use-my-identity";
 import { getMyEmployees } from "@/lib/auth/get-my-employee";
 
-// Пускаем юзера на сайт, если он либо system_admin, либо нанят хотя бы
-// в одной организации. Иначе — заглушка с предложением обратиться к
-// администратору. Источники — SelfQueryService.GetMyIdentity и
-// ListMyOrganizations + GetMyEmployment (medincident-backend#155).
+// Допускает в систему system_admin'ов и сотрудников хотя бы одной организации.
 export function RolesGuard({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
   const { identity, isLoading: isIdentityLoading } = useMyIdentity();
@@ -20,13 +17,10 @@ export function RolesGuard({ children }: { children: ReactNode }) {
   const [hasAnyEmployment, setHasAnyEmployment] = useState<boolean | null>(null);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+
   useEffect(() => {
-    if (status !== "authenticated") {
-      setHasAnyEmployment(null);
-      return;
-    }
-    const userId = (session?.user as any)?.id as string | undefined;
-    if (!userId) {
+    if (status !== "authenticated" || !userId) {
       setHasAnyEmployment(null);
       return;
     }
@@ -43,7 +37,7 @@ export function RolesGuard({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [session, status]);
+  }, [userId, status]);
 
   if (status === "loading" || isIdentityLoading || hasAnyEmployment === null) {
     return (

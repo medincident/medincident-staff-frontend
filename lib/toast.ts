@@ -50,10 +50,8 @@ export const notify = {
     notify.success(title, description);
   },
 
-  // Распаковывает ошибку с бэка (`v1ErrorResponse`) и показывает осмысленный
-  // тост: словарный заголовок по `code`, описание из `message` или списком
-  // нарушений валидации. Если форма ответа другая (сетевые сбои, 5xx без
-  // тела и т.п.) — fallback'и параметрах.
+  // Тост из v1ErrorResponse: заголовок по code, описание из message/violations.
+  // При других форматах ошибки используются fallback-параметры.
   apiError(
     err: unknown,
     fallbackTitle = "Не удалось выполнить операцию",

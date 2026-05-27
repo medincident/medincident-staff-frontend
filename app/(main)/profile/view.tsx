@@ -153,8 +153,7 @@ export function ProfileView() {
 
   if (!user) return null;
 
-  // ФИО / должность / клиника / отделение — с бэка (employee_cards).
-  // Аватар — из Zitadel (в нашей доменной модели его нет).
+  // Аватар берётся из Zitadel, остальное — из employee_cards.
   const displayName =
     employee?.displayName ||
     [employee?.firstName, employee?.lastName].filter(Boolean).join(" ") ||
@@ -162,9 +161,7 @@ export function ProfileView() {
     "Пользователь";
   const displayEmail = employee?.email || user.email;
 
-  // Сотрудник может иметь несколько ролей одновременно (см. backend assign-rpc).
-  // Собираем все активные, в бейдже на профиле показываем «главную» —
-  // sys-admin > главврач > админ > диспетчер — а ниже выводим все остальные.
+  // Бейдж показывает старшую роль (sys-admin > главврач > админ > диспетчер).
   const myRoles: string[] = [];
   if (identity?.isSystemAdmin) myRoles.push("Системный администратор");
   if (role.isOrgHead) myRoles.push("Главврач");

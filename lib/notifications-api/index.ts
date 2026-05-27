@@ -1,15 +1,6 @@
-// Канонический ре-экспорт сгенерированного клиента notifications-сервиса
-// и установка OpenAPI.BASE.
-//
-// Notifications — отдельный микросервис (отдельный gateway), поэтому у него
-// собственный singleton `OpenAPI` (`lib/notifications-api-generated/core/OpenAPI.ts`).
-// Чтобы не путать с main-клиентом (`lib/api-generated`), импортируйте всегда
-// через этот модуль: `import { NotificationService } from "@/lib/notifications-api";`
-//
-// BASE по умолчанию выводится из главного `NEXT_PUBLIC_API_URL` отбрасыванием
-// хвоста `/api` (notifications-swagger возвращает пути уже с префиксом
-// `/api/v1/notifications/...`). Если notifications хостится на отдельном
-// домене — задайте `NEXT_PUBLIC_NOTIFICATIONS_API_URL` явно.
+// Ре-экспорт клиента notifications-сервиса с настроенным BASE.
+// Отдельный микросервис → собственный singleton OpenAPI.
+// BASE: NEXT_PUBLIC_NOTIFICATIONS_API_URL или NEXT_PUBLIC_API_URL минус /api.
 
 import { OpenAPI as NotificationsOpenAPI } from "@/lib/notifications-api-generated";
 
