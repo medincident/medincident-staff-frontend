@@ -20,5 +20,7 @@ export type v1BufferEntryView = {
      * Populated only for patient callers.
      */
     patientStatus?: v1PatientStatus;
+    summary?: string;
+    priority?: string;
 };
 

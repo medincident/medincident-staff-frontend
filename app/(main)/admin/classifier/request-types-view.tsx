@@ -77,7 +77,7 @@ export function RequestTypesView() {
     try {
       const res = showInactive
         ? await RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200)
-        : await RequestClassifierQueryService.requestClassifierQueryListActiveRequestTypesByOrganization(orgId, 200);
+        : await RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200);
       if (res && "items" in res && Array.isArray(res.items)) {
         setTypes(res.items);
       } else {

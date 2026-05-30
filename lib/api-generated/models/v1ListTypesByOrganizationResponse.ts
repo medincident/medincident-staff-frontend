@@ -2,9 +2,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { v1RequestType } from './v1RequestType';
-export type v1ListActiveRequestTypesByOrganizationResponse = {
-    items?: Array<v1RequestType>;
+import type { classifierV1Type } from './classifierV1Type';
+export type v1ListTypesByOrganizationResponse = {
+    items?: Array<classifierV1Type>;
     nextCursor?: string;
 };
 

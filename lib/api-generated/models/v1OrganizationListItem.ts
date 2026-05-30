@@ -8,5 +8,6 @@
 export type v1OrganizationListItem = {
     id?: string;
     name?: string;
+    isActive?: boolean;
 };
 

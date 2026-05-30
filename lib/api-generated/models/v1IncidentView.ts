@@ -4,6 +4,7 @@
 /* eslint-disable */
 import type { queryIncidentV1IncidentPriority } from './queryIncidentV1IncidentPriority';
 import type { queryIncidentV1IncidentStatus } from './queryIncidentV1IncidentStatus';
+import type { v1PatientBufferInfo } from './v1PatientBufferInfo';
 import type { v1PatientStatus } from './v1PatientStatus';
 import type { v1RegistrarView } from './v1RegistrarView';
 /**
@@ -32,5 +33,6 @@ export type v1IncidentView = {
      * Populated only for patient callers.
      */
     patientStatus?: v1PatientStatus;
+    patientBuffer?: v1PatientBufferInfo;
 };
 

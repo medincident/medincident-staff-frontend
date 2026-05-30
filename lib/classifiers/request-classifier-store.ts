@@ -33,7 +33,7 @@ export const useRequestClassifierStore = create<State>((set, get) => ({
     const p = (async () => {
       try {
         const res =
-          await RequestClassifierQueryService.requestClassifierQueryListActiveRequestTypesByOrganization(
+          await RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(
             orgId,
             200,
           );

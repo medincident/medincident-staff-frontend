@@ -9,5 +9,6 @@ export type v1DepartmentListItem = {
     id?: string;
     clinicId?: string;
     name?: string;
+    isActive?: boolean;
 };
 

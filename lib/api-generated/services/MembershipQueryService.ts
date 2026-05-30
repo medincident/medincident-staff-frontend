@@ -10,6 +10,7 @@ import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetClinicHeadResponse } from '../models/v1GetClinicHeadResponse';
 import type { v1GetDepartmentResponsibleResponse } from '../models/v1GetDepartmentResponsibleResponse';
 import type { v1GetEmployeeResponse } from '../models/v1GetEmployeeResponse';
+import type { v1GetMyEmployeeResponse } from '../models/v1GetMyEmployeeResponse';
 import type { v1ListCandidatesForClinicHeadResponse } from '../models/v1ListCandidatesForClinicHeadResponse';
 import type { v1ListCandidatesForDeptResponsibleResponse } from '../models/v1ListCandidatesForDeptResponsibleResponse';
 import type { v1ListCandidatesForHireResponse } from '../models/v1ListCandidatesForHireResponse';
@@ -79,6 +80,8 @@ export class MembershipQueryService {
      * (current_vacation_ends_at IS NOT NULL AND > now()).
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
+     * @param includeDeactivated When false (default), only active employees are returned. Set true
+     * to include deactivated employees. Requires org-admin or system-admin.
      * @returns v1ListEmployeesByClinicResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -90,6 +93,7 @@ export class MembershipQueryService {
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListEmployeesByClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -103,12 +107,14 @@ export class MembershipQueryService {
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -146,7 +152,8 @@ export class MembershipQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`employee_card_count_failed\` — database query failed.`,
             },
         });
     }
@@ -169,7 +176,8 @@ export class MembershipQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`role_load_failed\` — database query failed.`,
             },
         });
     }
@@ -222,6 +230,8 @@ export class MembershipQueryService {
      * (current_vacation_ends_at IS NOT NULL AND > now()).
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
+     * @param includeDeactivated When false (default), only active employees are returned. Set true
+     * to include deactivated employees. Requires org-admin or system-admin.
      * @returns v1ListEmployeesByDepartmentResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -233,6 +243,7 @@ export class MembershipQueryService {
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListEmployeesByDepartmentResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -246,12 +257,14 @@ export class MembershipQueryService {
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -289,7 +302,8 @@ export class MembershipQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`employee_card_count_failed\` — database query failed.`,
             },
         });
     }
@@ -312,6 +326,26 @@ export class MembershipQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
+                500: `Internal server error. Error codes:
+                - \`role_load_failed\` — database query failed.`,
+            },
+        });
+    }
+    /**
+     * @returns v1GetMyEmployeeResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipQueryGetMyEmployee(): CancelablePromise<v1GetMyEmployeeResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/v1/employees/me',
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`employee_card_not_found\` — the authenticated user has no employee record.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -377,7 +411,8 @@ export class MembershipQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`vacation_count_failed\` — database query failed.`,
             },
         });
     }
@@ -636,6 +671,8 @@ export class MembershipQueryService {
      * (current_vacation_ends_at IS NOT NULL AND > now()).
      * @param position Optional exact-match filter on employee_cards.position. Trimmed
      * before comparison; all-whitespace is treated as unset.
+     * @param includeDeactivated When false (default), only active employees are returned. Set true
+     * to include deactivated employees. Requires org-admin or system-admin.
      * @returns v1ListEmployeesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -647,6 +684,7 @@ export class MembershipQueryService {
         includeTerminated?: boolean,
         onVacation?: boolean,
         position?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListEmployeesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -660,12 +698,14 @@ export class MembershipQueryService {
                 'includeTerminated': includeTerminated,
                 'onVacation': onVacation,
                 'position': position,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`membership_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -703,7 +743,8 @@ export class MembershipQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`employee_card_count_failed\` — database query failed.`,
             },
         });
     }

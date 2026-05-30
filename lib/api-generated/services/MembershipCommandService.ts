@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { MembershipCommandServiceActivateEmployeeBody } from '../models/MembershipCommandServiceActivateEmployeeBody';
 import type { MembershipCommandServiceAssignClinicHeadBody } from '../models/MembershipCommandServiceAssignClinicHeadBody';
 import type { MembershipCommandServiceAssignClinicHeadDeputyBody } from '../models/MembershipCommandServiceAssignClinicHeadDeputyBody';
 import type { MembershipCommandServiceAssignDepartmentResponsibleBody } from '../models/MembershipCommandServiceAssignDepartmentResponsibleBody';
@@ -12,11 +13,13 @@ import type { MembershipCommandServiceAssignOrganizationDispatcherBody } from '.
 import type { MembershipCommandServiceAssignOrganizationDispatcherDeputyBody } from '../models/MembershipCommandServiceAssignOrganizationDispatcherDeputyBody';
 import type { MembershipCommandServiceAssignOrganizationHeadBody } from '../models/MembershipCommandServiceAssignOrganizationHeadBody';
 import type { MembershipCommandServiceAssignOrganizationHeadDeputyBody } from '../models/MembershipCommandServiceAssignOrganizationHeadDeputyBody';
+import type { MembershipCommandServiceDeactivateEmployeeBody } from '../models/MembershipCommandServiceDeactivateEmployeeBody';
 import type { MembershipCommandServiceScheduleVacationBody } from '../models/MembershipCommandServiceScheduleVacationBody';
 import type { MembershipCommandServiceStartVacationNowBody } from '../models/MembershipCommandServiceStartVacationNowBody';
 import type { MembershipCommandServiceUpdateEmployeeDepartmentBody } from '../models/MembershipCommandServiceUpdateEmployeeDepartmentBody';
 import type { MembershipCommandServiceUpdateEmployeePositionBody } from '../models/MembershipCommandServiceUpdateEmployeePositionBody';
 import type { MembershipCommandServiceUpdateVacationEndDateBody } from '../models/MembershipCommandServiceUpdateVacationEndDateBody';
+import type { v1ActivateEmployeeResponse } from '../models/v1ActivateEmployeeResponse';
 import type { v1AssignClinicHeadDeputyResponse } from '../models/v1AssignClinicHeadDeputyResponse';
 import type { v1AssignClinicHeadResponse } from '../models/v1AssignClinicHeadResponse';
 import type { v1AssignDepartmentResponsibleDeputyResponse } from '../models/v1AssignDepartmentResponsibleDeputyResponse';
@@ -28,6 +31,7 @@ import type { v1AssignOrganizationDispatcherResponse } from '../models/v1AssignO
 import type { v1AssignOrganizationHeadDeputyResponse } from '../models/v1AssignOrganizationHeadDeputyResponse';
 import type { v1AssignOrganizationHeadResponse } from '../models/v1AssignOrganizationHeadResponse';
 import type { v1CancelScheduledVacationResponse } from '../models/v1CancelScheduledVacationResponse';
+import type { v1DeactivateEmployeeResponse } from '../models/v1DeactivateEmployeeResponse';
 import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1ForceEndVacationResponse } from '../models/v1ForceEndVacationResponse';
 import type { v1GrantSystemAdminRequest } from '../models/v1GrantSystemAdminRequest';
@@ -346,6 +350,64 @@ export class MembershipCommandService {
             path: {
                 'employeeId': employeeId,
             },
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`employee_not_found\` — employee with the given ID does not exist.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * @param employeeId
+     * @param body
+     * @returns v1ActivateEmployeeResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipCommandActivateEmployee(
+        employeeId: string,
+        body: MembershipCommandServiceActivateEmployeeBody,
+    ): CancelablePromise<v1ActivateEmployeeResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v1/employees/{employeeId}/activate',
+            path: {
+                'employeeId': employeeId,
+            },
+            body: body,
+            errors: {
+                400: `Validation failed or invalid input.`,
+                401: `Unauthenticated — missing or invalid token.`,
+                403: `Permission denied.`,
+                404: `Not found. Error codes:
+                - \`employee_not_found\` — employee with the given ID does not exist.`,
+                422: `Business rule violation. Error codes:
+                - \`employee_activate_parent_inactive\` — parent department is inactive.`,
+                500: `Unexpected server error.`,
+            },
+        });
+    }
+    /**
+     * @param employeeId
+     * @param body
+     * @returns v1DeactivateEmployeeResponse A successful response.
+     * @returns v1ErrorResponse An unexpected error response.
+     * @throws ApiError
+     */
+    public static membershipCommandDeactivateEmployee(
+        employeeId: string,
+        body: MembershipCommandServiceDeactivateEmployeeBody,
+    ): CancelablePromise<v1DeactivateEmployeeResponse | v1ErrorResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/v1/employees/{employeeId}/deactivate',
+            path: {
+                'employeeId': employeeId,
+            },
+            body: body,
             errors: {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,

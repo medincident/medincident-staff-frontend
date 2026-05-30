@@ -110,7 +110,7 @@ function RequestFormContent({ requestId }: RequestFormProps) {
 
         if (orgId) {
           const [typeRes, incRes, staffRes] = await Promise.all([
-            RequestClassifierQueryService.requestClassifierQueryListActiveRequestTypesByOrganization(orgId, 100),
+            RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 100),
             IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100),
             // Кандидаты на исполнение — сотрудники того же отделения, в котором
             // создаётся заявка. Так же сделано в [id]/view.tsx для AssignExecutors.

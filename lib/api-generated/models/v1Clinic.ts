@@ -12,6 +12,7 @@ export type v1Clinic = {
     name?: string;
     description?: string;
     physicalAddress?: queryOrgstructureV1Address;
+    isActive?: boolean;
     createdAt?: string;
     updatedAt?: string;
 };

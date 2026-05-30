@@ -4,7 +4,6 @@
 /* eslint-disable */
 import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetRequestTypeResponse } from '../models/v1GetRequestTypeResponse';
-import type { v1ListActiveRequestTypesByOrganizationResponse } from '../models/v1ListActiveRequestTypesByOrganizationResponse';
 import type { v1ListRequestTypesByOrganizationResponse } from '../models/v1ListRequestTypesByOrganizationResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -14,6 +13,7 @@ export class RequestClassifierQueryService {
      * @param organizationId
      * @param limit
      * @param after
+     * @param includeDeactivated
      * @returns v1ListRequestTypesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -22,6 +22,7 @@ export class RequestClassifierQueryService {
         organizationId: string,
         limit?: number,
         after?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListRequestTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -32,44 +33,14 @@ export class RequestClassifierQueryService {
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`request_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
-                500: `Unexpected server error.`,
-            },
-        });
-    }
-    /**
-     * @param organizationId
-     * @param limit
-     * @param after
-     * @returns v1ListActiveRequestTypesByOrganizationResponse A successful response.
-     * @returns v1ErrorResponse An unexpected error response.
-     * @throws ApiError
-     */
-    public static requestClassifierQueryListActiveRequestTypesByOrganization(
-        organizationId: string,
-        limit?: number,
-        after?: string,
-    ): CancelablePromise<v1ListActiveRequestTypesByOrganizationResponse | v1ErrorResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/v1/organizations/{organizationId}/request-types:active',
-            path: {
-                'organizationId': organizationId,
-            },
-            query: {
-                'limit': limit,
-                'after': after,
-            },
-            errors: {
-                400: `Validation failed. Error codes:
-                - \`request_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
-                401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });

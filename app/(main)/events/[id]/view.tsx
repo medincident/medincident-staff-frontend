@@ -345,7 +345,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         if (foundEvent.organizationId) {
           const [catsRes, typesRes] = await Promise.all([
             IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(foundEvent.organizationId, 100),
-            IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(foundEvent.organizationId, 100)
+            IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(foundEvent.organizationId, 100)
           ]);
 
           if (catsRes && "items" in catsRes && catsRes.items) {

@@ -94,7 +94,7 @@ export function EventForm({ eventId }: EventFormProps) {
         if (currentOrgId) {
           const [catsRes, typesRes] = await Promise.all([
             IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(currentOrgId, 100),
-            IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(currentOrgId, 100)
+            IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(currentOrgId, 100)
           ]);
           if (catsRes && "items" in catsRes && catsRes.items) {
             setCategories(catsRes.items);

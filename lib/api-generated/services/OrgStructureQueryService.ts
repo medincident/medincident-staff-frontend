@@ -21,6 +21,7 @@ export class OrgStructureQueryService {
      * @param clinicId
      * @param limit
      * @param after
+     * @param includeDeactivated
      * @returns v1ListDepartmentsByClinicResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -29,6 +30,7 @@ export class OrgStructureQueryService {
         clinicId: string,
         limit?: number,
         after?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListDepartmentsByClinicResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -39,12 +41,14 @@ export class OrgStructureQueryService {
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -68,7 +72,8 @@ export class OrgStructureQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`department_count_failed\` — database query failed.`,
             },
         });
     }
@@ -127,6 +132,7 @@ export class OrgStructureQueryService {
      * @param after Opaque pagination cursor returned as next_cursor from a previous
      * response. Omit or leave empty to start from the first page. An
      * invalid cursor is rejected with a domain error.
+     * @param includeDeactivated
      * @returns v1ListOrganizationsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -134,6 +140,7 @@ export class OrgStructureQueryService {
     public static orgStructureQueryListOrganizations(
         limit?: number,
         after?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListOrganizationsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -141,12 +148,14 @@ export class OrgStructureQueryService {
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -180,6 +189,7 @@ export class OrgStructureQueryService {
      * @param organizationId
      * @param limit
      * @param after
+     * @param includeDeactivated
      * @returns v1ListClinicsByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -188,6 +198,7 @@ export class OrgStructureQueryService {
         organizationId: string,
         limit?: number,
         after?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListClinicsByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -198,12 +209,14 @@ export class OrgStructureQueryService {
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -227,7 +240,8 @@ export class OrgStructureQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`clinic_count_failed\` — database query failed.`,
             },
         });
     }
@@ -244,7 +258,8 @@ export class OrgStructureQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`organization_count_failed\` — database query failed.`,
             },
         });
     }
@@ -252,6 +267,7 @@ export class OrgStructureQueryService {
      * @param query
      * @param limit
      * @param after
+     * @param includeDeactivated
      * @returns v1SearchOrganizationsResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -260,6 +276,7 @@ export class OrgStructureQueryService {
         query?: string,
         limit?: number,
         after?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1SearchOrganizationsResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -268,12 +285,14 @@ export class OrgStructureQueryService {
                 'query': query,
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`orgstructure_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });

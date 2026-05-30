@@ -5,13 +5,11 @@
 import type { v1ErrorResponse } from '../models/v1ErrorResponse';
 import type { v1GetCategoryResponse } from '../models/v1GetCategoryResponse';
 import type { v1GetTypeResponse } from '../models/v1GetTypeResponse';
-import type { v1ListActiveRootCategoriesResponse } from '../models/v1ListActiveRootCategoriesResponse';
-import type { v1ListActiveTypesByOrganizationResponse } from '../models/v1ListActiveTypesByOrganizationResponse';
 import type { v1ListCategoriesByOrganizationResponse } from '../models/v1ListCategoriesByOrganizationResponse';
 import type { v1ListCategorySubtreeResponse } from '../models/v1ListCategorySubtreeResponse';
-import type { v1ListPatientAllowedTypesByOrganizationResponse } from '../models/v1ListPatientAllowedTypesByOrganizationResponse';
-import type { v1ListPatientVisibleCategoriesByOrganizationResponse } from '../models/v1ListPatientVisibleCategoriesByOrganizationResponse';
+import type { v1ListRootCategoriesResponse } from '../models/v1ListRootCategoriesResponse';
 import type { v1ListTypesByCategoryResponse } from '../models/v1ListTypesByCategoryResponse';
+import type { v1ListTypesByOrganizationResponse } from '../models/v1ListTypesByOrganizationResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -20,6 +18,7 @@ export class IncidentClassifierQueryService {
      * @param categoryId
      * @param limit
      * @param after
+     * @param includeDeactivated
      * @returns v1ListTypesByCategoryResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
@@ -28,6 +27,7 @@ export class IncidentClassifierQueryService {
         categoryId: string,
         limit?: number,
         after?: string,
+        includeDeactivated?: boolean,
     ): CancelablePromise<v1ListTypesByCategoryResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -38,12 +38,14 @@ export class IncidentClassifierQueryService {
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -92,7 +94,8 @@ export class IncidentClassifierQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`incident_category_load_failed\` — database query failed.`,
             },
         });
     }
@@ -125,15 +128,17 @@ export class IncidentClassifierQueryService {
      * @param organizationId
      * @param limit
      * @param after
-     * @returns v1ListCategoriesByOrganizationResponse A successful response.
+     * @param includeDeactivated
+     * @returns v1ListRootCategoriesResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentClassifierQueryListCategoriesByOrganization(
+    public static incidentClassifierQueryListRootCategories(
         organizationId: string,
         limit?: number,
         after?: string,
-    ): CancelablePromise<v1ListCategoriesByOrganizationResponse | v1ErrorResponse> {
+        includeDeactivated?: boolean,
+    ): CancelablePromise<v1ListRootCategoriesResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/v1/organizations/{organizationId}/incident-categories',
@@ -143,12 +148,14 @@ export class IncidentClassifierQueryService {
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -157,30 +164,34 @@ export class IncidentClassifierQueryService {
      * @param organizationId
      * @param limit
      * @param after
-     * @returns v1ListPatientVisibleCategoriesByOrganizationResponse A successful response.
+     * @param includeDeactivated
+     * @returns v1ListCategoriesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentClassifierQueryListPatientVisibleCategoriesByOrganization(
+    public static incidentClassifierQueryListCategoriesByOrganization(
         organizationId: string,
         limit?: number,
         after?: string,
-    ): CancelablePromise<v1ListPatientVisibleCategoriesByOrganizationResponse | v1ErrorResponse> {
+        includeDeactivated?: boolean,
+    ): CancelablePromise<v1ListCategoriesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/v1/organizations/{organizationId}/incident-categories:patient-visible',
+            url: '/v1/organizations/{organizationId}/incident-categories:all',
             path: {
                 'organizationId': organizationId,
             },
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });
@@ -189,97 +200,34 @@ export class IncidentClassifierQueryService {
      * @param organizationId
      * @param limit
      * @param after
-     * @returns v1ListActiveRootCategoriesResponse A successful response.
+     * @param includeDeactivated
+     * @returns v1ListTypesByOrganizationResponse A successful response.
      * @returns v1ErrorResponse An unexpected error response.
      * @throws ApiError
      */
-    public static incidentClassifierQueryListActiveRootCategories(
+    public static incidentClassifierQueryListTypesByOrganization(
         organizationId: string,
         limit?: number,
         after?: string,
-    ): CancelablePromise<v1ListActiveRootCategoriesResponse | v1ErrorResponse> {
+        includeDeactivated?: boolean,
+    ): CancelablePromise<v1ListTypesByOrganizationResponse | v1ErrorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/v1/organizations/{organizationId}/incident-categories:roots',
+            url: '/v1/organizations/{organizationId}/incident-types',
             path: {
                 'organizationId': organizationId,
             },
             query: {
                 'limit': limit,
                 'after': after,
+                'includeDeactivated': includeDeactivated,
             },
             errors: {
                 400: `Validation failed. Error codes:
                 - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
                 401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
-                500: `Unexpected server error.`,
-            },
-        });
-    }
-    /**
-     * @param organizationId
-     * @param limit
-     * @param after
-     * @returns v1ListActiveTypesByOrganizationResponse A successful response.
-     * @returns v1ErrorResponse An unexpected error response.
-     * @throws ApiError
-     */
-    public static incidentClassifierQueryListActiveTypesByOrganization(
-        organizationId: string,
-        limit?: number,
-        after?: string,
-    ): CancelablePromise<v1ListActiveTypesByOrganizationResponse | v1ErrorResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/v1/organizations/{organizationId}/incident-types:active',
-            path: {
-                'organizationId': organizationId,
-            },
-            query: {
-                'limit': limit,
-                'after': after,
-            },
-            errors: {
-                400: `Validation failed. Error codes:
-                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
-                401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
-                500: `Unexpected server error.`,
-            },
-        });
-    }
-    /**
-     * Patient-facing reads. These are scoped to one organisation and return
-     * only the slice of the classifier that a patient may see when filing
-     * an incident.
-     * @param organizationId
-     * @param limit
-     * @param after
-     * @returns v1ListPatientAllowedTypesByOrganizationResponse A successful response.
-     * @returns v1ErrorResponse An unexpected error response.
-     * @throws ApiError
-     */
-    public static incidentClassifierQueryListPatientAllowedTypesByOrganization(
-        organizationId: string,
-        limit?: number,
-        after?: string,
-    ): CancelablePromise<v1ListPatientAllowedTypesByOrganizationResponse | v1ErrorResponse> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/v1/organizations/{organizationId}/incident-types:patient-allowed',
-            path: {
-                'organizationId': organizationId,
-            },
-            query: {
-                'limit': limit,
-                'after': after,
-            },
-            errors: {
-                400: `Validation failed. Error codes:
-                - \`incident_classifier_bad_cursor\` — pagination cursor is invalid or malformed.`,
-                401: `Unauthenticated — missing or invalid token.`,
-                403: `Permission denied.`,
+                403: `Permission denied. Error codes:
+                - \`permission_denied\` — include_deactivated=true requires org-admin or system-admin privileges.`,
                 500: `Unexpected server error.`,
             },
         });

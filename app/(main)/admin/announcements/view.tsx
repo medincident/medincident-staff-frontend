@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import {
   AnnouncementCommandService,
   AnnouncementQueryService,
+  OrgStructureQueryService,
   commandAnnouncementV1AnnouncementPriority,
   v1AnnouncementView,
 } from "@/lib/api-generated";
@@ -110,6 +111,10 @@ export function AnnouncementsView() {
   const [includeArchived, setIncludeArchived] = useState(true);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  // Скоуп: за всю орг (default) или по конкретной клинике/отделению.
+  // value хранится как `org` | `clinic:<id>` | `dept:<id>`.
+  const [scope, setScope] = useState<string>("org");
+  const [clinics, setClinics] = useState<{ id: string; name: string; departments: { id: string; name: string }[] }[]>([]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -119,14 +124,33 @@ export function AnnouncementsView() {
   const loadAnnouncements = async (orgId: string) => {
     setIsLoading(true);
     try {
-      const res = await AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(
-        orgId,
-        includeArchived,
-        "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
-        100,
-      );
-      if (res && "items" in res && Array.isArray(res.items)) {
-        setItems(res.items);
+      let res: unknown;
+      if (scope.startsWith("clinic:")) {
+        const clinicId = scope.slice("clinic:".length);
+        res = await AnnouncementQueryService.announcementQueryListAnnouncementsForClinic(
+          clinicId,
+          includeArchived,
+          "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
+          100,
+        );
+      } else if (scope.startsWith("dept:")) {
+        const deptId = scope.slice("dept:".length);
+        res = await AnnouncementQueryService.announcementQueryListAnnouncementsForDepartment(
+          deptId,
+          includeArchived,
+          "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
+          100,
+        );
+      } else {
+        res = await AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(
+          orgId,
+          includeArchived,
+          "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
+          100,
+        );
+      }
+      if (res && typeof res === "object" && "items" in res && Array.isArray((res as { items: unknown }).items)) {
+        setItems((res as { items: v1AnnouncementView[] }).items);
       } else {
         setItems([]);
       }
@@ -138,6 +162,35 @@ export function AnnouncementsView() {
     }
   };
 
+  // Подгружаем структуру орги один раз для select-фильтра. Объявления внутри
+  // отделения принадлежат конкретному dept, поэтому раскрываем clinics → depts.
+  useEffect(() => {
+    if (!organizationId) {
+      setClinics([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const cRes = await OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(organizationId, 100);
+        const cItems = (cRes && typeof cRes === "object" && "items" in cRes ? (cRes as { items: { id: string; name: string }[] }).items : []) ?? [];
+        const built = await Promise.all(
+          cItems.map(async (c) => {
+            const dRes = await OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(c.id, 100).catch(() => null);
+            const dItems = (dRes && typeof dRes === "object" && "items" in dRes ? (dRes as { items: { id: string; name: string }[] }).items : []) ?? [];
+            return { id: c.id, name: c.name, departments: dItems };
+          }),
+        );
+        if (!cancelled) setClinics(built);
+      } catch (e) {
+        console.warn("[announcements] failed to load clinics tree", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId]);
+
   useEffect(() => {
     if (isOrgResolving) return;
     if (organizationId) {
@@ -147,7 +200,7 @@ export function AnnouncementsView() {
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, includeArchived, isOrgResolving]);
+  }, [organizationId, includeArchived, isOrgResolving, scope]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -294,6 +347,24 @@ export function AnnouncementsView() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Select value={scope} onValueChange={setScope}>
+          <SelectTrigger className="w-full sm:w-[240px] bg-background shrink-0">
+            <SelectValue placeholder="Скоуп" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="org">Вся организация</SelectItem>
+            {clinics.flatMap((c) => [
+              <SelectItem key={`c-${c.id}`} value={`clinic:${c.id}`}>
+                Клиника: {c.name}
+              </SelectItem>,
+              ...c.departments.map((d) => (
+                <SelectItem key={`d-${d.id}`} value={`dept:${d.id}`}>
+                  &nbsp;&nbsp;↳ {c.name} / {d.name}
+                </SelectItem>
+              )),
+            ])}
+          </SelectContent>
+        </Select>
         <label className="flex items-center gap-2 text-sm select-none cursor-pointer shrink-0">
           <Switch
             checked={includeArchived}

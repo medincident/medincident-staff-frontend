@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { notify } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 import {
   MembershipQueryService,
   MembershipCommandService,
@@ -94,6 +95,7 @@ function buildHeadOptions(
 
 export function StructureView() {
   const { orgId: selectedOrgId, isResolving: isOrgsLoading } = useActiveOrgId();
+  const confirm = useConfirm();
 
   const [clinics, setClinics] = useState<any[]>([]);
   const [users, setUsers] = useState<v1EmployeeCardView[]>([]);
@@ -337,12 +339,43 @@ export function StructureView() {
     }
   };
 
-  const toggleClinicStatus = async (_id: string, _isActive: boolean) => {
-    notify.error("Не поддерживается", "В новом API удаление/деактивация клиник пока недоступны.");
+  // isActive=true означает "сейчас активна" → действие — деактивировать.
+  const toggleClinicStatus = async (id: string, isActive: boolean) => {
+    try {
+      if (isActive) {
+        const ok = await confirm({
+          title: "Деактивировать клинику?",
+          description: "Клиника станет недоступна для работы. Данные сохранятся, можно вернуть позже.",
+          confirmLabel: "Деактивировать",
+        });
+        if (!ok) return;
+        await OrgStructureCommandService.orgStructureCommandDeactivateClinic(id, {});
+        notify.mutationSuccess("Клиника деактивирована", "");
+      } else {
+        await OrgStructureCommandService.orgStructureCommandActivateClinic(id, {});
+        notify.mutationSuccess("Клиника активирована", "");
+      }
+      void loadData();
+    } catch (e) {
+      notify.apiError(e, isActive ? "Не удалось деактивировать клинику" : "Не удалось активировать клинику");
+    }
   };
 
-  const deleteClinic = async (_id: string) => {
-    notify.error("Не поддерживается", "В новом API удаление клиник пока недоступно.");
+  const deleteClinic = async (id: string) => {
+    const ok = await confirm({
+      title: "Удалить клинику безвозвратно?",
+      description: "Действие необратимо. Если у клиники есть отделения/сотрудники/инциденты — бэк отклонит удаление.",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await OrgStructureCommandService.orgStructureCommandDeleteClinic(id);
+      notify.mutationSuccess("Клиника удалена", "");
+      void loadData();
+    } catch (e) {
+      notify.apiError(e, "Не удалось удалить клинику");
+    }
   };
 
   const openDeptModal = async (clinicId: string, dept?: any) => {
@@ -434,12 +467,42 @@ export function StructureView() {
     }
   };
 
-  const toggleDeptStatus = async (_id: string, _isActive: boolean) => {
-    notify.error("Не поддерживается", "В новом API деактивация отделений пока недоступна.");
+  const toggleDeptStatus = async (id: string, isActive: boolean) => {
+    try {
+      if (isActive) {
+        const ok = await confirm({
+          title: "Деактивировать отделение?",
+          description: "Сотрудники не смогут регистрировать заявки/НС в этом отделении.",
+          confirmLabel: "Деактивировать",
+        });
+        if (!ok) return;
+        await OrgStructureCommandService.orgStructureCommandDeactivateDepartment(id, {});
+        notify.mutationSuccess("Отделение деактивировано", "");
+      } else {
+        await OrgStructureCommandService.orgStructureCommandActivateDepartment(id, {});
+        notify.mutationSuccess("Отделение активировано", "");
+      }
+      void loadData();
+    } catch (e) {
+      notify.apiError(e, isActive ? "Не удалось деактивировать отделение" : "Не удалось активировать отделение");
+    }
   };
 
-  const deleteDept = async (_deptId: string) => {
-    notify.error("Не поддерживается", "В новом API удаление отделений пока недоступно.");
+  const deleteDept = async (deptId: string) => {
+    const ok = await confirm({
+      title: "Удалить отделение безвозвратно?",
+      description: "Действие необратимо. Если есть связанные сотрудники/инциденты/заявки — бэк отклонит удаление.",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await OrgStructureCommandService.orgStructureCommandDeleteDepartment(deptId);
+      notify.mutationSuccess("Отделение удалено", "");
+      void loadData();
+    } catch (e) {
+      notify.apiError(e, "Не удалось удалить отделение");
+    }
   };
 
   return (
@@ -514,13 +577,18 @@ export function StructureView() {
                 <CardHeader className="bg-muted/30 border-b px-4 py-3 pb-2!">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 overflow-hidden pr-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <CardTitle className="text-sm font-bold truncate" title={clinic.name}>
                           {clinic.name}
                         </CardTitle>
                         <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background border shrink-0">
                           {clinic.departments?.length || 0} отд.
                         </Badge>
+                        {clinic.isActive === false && (
+                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-muted-foreground/30 text-muted-foreground shrink-0">
+                            Неактивна
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
@@ -566,9 +634,15 @@ export function StructureView() {
                         <DropdownMenuItem onClick={() => openClinicModal(clinic)}>
                           <Pencil className="mr-2 h-4 w-4" /> Изменить
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, true)}>
-                          <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
-                        </DropdownMenuItem>
+                        {clinic.isActive === false ? (
+                          <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, false)}>
+                            <Power className="mr-2 h-4 w-4" /> Активировать
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => toggleClinicStatus(clinic.id, true)}>
+                            <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive focus:bg-destructive/10"
                           onClick={() => deleteClinic(clinic.id)}
@@ -593,8 +667,13 @@ export function StructureView() {
                                 <Stethoscope className="h-3.5 w-3.5" />
                               </div>
                               <div className="min-w-0">
-                                <span className="text-foreground font-medium truncate block w-full">
+                                <span className="text-foreground font-medium truncate block w-full inline-flex items-center gap-1.5">
                                   {dept.name}
+                                  {dept.isActive === false && (
+                                    <Badge variant="outline" className="text-[9px] h-4 px-1 border-muted-foreground/30 text-muted-foreground shrink-0">
+                                      Неактивно
+                                    </Badge>
+                                  )}
                                 </span>
                                 <span className="text-xs text-muted-foreground truncate block w-full opacity-80">
                                   {deptHeadName || "Руководитель не назначен"}
@@ -612,9 +691,15 @@ export function StructureView() {
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openDeptModal(clinic.id, dept)}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleDeptStatus(dept.id, true)}>
-                                <PowerOff className="h-3.5 w-3.5" />
-                              </Button>
+                              {dept.isActive === false ? (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleDeptStatus(dept.id, false)}>
+                                  <Power className="h-3.5 w-3.5" />
+                                </Button>
+                              ) : (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => toggleDeptStatus(dept.id, true)}>
+                                  <PowerOff className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteDept(dept.id)}>
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>

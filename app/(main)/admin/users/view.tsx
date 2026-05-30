@@ -56,6 +56,11 @@ export function UsersView() {
   const [admins, setAdmins] = useState<string[]>([]);
   const [orgHeads, setOrgHeads] = useState<string[]>([]);
   const [orgDispatchers, setOrgDispatchers] = useState<string[]>([]);
+  // Заместители орг-ролей: у каждой роли может быть один зам (или ноль).
+  // Храним employeeId зама либо null.
+  const [orgAdminDeputyId, setOrgAdminDeputyId] = useState<string | null>(null);
+  const [orgHeadDeputyId, setOrgHeadDeputyId] = useState<string | null>(null);
+  const [orgDispatcherDeputyId, setOrgDispatcherDeputyId] = useState<string | null>(null);
   // Системные администраторы привязаны к Zitadel-пользователю (роль глобальная,
   // а не к организации), поэтому здесь хранятся zitadelUserId, а не employeeId.
   const [sysAdmins, setSysAdmins] = useState<string[]>([]);
@@ -114,6 +119,9 @@ export function UsersView() {
         setOrgHeads([]);
         setOrgDispatchers([]);
         setSysAdmins([]);
+        setOrgAdminDeputyId(null);
+        setOrgHeadDeputyId(null);
+        setOrgDispatcherDeputyId(null);
         return;
       }
       const orgId = organizationId;
@@ -136,15 +144,25 @@ export function UsersView() {
       // — где employeeId зашит внутри holder. Раньше брали a.employeeId напрямую,
       // из-за чего все ряды получали undefined и в UI у каждого светилось «Сотрудник».
       if (adminsRes && "items" in adminsRes && adminsRes.items) {
-        setAdmins((adminsRes.items as any[]).map((a: any) => a.holder?.employeeId).filter(Boolean));
+        const arr = adminsRes.items as any[];
+        setAdmins(arr.map((a) => a.holder?.employeeId).filter(Boolean));
+        // У орг-роли может быть один заместитель: берём первый с deputy.
+        const withDeputy = arr.find((a) => a.deputy?.employeeId);
+        setOrgAdminDeputyId(withDeputy?.deputy?.employeeId ?? null);
       }
 
       if (headsRes && "items" in headsRes && headsRes.items) {
-        setOrgHeads((headsRes.items as any[]).map((a: any) => a.holder?.employeeId).filter(Boolean));
+        const arr = headsRes.items as any[];
+        setOrgHeads(arr.map((a) => a.holder?.employeeId).filter(Boolean));
+        const withDeputy = arr.find((a) => a.deputy?.employeeId);
+        setOrgHeadDeputyId(withDeputy?.deputy?.employeeId ?? null);
       }
 
       if (dispatchersRes && "items" in dispatchersRes && dispatchersRes.items) {
-        setOrgDispatchers((dispatchersRes.items as any[]).map((a: any) => a.holder?.employeeId).filter(Boolean));
+        const arr = dispatchersRes.items as any[];
+        setOrgDispatchers(arr.map((a) => a.holder?.employeeId).filter(Boolean));
+        const withDeputy = arr.find((a) => a.deputy?.employeeId);
+        setOrgDispatcherDeputyId(withDeputy?.deputy?.employeeId ?? null);
       }
 
       if (sysAdminsRes && "items" in sysAdminsRes && sysAdminsRes.items) {
@@ -640,6 +658,22 @@ export function UsersView() {
                   />
                 )}
               </div>
+              {(formData.isOrgHead || formData.isAdmin || formData.isOrgDispatcher) && (
+                <DeputyManager
+                  organizationId={organizationId}
+                  holderEmployeeId={editingUserId}
+                  isOrgHead={formData.isOrgHead}
+                  isOrgAdmin={formData.isAdmin}
+                  isOrgDispatcher={formData.isOrgDispatcher}
+                  currentDeputies={{
+                    head: orgHeads.includes(editingUserId ?? "") ? orgHeadDeputyId : null,
+                    admin: admins.includes(editingUserId ?? "") ? orgAdminDeputyId : null,
+                    dispatcher: orgDispatchers.includes(editingUserId ?? "") ? orgDispatcherDeputyId : null,
+                  }}
+                  candidates={users}
+                  onChanged={loadData}
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
@@ -816,5 +850,197 @@ function RoleChip({
       />
       {label}
     </button>
+  );
+}
+
+// Управление заместителями орг-ролей. Deputy в Zitadel привязан к КОНКРЕТНОМУ
+// holder'у (URL /admins/{employeeId}/deputy), поэтому редактируется только
+// в карточке самого holder'а: показываем по строке на каждую активную роль.
+function DeputyManager({
+  organizationId,
+  holderEmployeeId,
+  isOrgHead,
+  isOrgAdmin,
+  isOrgDispatcher,
+  currentDeputies,
+  candidates,
+  onChanged,
+}: {
+  organizationId: string | null;
+  holderEmployeeId: string | null;
+  isOrgHead: boolean;
+  isOrgAdmin: boolean;
+  isOrgDispatcher: boolean;
+  currentDeputies: { head: string | null; admin: string | null; dispatcher: string | null };
+  candidates: v1EmployeeCardView[];
+  onChanged: () => void;
+}) {
+  const options = useMemo(
+    () =>
+      candidates
+        .filter((u) => u.employeeId && u.employeeId !== holderEmployeeId && !u.terminatedAt)
+        .map((u) => ({
+          value: u.employeeId!,
+          label:
+            u.displayName ||
+            `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() ||
+            u.email ||
+            u.employeeId!,
+        })),
+    [candidates, holderEmployeeId],
+  );
+
+  if (!organizationId || !holderEmployeeId) return null;
+
+  return (
+    <div className="grid gap-3 border-t pt-3 mt-1">
+      <Label className="text-muted-foreground">Заместители</Label>
+      {isOrgHead && (
+        <DeputyRow
+          label="И.о. главврача"
+          currentId={currentDeputies.head}
+          options={options}
+          onAssign={(deputyId) =>
+            MembershipCommandService.membershipCommandAssignOrganizationHeadDeputy(
+              organizationId,
+              holderEmployeeId,
+              { deputyEmployeeId: deputyId },
+            )
+          }
+          onRemove={() =>
+            MembershipCommandService.membershipCommandRemoveOrganizationHeadDeputy(
+              organizationId,
+              holderEmployeeId,
+            )
+          }
+          onChanged={onChanged}
+        />
+      )}
+      {isOrgAdmin && (
+        <DeputyRow
+          label="И.о. администратора"
+          currentId={currentDeputies.admin}
+          options={options}
+          onAssign={(deputyId) =>
+            MembershipCommandService.membershipCommandAssignOrganizationAdminDeputy(
+              organizationId,
+              holderEmployeeId,
+              { deputyEmployeeId: deputyId },
+            )
+          }
+          onRemove={() =>
+            MembershipCommandService.membershipCommandRemoveOrganizationAdminDeputy(
+              organizationId,
+              holderEmployeeId,
+            )
+          }
+          onChanged={onChanged}
+        />
+      )}
+      {isOrgDispatcher && (
+        <DeputyRow
+          label="И.о. диспетчера"
+          currentId={currentDeputies.dispatcher}
+          options={options}
+          onAssign={(deputyId) =>
+            MembershipCommandService.membershipCommandAssignOrganizationDispatcherDeputy(
+              organizationId,
+              holderEmployeeId,
+              { deputyEmployeeId: deputyId },
+            )
+          }
+          onRemove={() =>
+            MembershipCommandService.membershipCommandRemoveOrganizationDispatcherDeputy(
+              organizationId,
+              holderEmployeeId,
+            )
+          }
+          onChanged={onChanged}
+        />
+      )}
+    </div>
+  );
+}
+
+function DeputyRow({
+  label,
+  currentId,
+  options,
+  onAssign,
+  onRemove,
+  onChanged,
+}: {
+  label: string;
+  currentId: string | null;
+  options: { value: string; label: string }[];
+  onAssign: (deputyId: string) => Promise<unknown>;
+  onRemove: () => Promise<unknown>;
+  onChanged: () => void;
+}) {
+  const [selected, setSelected] = useState<string>(currentId ?? "");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setSelected(currentId ?? "");
+  }, [currentId]);
+
+  const handleAssign = async () => {
+    if (!selected || selected === currentId) return;
+    setBusy(true);
+    try {
+      await onAssign(selected);
+      notify.mutationSuccess("Заместитель назначен", "");
+      onChanged();
+    } catch (e) {
+      notify.apiError(e, "Не удалось назначить заместителя");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setBusy(true);
+    try {
+      await onRemove();
+      notify.mutationSuccess("Заместитель снят", "");
+      onChanged();
+    } catch (e) {
+      notify.apiError(e, "Не удалось снять заместителя");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] items-end">
+      <div className="grid gap-1">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <SearchableSelect
+          options={options}
+          value={selected}
+          onChange={setSelected}
+          placeholder="Не назначен"
+        />
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busy || !selected || selected === currentId}
+        onClick={handleAssign}
+      >
+        {currentId ? "Сменить" : "Назначить"}
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="text-destructive hover:text-destructive"
+        disabled={busy || !currentId}
+        onClick={handleRemove}
+      >
+        Снять
+      </Button>
+    </div>
   );
 }

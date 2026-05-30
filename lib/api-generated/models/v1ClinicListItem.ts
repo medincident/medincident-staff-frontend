@@ -9,5 +9,6 @@ export type v1ClinicListItem = {
     id?: string;
     organizationId?: string;
     name?: string;
+    isActive?: boolean;
 };
 

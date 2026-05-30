@@ -2,11 +2,14 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { v1BufferPriority } from './v1BufferPriority';
 export type v1SubmitPatientIncidentRequest = {
     organizationId: string;
     categoryId?: string;
     typeId?: string;
-    description?: string;
+    description: string;
     occurredAt?: string;
+    summary: string;
+    priority: v1BufferPriority;
 };
 

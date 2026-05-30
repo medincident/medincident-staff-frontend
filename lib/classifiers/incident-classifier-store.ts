@@ -42,7 +42,7 @@ export const useIncidentClassifierStore = create<State>((set, get) => ({
       try {
         const [catsRes, typesRes] = await Promise.all([
           IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 100),
-          IncidentClassifierQueryService.incidentClassifierQueryListActiveTypesByOrganization(orgId, 100),
+          IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(orgId, 100),
         ]);
         const categories =
           catsRes && "items" in catsRes && catsRes.items ? catsRes.items : [];

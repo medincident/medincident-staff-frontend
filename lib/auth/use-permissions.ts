@@ -80,6 +80,8 @@ export interface Permissions {
   canManageDepartmentSettings: boolean;
   /** /admin/classifier. */
   canManageClassifiers: boolean;
+  /** /admin/capa — корректирующие/предупреждающие мероприятия (785н). */
+  canManageCapa: boolean;
   /** /admin/announcements. */
   canManageAnnouncements: boolean;
 
@@ -123,6 +125,7 @@ const EMPTY: Permissions = {
   canManageOrgUsers: false,
   canManageDepartmentSettings: false,
   canManageClassifiers: false,
+  canManageCapa: false,
   canManageAnnouncements: false,
   canViewReports: false,
   canViewAnalytics: false,
@@ -245,6 +248,14 @@ export function usePermissions(): Permissions {
     canManageDepartmentSettings:
       isSystemAdmin || isOrgAdmin || isClinicHead || isDepartmentResponsible,
     canManageClassifiers: isSystemAdmin || isOrgAdmin,
+    // CAPA — управление качеством (785н). Доступно всем уровням руководства,
+    // которые могут принимать и контролировать корректирующие мероприятия.
+    canManageCapa:
+      isSystemAdmin ||
+      isOrgAdmin ||
+      isOrgHead ||
+      isClinicHead ||
+      isDepartmentResponsible,
     canManageAnnouncements: isSystemAdmin || isOrgAdmin,
 
     canViewReports: !isGuest,

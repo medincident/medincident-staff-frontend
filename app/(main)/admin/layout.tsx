@@ -23,7 +23,7 @@ interface AdminTab {
 const adminTabs: AdminTab[] = [
   { href: "/admin/organizations", label: "Организации", icon: Network, can: "canManageOrganizations" },
   { href: "/admin/classifier", label: "Классификатор", icon: Shield, can: "canManageClassifiers" },
-  { href: "/admin/capa", label: "Мероприятия", icon: ClipboardCheck, can: "canManageClassifiers" },
+  { href: "/admin/capa", label: "Мероприятия", icon: ClipboardCheck, can: "canManageCapa" },
   { href: "/admin/department", label: "Подразделение", icon: UserCheck, can: "canManageDepartmentSettings" },
   { href: "/admin/structure", label: "Структура", icon: Building, can: "canManageOrgStructure" },
   { href: "/admin/announcements", label: "Объявления", icon: Megaphone, can: "canManageAnnouncements" },

@@ -319,6 +319,9 @@ export function ReportsView() {
   ]);
 
   const { startMs, endMs, prevStartMs, prevEndMs, effectiveDays } = useMemo(() => {
+    // Date.now() здесь безопасен: useMemo пересчитывается только при смене
+    // period/customRange, и в этот момент нам нужен именно текущий timestamp.
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
 
     if (period === "custom") {
@@ -1086,9 +1089,11 @@ export function ReportsView() {
                 </div>
                 <Select value={forecastCategory} onValueChange={setForecastCategory}>
                   <SelectTrigger className="w-full sm:w-[240px] bg-background">
-                    <div className="flex items-center gap-2 text-muted-foreground min-w-0">
-                      <Filter className="h-4 w-4 shrink-0" />
-                      <SelectValue placeholder="Категория НС" />
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">
+                        <SelectValue placeholder="Категория НС" />
+                      </span>
                     </div>
                   </SelectTrigger>
                   <SelectContent className="border">

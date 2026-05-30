@@ -7,7 +7,7 @@ const authMiddleware = withAuth({
   },
 });
 
-export default function middleware(req: NextRequest, event: any) {
+export default function proxy(req: NextRequest, event: any) {
   return authMiddleware(req as any, event);
 }
 

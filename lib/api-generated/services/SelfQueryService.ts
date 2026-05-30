@@ -27,7 +27,8 @@ export class SelfQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`self_identity_failed\` — database query failed.`,
             },
         });
     }
@@ -103,7 +104,8 @@ export class SelfQueryService {
                 400: `Validation failed or invalid input.`,
                 401: `Unauthenticated — missing or invalid token.`,
                 403: `Permission denied.`,
-                500: `Unexpected server error.`,
+                500: `Internal server error. Error codes:
+                - \`self_orgs_failed\` — database query failed.`,
             },
         });
     }

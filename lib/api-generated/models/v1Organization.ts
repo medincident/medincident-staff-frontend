@@ -12,6 +12,7 @@ export type v1Organization = {
     name?: string;
     description?: string;
     legalAddress?: queryOrgstructureV1Address;
+    isActive?: boolean;
     createdAt?: string;
     updatedAt?: string;
 };

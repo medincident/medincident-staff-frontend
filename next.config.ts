@@ -20,6 +20,14 @@ const withPWA = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  // Next 16 по умолчанию блокирует cross-origin запросы к /_next/* в dev.
+  // У нас dev-контейнер ходит через nginx-gateway по внешнему хосту, поэтому
+  // HMR (webpack-hmr) и динамические чанки получают block — это ломает
+  // гидрацию и редиректы (бесконечные ретраи в DevTools).
+  allowedDevOrigins: [
+    "patient-medincident.ulbwa.bombomeow.ru",
+    "localhost",
+  ],
   async headers() {
     return [
       {

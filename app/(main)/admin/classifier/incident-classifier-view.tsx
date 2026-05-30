@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
-  Plus, Pencil, Trash2, Search, FolderPlus, MoreVertical, Layers, Loader2, ChevronRight, ChevronDown, Power, PowerOff
+  Plus, Pencil, Trash2, Search, FolderPlus, MoreVertical, Layers, Loader2, ChevronRight, ChevronDown, Power, PowerOff, MoveRight
 } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,16 +54,14 @@ export function IncidentClassifierView() {
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemPatientCanReport, setNewItemPatientCanReport] = useState(false);
 
-  useEffect(() => {
-    if (isOrgResolving) return;
-    if (organizationId) {
-      loadCategories();
-    } else {
-      setCategories([]);
-      setTypesMap({});
-      setIsLoading(false);
-    }
-  }, [search, organizationId, isOrgResolving]);
+  // Диалог переноса категории/типа в новую категорию-родителя.
+  const [moveDialog, setMoveDialog] = useState<
+    | { kind: "category"; id: string; name: string }
+    | { kind: "type"; id: string; name: string; currentCategoryId: string }
+    | null
+  >(null);
+  const [moveTargetId, setMoveTargetId] = useState<string>("");
+  const [isMoving, setIsMoving] = useState(false);
 
   const loadCategories = async () => {
     if (!organizationId) return;
@@ -98,6 +97,17 @@ export function IncidentClassifierView() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isOrgResolving) return;
+    if (organizationId) {
+      loadCategories();
+    } else {
+      setCategories([]);
+      setTypesMap({});
+      setIsLoading(false);
+    }
+  }, [search, organizationId, isOrgResolving]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCats(prev => {
@@ -279,6 +289,63 @@ export function IncidentClassifierView() {
     setIsTypeDialogOpen(true);
   };
 
+  const openMoveCategory = (cat: any) => {
+    setMoveDialog({ kind: "category", id: cat.id, name: cat.name });
+    setMoveTargetId(cat.parentId ?? "__root__");
+  };
+
+  const openMoveType = (categoryId: string, type: any) => {
+    setMoveDialog({ kind: "type", id: type.id, name: type.name, currentCategoryId: categoryId });
+    setMoveTargetId(categoryId);
+  };
+
+  const handleMove = async () => {
+    if (!moveDialog) return;
+    setIsMoving(true);
+    try {
+      if (moveDialog.kind === "category") {
+        await IncidentClassifierCommandService.incidentClassifierCommandMoveIncidentCategory(moveDialog.id, {
+          newParentCategoryId: moveTargetId === "__root__" ? undefined : moveTargetId,
+        });
+        notify.mutationSuccess("Категория перенесена", "");
+      } else {
+        if (!moveTargetId || moveTargetId === "__root__") {
+          notify.error("Не выбрана категория", "Тип события должен принадлежать какой-либо категории.");
+          setIsMoving(false);
+          return;
+        }
+        await IncidentClassifierCommandService.incidentClassifierCommandMoveIncidentType(moveDialog.id, {
+          newCategoryId: moveTargetId,
+        });
+        notify.mutationSuccess("Тип события перенесён", "");
+      }
+      invalidateIncidentClassifier(organizationId);
+      setMoveDialog(null);
+      loadCategories();
+    } catch (e) {
+      notify.apiError(e, "Не удалось перенести");
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
+  // Опции для select-а целевой категории: для категории фильтруем саму себя
+  // и её прямых потомков (защита от циклов на клиенте, бэк дополнительно
+  // проверяет всё поддерево).
+  const moveTargetOptions = useMemo(() => {
+    if (!moveDialog) return [] as { value: string; label: string }[];
+    const opts: { value: string; label: string }[] = [];
+    if (moveDialog.kind === "category") {
+      opts.push({ value: "__root__", label: "На корневой уровень" });
+    }
+    for (const c of categories) {
+      if (moveDialog.kind === "category" && c.id === moveDialog.id) continue;
+      if (moveDialog.kind === "category" && c.parentId === moveDialog.id) continue;
+      opts.push({ value: c.id, label: c.name });
+    }
+    return opts;
+  }, [moveDialog, categories]);
+
   return (
     <div className="space-y-6 pb-20 overflow-x-hidden">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -397,6 +464,9 @@ export function IncidentClassifierView() {
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openCategoryModal(cat); }}>
                           <Pencil className="mr-2 h-4 w-4" /> Изменить
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMoveCategory(cat); }}>
+                          <MoveRight className="mr-2 h-4 w-4" /> Перенести
+                        </DropdownMenuItem>
                         {isActive ? (
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleCategoryStatus(cat.id, true); }}>
                             <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
@@ -472,6 +542,15 @@ export function IncidentClassifierView() {
                                 title="Изменить"
                               >
                                 <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground"
+                                onClick={() => openMoveType(cat.id, type)}
+                                title="Перенести в другую категорию"
+                              >
+                                <MoveRight className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -577,6 +656,38 @@ export function IncidentClassifierView() {
           <DialogFooter>
             <Button onClick={saveType} disabled={!newItemName.trim() || isSaving}>
               Сохранить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!moveDialog} onOpenChange={(o) => !o && setMoveDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {moveDialog?.kind === "category" ? "Перенести категорию" : "Перенести тип события"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              «{moveDialog?.name}» →
+            </p>
+            <Label className="text-sm">
+              {moveDialog?.kind === "category" ? "Новая родительская категория" : "Новая категория"}
+            </Label>
+            <SearchableSelect
+              value={moveTargetId}
+              onChange={setMoveTargetId}
+              options={moveTargetOptions}
+              placeholder="Выберите категорию"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveDialog(null)} disabled={isMoving}>
+              Отмена
+            </Button>
+            <Button onClick={handleMove} disabled={isMoving || !moveTargetId}>
+              {isMoving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Перенести"}
             </Button>
           </DialogFooter>
         </DialogContent>

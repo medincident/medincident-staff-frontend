@@ -12,7 +12,13 @@ import {
   Hospital,
   Stethoscope,
   Palmtree,
+  Power,
+  PowerOff,
+  Trash2,
 } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -45,6 +51,7 @@ import { useSession } from "next-auth/react";
 
 export function OrganizationsView() {
   const { data: session } = useSession();
+  const confirm = useConfirm();
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -101,6 +108,49 @@ export function OrganizationsView() {
       setOrgAddress("");
     }
     setIsOrgDialogOpen(true);
+  };
+
+  const handleDeactivate = async (org: any) => {
+    const ok = await confirm({
+      title: "Деактивировать организацию?",
+      description: `«${org.name ?? ""}» станет недоступна для работы. Данные сохранятся, при необходимости можно активировать обратно.`,
+      confirmLabel: "Деактивировать",
+    });
+    if (!ok) return;
+    try {
+      await OrgStructureCommandService.orgStructureCommandDeactivateOrganization(org.id, {});
+      notify.mutationSuccess("Организация деактивирована", "");
+      loadOrganizations();
+    } catch (e) {
+      notify.apiError(e, "Не удалось деактивировать организацию");
+    }
+  };
+
+  const handleActivate = async (org: any) => {
+    try {
+      await OrgStructureCommandService.orgStructureCommandActivateOrganization(org.id, {});
+      notify.mutationSuccess("Организация активирована", "");
+      loadOrganizations();
+    } catch (e) {
+      notify.apiError(e, "Не удалось активировать организацию");
+    }
+  };
+
+  const handleDelete = async (org: any) => {
+    const ok = await confirm({
+      title: "Удалить организацию безвозвратно?",
+      description: `«${org.name ?? ""}» — действие необратимо. Если есть связанные инциденты или заявки, бэк отклонит удаление.`,
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await OrgStructureCommandService.orgStructureCommandDeleteOrganization(org.id);
+      notify.mutationSuccess("Организация удалена", "");
+      loadOrganizations();
+    } catch (e) {
+      notify.apiError(e, "Не удалось удалить организацию");
+    }
   };
 
   const saveOrganization = async () => {
@@ -187,9 +237,14 @@ export function OrganizationsView() {
               <Card key={org.id} className="gap-2 transition-all">
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                   <div className="space-y-1 overflow-hidden pr-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Building className="h-5 w-5 text-primary shrink-0" />
                       <CardTitle className="truncate text-lg">{org.name}</CardTitle>
+                      {org.isActive === false && (
+                        <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
+                          Неактивна
+                        </Badge>
+                      )}
                     </div>
                     <CardDescription className="flex items-center gap-1 truncate text-xs">
                       <MapPin className="h-3 w-3 shrink-0" />
@@ -206,6 +261,21 @@ export function OrganizationsView() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => openOrgDialog(org)}>
                         <Pencil className="mr-2 h-4 w-4" /> Настройки
+                      </DropdownMenuItem>
+                      {org.isActive === false ? (
+                        <DropdownMenuItem onClick={() => handleActivate(org)}>
+                          <Power className="mr-2 h-4 w-4" /> Активировать
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => handleDeactivate(org)}>
+                          <PowerOff className="mr-2 h-4 w-4" /> Деактивировать
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(org)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Удалить
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

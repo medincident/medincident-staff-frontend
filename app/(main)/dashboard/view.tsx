@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { STATUS_MAP } from "@/lib/constants";
 import { useMyEmployee } from "@/lib/auth/use-my-employee";
 import { useMyIdentity } from "@/lib/auth/use-my-identity";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import { getBadgeColor } from "@/lib/status-helper";
 
 import {
@@ -61,6 +62,7 @@ export function DashboardView() {
   const user = session?.user as any;
   const { identity } = useMyIdentity();
   const isSystemAdmin = !!identity?.isSystemAdmin;
+  const perms = usePermissions();
 
   // Что писать в подзаголовке: должность из employee_card → fallback
   // системный админ → fallback "Сотрудник".
@@ -206,24 +208,30 @@ export function DashboardView() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <Link href="/requests/new" className="w-full sm:w-auto flex-1">
-            <Button
-              variant="outline"
-              className="w-full h-12 px-6 text-base font-medium border border-primary text-primary hover:text-primary hover:bg-primary/5 transition-all"
-            >
-              <Wrench className="mr-2 h-5 w-5" />
-              Тех. заявка
-            </Button>
-          </Link> 
+        {(perms.canCreateRequest || perms.canCreateIncident) && (
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            {perms.canCreateRequest && (
+              <Link href="/requests/new" className="w-full sm:w-auto flex-1">
+                <Button
+                  variant="outline"
+                  className="w-full h-12 px-6 text-base font-medium border border-primary text-primary hover:text-primary hover:bg-primary/5 transition-all"
+                >
+                  <Wrench className="mr-2 h-5 w-5" />
+                  Тех. заявка
+                </Button>
+              </Link>
+            )}
 
-          <Link href="/events/new" className="w-full sm:w-auto flex-1">
-            <Button className="w-full h-12 px-6 text-base font-bold transition-all">
-              <Siren className="mr-2 h-5 w-5 animate-pulse" />
-              ЗАРЕГИСТРИРОВАТЬ НС
-            </Button>
-          </Link>
-        </div>
+            {perms.canCreateIncident && (
+              <Link href="/events/new" className="w-full sm:w-auto flex-1">
+                <Button className="w-full h-12 px-6 text-base font-bold transition-all">
+                  <Siren className="mr-2 h-5 w-5 animate-pulse" />
+                  ЗАРЕГИСТРИРОВАТЬ НС
+                </Button>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

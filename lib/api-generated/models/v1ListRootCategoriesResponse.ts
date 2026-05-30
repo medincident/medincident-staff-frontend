@@ -3,7 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { v1Category } from './v1Category';
-export type v1ListPatientVisibleCategoriesByOrganizationResponse = {
+export type v1ListRootCategoriesResponse = {
     items?: Array<v1Category>;
     nextCursor?: string;
 };
