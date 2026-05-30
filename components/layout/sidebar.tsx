@@ -14,6 +14,7 @@ import {
   UserCheck,
   Network,
   Wrench,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,12 @@ const ADMIN_LINKS: NavLink[] = [
     label: "Классификатор",
     icon: Shield,
     can: "canManageClassifiers",
+  },
+  {
+    href: "/admin/capa",
+    label: "Мероприятия",
+    icon: ClipboardCheck,
+    can: "canManageCapa",
   },
   {
     href: "/admin/announcements",
