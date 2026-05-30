@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 
 import { notify } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 import { cn } from "@/lib/utils";
 import {
   AnnouncementCommandService,
@@ -103,6 +104,7 @@ const EMPTY_FORM: FormState = {
 
 export function AnnouncementsView() {
   const { orgId: organizationId, isResolving: isOrgResolving } = useActiveOrgId();
+  const confirm = useConfirm();
 
   const [items, setItems] = useState<v1AnnouncementView[]>([]);
   const [includeArchived, setIncludeArchived] = useState(true);
@@ -230,9 +232,12 @@ export function AnnouncementsView() {
 
   const handleArchive = async (a: v1AnnouncementView) => {
     if (!a.id || !organizationId) return;
-    if (!confirm(`Архивировать объявление «${a.title ?? ""}»? Сотрудники перестанут его видеть.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Архивировать объявление?",
+      description: `«${a.title ?? ""}» — сотрудники перестанут его видеть.`,
+      confirmLabel: "Архивировать",
+    });
+    if (!ok) return;
     try {
       await AnnouncementCommandService.announcementCommandArchiveAnnouncement(a.id);
       notify.mutationSuccess("Объявление архивировано", "");

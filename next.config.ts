@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import withPWAInit from "@ducanh2912/next-pwa";
+import withSerwistInit from "@serwist/next";
 
 const ZITADEL_ORIGIN = (() => {
   const issuer = process.env.NEXT_PUBLIC_ZITADEL_ISSUER;
@@ -11,24 +11,12 @@ const ZITADEL_ORIGIN = (() => {
   }
 })();
 
-const withPWA = withPWAInit({
-  dest: "public",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+// Логика precache/runtime-caching и /api/auth NetworkOnly — в app/sw.ts.
+const withPWA = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
-  // SW не кэширует /api/auth/*: повторный fetch одного и того же
-  // auth-кода в Zitadel ловит Errors.AuthRequest.NoCode.
-  extendDefaultRuntimeCaching: true,
-  workboxOptions: {
-    disableDevLogs: true,
-    runtimeCaching: [
-      {
-        urlPattern: /\/api\/auth\//,
-        handler: "NetworkOnly",
-      },
-    ],
-  },
 });
 
 const nextConfig: NextConfig = {
@@ -63,9 +51,8 @@ const nextConfig: NextConfig = {
             value: "no-cache, no-store, must-revalidate",
           },
           {
-            // CSP применяется к самому SW. Workbox использует fetch()
-            // даже в NetworkOnly — без Zitadel в connect-src аватарка
-            // ломается.
+            // CSP на сам SW: Serwist/Workbox используют fetch() даже в
+            // NetworkOnly — без Zitadel в connect-src аватарка ломается.
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",

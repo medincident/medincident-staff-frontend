@@ -43,6 +43,8 @@ type Props = {
   reqColor?: string;
   evtColor?: string;
   changePoints?: ChangePointMarker[];
+  capaMarkers?: ChangePointMarker[];
+  showRequests?: boolean;
 };
 
 function Legend_({ payload }: any) {
@@ -126,6 +128,8 @@ export function ForecastChart({
   reqColor = "#3b82f6",
   evtColor = "#f59e0b",
   changePoints = [],
+  capaMarkers = [],
+  showRequests = true,
 }: Props) {
   if (!data || data.length === 0) {
     return (
@@ -169,17 +173,19 @@ export function ForecastChart({
           <Legend content={<Legend_ />} verticalAlign="top" />
 
           {/* 95% ДИ — серые зоны для каждой метрики */}
-          <Area
-            type="monotone"
-            dataKey="Заявки_ДИ"
-            name="95% ДИ (заявки)"
-            legendType="none"
-            stroke="none"
-            fill={reqColor}
-            fillOpacity={0.08}
-            isAnimationActive={false}
-            connectNulls
-          />
+          {showRequests && (
+            <Area
+              type="monotone"
+              dataKey="Заявки_ДИ"
+              name="95% ДИ (заявки)"
+              legendType="none"
+              stroke="none"
+              fill={reqColor}
+              fillOpacity={0.08}
+              isAnimationActive={false}
+              connectNulls
+            />
+          )}
           <Area
             type="monotone"
             dataKey="Инциденты_ДИ"
@@ -193,16 +199,18 @@ export function ForecastChart({
           />
 
           {/* Исторические области */}
-          <Area
-            type="monotone"
-            dataKey="Заявки"
-            stroke={reqColor}
-            strokeWidth={2}
-            fill="url(#grad-req-hist)"
-            fillOpacity={1}
-            connectNulls={false}
-            isAnimationActive={false}
-          />
+          {showRequests && (
+            <Area
+              type="monotone"
+              dataKey="Заявки"
+              stroke={reqColor}
+              strokeWidth={2}
+              fill="url(#grad-req-hist)"
+              fillOpacity={1}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          )}
           <Area
             type="monotone"
             dataKey="Инциденты"
@@ -215,18 +223,20 @@ export function ForecastChart({
           />
 
           {/* Линии прогноза — пунктир */}
-          <Line
-            type="monotone"
-            dataKey="Заявки_прогноз"
-            name="Заявки (прогноз)"
-            legendType="none"
-            stroke={reqColor}
-            strokeWidth={2}
-            strokeDasharray="5 4"
-            dot={{ r: 2, fill: reqColor }}
-            connectNulls={false}
-            isAnimationActive={false}
-          />
+          {showRequests && (
+            <Line
+              type="monotone"
+              dataKey="Заявки_прогноз"
+              name="Заявки (прогноз)"
+              legendType="none"
+              stroke={reqColor}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={{ r: 2, fill: reqColor }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          )}
           <Line
             type="monotone"
             dataKey="Инциденты_прогноз"
@@ -253,6 +263,26 @@ export function ForecastChart({
                       value: cp.label,
                       position: "insideTopLeft",
                       fill: cp.color ?? "#ef4444",
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }
+                  : undefined
+              }
+            />
+          ))}
+
+          {capaMarkers.map((cp, i) => (
+            <ReferenceLine
+              key={`capa-${i}-${cp.name}`}
+              x={cp.name}
+              stroke={cp.color ?? "#10b981"}
+              strokeWidth={1.5}
+              label={
+                cp.label
+                  ? {
+                      value: cp.label,
+                      position: "insideBottomLeft",
+                      fill: cp.color ?? "#10b981",
                       fontSize: 10,
                       fontWeight: 600,
                     }

@@ -27,6 +27,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { notify } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 import { cn } from "@/lib/utils";
 import {
   MembershipQueryService,
@@ -90,6 +91,7 @@ type Props = {
 };
 
 export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }: Props) {
+  const confirm = useConfirm();
   const [vacations, setVacations] = useState<v1VacationView[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -169,7 +171,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
 
   const handleStartNow = async () => {
     if (!employeeId) return;
-    if (!confirm("Начать отпуск прямо сейчас? Сотрудник станет недоступен сразу.")) return;
+    const ok = await confirm({
+      title: "Начать отпуск прямо сейчас?",
+      description: "Сотрудник станет недоступен сразу.",
+      confirmLabel: "Начать",
+    });
+    if (!ok) return;
     setIsMutating(true);
     try {
       await MembershipCommandService.membershipCommandStartVacationNow(employeeId, {
@@ -188,7 +195,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
 
   const handleCancel = async (v: v1VacationView) => {
     if (!v.id || !employeeId) return;
-    if (!confirm("Отменить запланированный отпуск?")) return;
+    const ok = await confirm({
+      title: "Отменить запланированный отпуск?",
+      confirmLabel: "Отменить отпуск",
+      destructive: true,
+    });
+    if (!ok) return;
     setIsMutating(true);
     try {
       await MembershipCommandService.membershipCommandCancelScheduledVacation(v.id);
@@ -204,7 +216,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
 
   const handleForceEnd = async (v: v1VacationView) => {
     if (!v.id || !employeeId) return;
-    if (!confirm("Завершить отпуск досрочно? Сотрудник снова станет доступен.")) return;
+    const ok = await confirm({
+      title: "Завершить отпуск досрочно?",
+      description: "Сотрудник снова станет доступен.",
+      confirmLabel: "Завершить",
+    });
+    if (!ok) return;
     setIsMutating(true);
     try {
       await MembershipCommandService.membershipCommandForceEndVacation(v.id);

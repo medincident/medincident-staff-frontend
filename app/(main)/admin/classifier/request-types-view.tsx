@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { notify } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 import { cn } from "@/lib/utils";
 import {
   RequestClassifierQueryService,
@@ -59,6 +60,7 @@ const EMPTY_FORM: FormState = { name: "", description: "" };
 
 export function RequestTypesView() {
   const { orgId: organizationId, isResolving: isOrgResolving } = useActiveOrgId();
+  const confirm = useConfirm();
 
   const [types, setTypes] = useState<v1RequestType[]>([]);
   const [showInactive, setShowInactive] = useState(true);
@@ -188,9 +190,13 @@ export function RequestTypesView() {
 
   const handleDelete = async (t: v1RequestType) => {
     if (!t.id || !organizationId) return;
-    if (!confirm(`Удалить тип «${t.name ?? ""}» безвозвратно? Действие необратимо.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Удалить тип безвозвратно?",
+      description: `«${t.name ?? ""}» — действие необратимо.`,
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await RequestClassifierCommandService.requestClassifierCommandDeleteRequestType(t.id);
       notify.mutationSuccess("Тип удалён", "");

@@ -67,7 +67,8 @@ import {
   type ChangePoint,
 } from "@/lib/analytics/change-points";
 import { ForecastChart } from "@/components/charts/forecast-chart";
-import { Sparkles, Brain, Loader2, GitBranch } from "lucide-react";
+import { useCapaStore } from "@/lib/capa/store";
+import { Sparkles, Brain, Loader2, GitBranch, Filter } from "lucide-react";
 
 const PERIODS = [
   { value: "7d", label: "Последние 7 дней", days: 7 },
@@ -214,12 +215,18 @@ export function ReportsView() {
   const sessionUserName = (session?.user as { name?: string } | undefined)?.name;
   const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
   useRequirePermission("canViewReports");
+  const allCapa = useCapaStore((s) => s.entries);
+  const capaEntries = useMemo(
+    () => allCapa.filter((e) => e.organizationId === orgId),
+    [allCapa, orgId],
+  );
   // Для шапки экспорта. Имена категорий/типов приходят строками в snapshot.
   const { employee } = useMyEmployee();
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodValue>("30d");
   const [forecastMethod, setForecastMethod] = useState<"holt" | "lstm">("holt");
+  const [forecastCategory, setForecastCategory] = useState<string>("all");
   const [lstmResult, setLstmResult] = useState<{
     key: string;
     requests: ForecastResult;
@@ -555,6 +562,40 @@ export function ReportsView() {
     return { buckets, useWeekly, bucketSizeMs };
   }, [filtered, startMs, endMs, effectiveDays]);
 
+  // Категории НС, доступные для фильтра прогноза (из событий периода + те,
+  // по которым заведены CAPA — чтобы линию мероприятия было к чему привязать).
+  const forecastCategoryOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const e of filtered.events as Array<{ categoryId?: string; categoryName?: string }>) {
+      if (e.categoryId) byId.set(e.categoryId, e.categoryName || e.categoryId);
+    }
+    for (const c of capaEntries) {
+      if (c.categoryId && !byId.has(c.categoryId)) byId.set(c.categoryId, c.categoryName);
+    }
+    return Array.from(byId, ([value, label]) => ({ value, label })).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+  }, [filtered.events, capaEntries]);
+
+  // Частота для карточки прогноза: при выбранной категории «Инциденты»
+  // считаются только по ней — иначе эффект CAPA тонет в общей сумме.
+  // Аномалии и KPI-плитки продолжают считаться по всем категориям (frequencyData).
+  const forecastFrequency = useMemo(() => {
+    if (forecastCategory === "all") return frequencyData;
+    const evts = (filtered.events as Array<{ createdAt: string; categoryId?: string }>).filter(
+      (e) => e.categoryId === forecastCategory,
+    );
+    const buckets = frequencyData.buckets.map((b) => {
+      const start = b.bucketEndMs - frequencyData.bucketSizeMs;
+      const count = evts.filter((e) => {
+        const t = new Date(e.createdAt).getTime();
+        return t >= start && t < b.bucketEndMs;
+      }).length;
+      return { ...b, Инциденты: count };
+    });
+    return { ...frequencyData, buckets };
+  }, [forecastCategory, frequencyData, filtered.events]);
+
   // Аномалии: бакет, где значение отклоняется от среднего более чем на ANOMALY_Z_THRESHOLD σ.
   const anomalies = useMemo(() => {
     const reqs = frequencyData.buckets.map((b) => b["Заявки"]);
@@ -620,29 +661,48 @@ export function ReportsView() {
   }, [frequencyData]);
 
   const changePoints = useMemo(() => {
-    const labels = frequencyData.buckets.map(b => b.name);
-    const reqVals = frequencyData.buckets.map(b => b["Заявки"]);
-    const evtVals = frequencyData.buckets.map(b => b["Инциденты"]);
+    const labels = forecastFrequency.buckets.map(b => b.name);
+    const reqVals = forecastFrequency.buckets.map(b => b["Заявки"]);
+    const evtVals = forecastFrequency.buckets.map(b => b["Инциденты"]);
 
     return {
       requests: detectChangePoints(reqVals, labels),
       events: detectChangePoints(evtVals, labels),
     };
-  }, [frequencyData]);
+  }, [forecastFrequency]);
+
+  // Маркеры CAPA: только выбранной категории (или все при «Все категории»),
+  // привязанные к бакету, в который попадает дата ввода.
+  const capaMarkers = useMemo(() => {
+    const size = forecastFrequency.bucketSizeMs;
+    return capaEntries
+      .filter((c) => forecastCategory === "all" || c.categoryId === forecastCategory)
+      .map((c) => {
+        const t = new Date(c.introducedAt).getTime();
+        if (Number.isNaN(t)) return null;
+        const bucket = forecastFrequency.buckets.find(
+          (b) => t >= b.bucketEndMs - size && t < b.bucketEndMs,
+        );
+        if (!bucket) return null;
+        const short = c.title.length > 22 ? c.title.slice(0, 21) + "…" : c.title;
+        return { name: bucket.name, color: "#10b981", label: `КАПА: ${short}` };
+      })
+      .filter((m): m is { name: string; color: string; label: string } => m !== null);
+  }, [capaEntries, forecastCategory, forecastFrequency]);
 
   const forecastSeriesKey = useMemo(() => {
     // Ключ для кеша LSTM — меняется только при изменении рядов.
     return (
-      frequencyData.useWeekly + ":" +
-      frequencyData.buckets
+      forecastCategory + ":" + forecastFrequency.useWeekly + ":" +
+      forecastFrequency.buckets
         .map(b => `${b["Заявки"]}|${b["Инциденты"]}`)
         .join(",")
     );
-  }, [frequencyData]);
+  }, [forecastCategory, forecastFrequency]);
 
   useEffect(() => {
     if (forecastMethod !== "lstm") return;
-    if (frequencyData.buckets.length < 7) return;
+    if (forecastFrequency.buckets.length < 7) return;
     if (lstmResult?.key === forecastSeriesKey) return;
 
     let cancelled = false;
@@ -650,9 +710,9 @@ export function ReportsView() {
 
     (async () => {
       const { forecastLstm } = await import("@/lib/analytics/lstm-forecast");
-      const horizon = frequencyData.useWeekly ? 4 : 7;
-      const reqSeries = frequencyData.buckets.map(b => b["Заявки"]);
-      const evtSeries = frequencyData.buckets.map(b => b["Инциденты"]);
+      const horizon = forecastFrequency.useWeekly ? 4 : 7;
+      const reqSeries = forecastFrequency.buckets.map(b => b["Заявки"]);
+      const evtSeries = forecastFrequency.buckets.map(b => b["Инциденты"]);
 
       try {
         const [reqRes, evtRes] = await Promise.all([
@@ -672,12 +732,12 @@ export function ReportsView() {
     return () => {
       cancelled = true;
     };
-  }, [forecastMethod, forecastSeriesKey, frequencyData, lstmResult]);
+  }, [forecastMethod, forecastSeriesKey, forecastFrequency, lstmResult]);
 
   const forecast = useMemo(() => {
-    const horizon = frequencyData.useWeekly ? 4 : 7;
-    const reqSeries = frequencyData.buckets.map(b => b["Заявки"]);
-    const evtSeries = frequencyData.buckets.map(b => b["Инциденты"]);
+    const horizon = forecastFrequency.useWeekly ? 4 : 7;
+    const reqSeries = forecastFrequency.buckets.map(b => b["Заявки"]);
+    const evtSeries = forecastFrequency.buckets.map(b => b["Инциденты"]);
 
     const holtReq = forecastHolt(reqSeries, horizon);
     const holtEvt = forecastHolt(evtSeries, horizon);
@@ -687,7 +747,7 @@ export function ReportsView() {
     const reqRes = useLstm ? lstmResult!.requests : holtReq;
     const evtRes = useLstm ? lstmResult!.events : holtEvt;
 
-    const hasEnoughData = frequencyData.buckets.length >= 5;
+    const hasEnoughData = forecastFrequency.buckets.length >= 5;
 
     const chartData: Array<{
       name: string;
@@ -698,7 +758,7 @@ export function ReportsView() {
       "Заявки_ДИ"?: [number, number] | null;
       "Инциденты_ДИ"?: [number, number] | null;
       isForecast?: boolean;
-    }> = frequencyData.buckets.map((b, i, arr) => {
+    }> = forecastFrequency.buckets.map((b, i, arr) => {
       const isLast = i === arr.length - 1;
       const base: any = {
         name: b.name,
@@ -715,15 +775,15 @@ export function ReportsView() {
     });
 
     const forecastStartName =
-      frequencyData.buckets.length > 0
-        ? frequencyData.buckets[frequencyData.buckets.length - 1].name
+      forecastFrequency.buckets.length > 0
+        ? forecastFrequency.buckets[forecastFrequency.buckets.length - 1].name
         : undefined;
 
     if (hasEnoughData) {
       const lastMs =
-        frequencyData.buckets[frequencyData.buckets.length - 1].bucketEndMs;
+        forecastFrequency.buckets[forecastFrequency.buckets.length - 1].bucketEndMs;
       for (let h = 0; h < horizon; h++) {
-        const endMs = lastMs + (h + 1) * frequencyData.bucketSizeMs;
+        const endMs = lastMs + (h + 1) * forecastFrequency.bucketSizeMs;
         const rp = reqRes.points[h];
         const ep = evtRes.points[h];
         chartData.push({
@@ -743,14 +803,14 @@ export function ReportsView() {
       requests: reqRes,
       events: evtRes,
       horizon,
-      unit: frequencyData.useWeekly ? "неделю" : "день",
-      unitPlural: frequencyData.useWeekly ? "недель" : "дней",
+      unit: forecastFrequency.useWeekly ? "неделю" : "день",
+      unitPlural: forecastFrequency.useWeekly ? "недель" : "дней",
       hasEnoughData,
       chartData,
       forecastStartName,
       activeMethod: useLstm ? ("lstm" as const) : ("holt" as const),
     };
-  }, [frequencyData, forecastMethod, forecastSeriesKey, lstmResult]);
+  }, [forecastFrequency, forecastMethod, forecastSeriesKey, lstmResult]);
 
   const distributions = useMemo(() => {
     const byReqStatus = Object.entries(
@@ -1012,14 +1072,35 @@ export function ReportsView() {
         <TabsContent value="frequency" className="space-y-6 mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Частота регистрации
-              </CardTitle>
-              <CardDescription>
-                Количество созданных заявок и инцидентов{" "}
-                {frequencyData.useWeekly ? "по неделям" : "по дням"}.
-              </CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    Частота регистрации
+                  </CardTitle>
+                  <CardDescription>
+                    {forecastCategory === "all"
+                      ? `Заявки и инциденты ${frequencyData.useWeekly ? "по неделям" : "по дням"}.`
+                      : `Инциденты категории по дням. Зелёная линия — ввод мероприятия (CAPA), видно динамику до и после.`}
+                  </CardDescription>
+                </div>
+                <Select value={forecastCategory} onValueChange={setForecastCategory}>
+                  <SelectTrigger className="w-full sm:w-[240px] bg-background">
+                    <div className="flex items-center gap-2 text-muted-foreground min-w-0">
+                      <Filter className="h-4 w-4 shrink-0" />
+                      <SelectValue placeholder="Категория НС" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="border">
+                    <SelectItem value="all">Все категории</SelectItem>
+                    {forecastCategoryOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-[360px] w-full min-h-[360px]">
@@ -1031,15 +1112,17 @@ export function ReportsView() {
                     forecastStartName={forecast.forecastStartName}
                     height={360}
                     changePoints={[
-                      ...changePoints.requests.map(cp => ({
-                        name: cp.bucketName,
-                        color: "#f59e0b",
-                        label: `${cp.direction === "up" ? "↑" : "↓"} заявки ${
-                          cp.deltaPct !== null
-                            ? `${cp.deltaPct > 0 ? "+" : ""}${cp.deltaPct.toFixed(0)}%`
-                            : ""
-                        }`,
-                      })),
+                      ...(forecastCategory === "all"
+                        ? changePoints.requests.map(cp => ({
+                            name: cp.bucketName,
+                            color: "#f59e0b",
+                            label: `${cp.direction === "up" ? "↑" : "↓"} заявки ${
+                              cp.deltaPct !== null
+                                ? `${cp.deltaPct > 0 ? "+" : ""}${cp.deltaPct.toFixed(0)}%`
+                                : ""
+                            }`,
+                          }))
+                        : []),
                       ...changePoints.events.map(cp => ({
                         name: cp.bucketName,
                         color: "#3b82f6",
@@ -1050,6 +1133,8 @@ export function ReportsView() {
                         }`,
                       })),
                     ]}
+                    capaMarkers={capaMarkers}
+                    showRequests={forecastCategory === "all"}
                   />
                 ) : (
                   <EmptyState />

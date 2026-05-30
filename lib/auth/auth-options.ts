@@ -9,7 +9,7 @@ async function refreshAccessToken(token: any) {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: process.env.ZITADEL_CLIENT_ID as string,
+          client_id: process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID as string,
           grant_type: "refresh_token",
           refresh_token: token.refreshToken,
         }),
@@ -39,7 +39,7 @@ export const authOptions: NextAuthOptions = {
   providers: [
     ZitadelProvider({
       issuer: process.env.NEXT_PUBLIC_ZITADEL_ISSUER as string,
-      clientId: process.env.ZITADEL_CLIENT_ID as string,
+      clientId: process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID as string,
       // Public-client + PKCE. Auth Method=None в Zitadel, secret не передаётся.
       clientSecret: "",
       client: { token_endpoint_auth_method: "none" },

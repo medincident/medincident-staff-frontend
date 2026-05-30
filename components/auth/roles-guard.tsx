@@ -87,7 +87,6 @@ export function RolesGuard({ children }: { children: ReactNode }) {
       <LogoutDialog
         open={isLogoutOpen}
         onOpenChange={setIsLogoutOpen}
-        idToken={(session as any)?.idToken}
       />
     </div>
   );

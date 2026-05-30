@@ -19,10 +19,9 @@ import { logout } from "@/lib/auth/logout";
 interface LogoutDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  idToken?: string | null;
 }
 
-export function LogoutDialog({ open, onOpenChange, idToken }: LogoutDialogProps) {
+export function LogoutDialog({ open, onOpenChange }: LogoutDialogProps) {
   const [keepSession, setKeepSession] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -35,7 +34,7 @@ export function LogoutDialog({ open, onOpenChange, idToken }: LogoutDialogProps)
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    await logout({ keepSession, idToken });
+    await logout({ keepSession });
   };
 
   return (

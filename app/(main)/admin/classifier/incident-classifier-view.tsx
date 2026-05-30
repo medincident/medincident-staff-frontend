@@ -17,6 +17,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 import { Switch } from "@/components/ui/switch";
 import {
   IncidentClassifierQueryService,
@@ -35,6 +36,7 @@ const getDeclension = (n: number, words: string[]) => {
 
 export function IncidentClassifierView() {
   const { orgId: organizationId, isResolving: isOrgResolving } = useActiveOrgId();
+  const confirm = useConfirm();
   const [categories, setCategories] = useState<any[]>([]);
   const [typesMap, setTypesMap] = useState<Record<string, any[]>>({});
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
@@ -161,14 +163,19 @@ export function IncidentClassifierView() {
   };
 
   const deleteCategory = async (id: string) => {
-    if (confirm("Удалить категорию и все ее подкатегории/типы?")) {
-      try {
-        await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentCategory(id);
-        notify.mutationSuccess("Категория удалена", "Запись категории удалена из справочника.");
-        loadCategories();
-      } catch (e) {
-        notify.apiError(e, "Не удалось удалить категорию");
-      }
+    const ok = await confirm({
+      title: "Удалить категорию?",
+      description: "Будут удалены все её подкатегории и типы.",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentCategory(id);
+      notify.mutationSuccess("Категория удалена", "Запись категории удалена из справочника.");
+      loadCategories();
+    } catch (e) {
+      notify.apiError(e, "Не удалось удалить категорию");
     }
   };
 
@@ -246,16 +253,20 @@ export function IncidentClassifierView() {
   };
 
   const deleteType = async (typeId: string, categoryId: string) => {
-    if (confirm("Удалить этот тип события?")) {
-      try {
-        await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentType(typeId);
-        const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
-        setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
-        invalidateIncidentClassifier(organizationId);
-        notify.mutationSuccess("Тип удалён", "Запись типа события удалена из справочника.");
-      } catch (e) {
-        notify.apiError(e, "Не удалось удалить тип события");
-      }
+    const ok = await confirm({
+      title: "Удалить тип события?",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentType(typeId);
+      const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
+      setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
+      invalidateIncidentClassifier(organizationId);
+      notify.mutationSuccess("Тип удалён", "Запись типа события удалена из справочника.");
+    } catch (e) {
+      notify.apiError(e, "Не удалось удалить тип события");
     }
   };
 

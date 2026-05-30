@@ -26,7 +26,7 @@ export function SessionExpiredBanner() {
   const handleReauth = async () => {
     setIsReauthing(true);
     // SSO в Zitadel мог умереть вместе с refresh-токеном — гасим целиком.
-    await logout({ keepSession: false, idToken: (session as any)?.idToken });
+    await logout({ keepSession: false });
   };
 
   return (

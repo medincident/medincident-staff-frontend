@@ -10,13 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: "20"
-          cache: "npm"
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm run lint
+          bun-version: "1.3.11"
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bun run lint
 
   build:
     needs: check
@@ -55,4 +54,5 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://patient-medincident.ulbwa.bombomeow.ru/api' }}
             NEXT_PUBLIC_ZITADEL_ISSUER=${{ vars.NEXT_PUBLIC_ZITADEL_ISSUER || 'https://zitadel-medincident.ulbwa.bombomeow.ru' }}
+            NEXT_PUBLIC_ZITADEL_CLIENT_ID=${{ vars.NEXT_PUBLIC_ZITADEL_CLIENT_ID || '371315489412022275' }}
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}

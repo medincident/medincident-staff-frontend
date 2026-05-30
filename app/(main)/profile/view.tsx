@@ -346,7 +346,6 @@ export function ProfileView() {
       <LogoutDialog
         open={isLogoutDialogOpen}
         onOpenChange={setIsLogoutDialogOpen}
-        idToken={(session as any)?.idToken}
       />
     </div>
   );

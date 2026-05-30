@@ -21,6 +21,7 @@ import {
   History as HistoryIcon,
 } from "lucide-react";
 import { notify } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -292,6 +293,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const perms = usePermissions();
   const canManage = perms.canAssignIncidentResponsible;
   const { data: session } = useSession();
+  const confirm = useConfirm();
 
   const [event, setEvent] = useState<v1IncidentView | null>(null);
   const [categories, setCategories] = useState<v1Category[]>([]);
@@ -421,9 +423,13 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
 
   const handleCancel = async () => {
     if (!event?.id) return;
-    if (!confirm("Отменить событие? Статус и приоритет станут недоступны для изменения, пока вы не возобновите событие.")) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Отменить событие?",
+      description: "Статус и приоритет станут недоступны для изменения, пока вы не возобновите событие.",
+      confirmLabel: "Отменить событие",
+      destructive: true,
+    });
+    if (!ok) return;
     setIsMutating(true);
     try {
       await IncidentCommandService.incidentCommandCancelIncident(event.id);
@@ -444,9 +450,12 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   // на страницу нового события — там и пойдёт дальнейшая работа.
   const handleReopen = async () => {
     if (!event?.id) return;
-    if (!confirm("Создать повторное событие на основе этого? Текущее останется в архивe в статусе завершённого.")) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Создать повторное событие?",
+      description: "Текущее останется в архиве в статусе завершённого.",
+      confirmLabel: "Создать повторное",
+    });
+    if (!ok) return;
     setIsMutating(true);
     try {
       const res = await IncidentCommandService.incidentCommandReopenIncident(event.id);

@@ -35,6 +35,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm-dialog/store";
 import {
   MembershipQueryService,
   MembershipCommandService,
@@ -49,6 +50,7 @@ import { VacationsDialog } from "./vacations-dialog";
 export function UsersView() {
   const { data: session } = useSession();
   const { orgId: organizationId, isResolving: isOrgResolving } = useActiveOrgId();
+  const confirm = useConfirm();
 
   const [users, setUsers] = useState<v1EmployeeCardView[]>([]);
   const [admins, setAdmins] = useState<string[]>([]);
@@ -285,14 +287,19 @@ export function UsersView() {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (confirm("Уволить сотрудника навсегда? Это действие нельзя отменить.")) {
-      try {
-        await MembershipCommandService.membershipCommandTerminateEmployee(id);
-        notify.mutationSuccess("Успешно", "Сотрудник уволен.");
-        loadData();
-      } catch (e) {
-        notify.apiError(e, "Не удалось удалить");
-      }
+    const ok = await confirm({
+      title: "Уволить сотрудника навсегда?",
+      description: "Это действие нельзя отменить.",
+      confirmLabel: "Уволить",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await MembershipCommandService.membershipCommandTerminateEmployee(id);
+      notify.mutationSuccess("Успешно", "Сотрудник уволен.");
+      loadData();
+    } catch (e) {
+      notify.apiError(e, "Не удалось удалить");
     }
   };
 

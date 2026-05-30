@@ -299,7 +299,6 @@ export function Header() {
       <LogoutDialog
         open={isLogoutDialogOpen}
         onOpenChange={setIsLogoutDialogOpen}
-        idToken={(session as any)?.idToken}
       />
     </header>
   );

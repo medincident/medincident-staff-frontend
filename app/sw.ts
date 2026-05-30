@@ -1,17 +1,43 @@
-// next-pwa склеивает этот файл с основным sw.js через importScripts.
-
 /// <reference lib="webworker" />
 
+import { defaultCache } from "@serwist/next/worker";
+import { Serwist, NetworkOnly, type PrecacheEntry } from "serwist";
+
+declare global {
+  // Serwist подставляет сюда precache-манифест при сборке. Ссылка должна
+  // быть буквально `self.__SW_MANIFEST` — плагин ищет её текстом.
+  // eslint-disable-next-line no-var
+  var __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
+}
+
+const serwist = new Serwist({
+  precacheEntries: self.__SW_MANIFEST,
+  skipWaiting: true,
+  clientsClaim: true,
+  navigationPreload: true,
+  runtimeCaching: [
+    // /api/auth/* — только сеть: повторный fetch одного auth-кода в Zitadel
+    // ловит Errors.AuthRequest.NoCode.
+    {
+      matcher: ({ url }) => url.pathname.startsWith("/api/auth"),
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
+});
+
+serwist.addEventListeners();
+
+// `self` в SW — ServiceWorkerGlobalScope; tsconfig тянет и dom-lib, поэтому
+// для push-API приводим через unknown-cast (литеральный self нужен только выше).
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
+// ─── Push ────────────────────────────────────────────────────────────────
 interface PushPayload {
   title?: string;
   body?: string;
   tag?: string;
-  data?: {
-    url?: string;
-    is_security?: boolean;
-  };
+  data?: { url?: string; is_security?: boolean };
   url?: string;
 }
 
@@ -42,9 +68,7 @@ sw.addEventListener("push", (event: PushEvent) => {
     badge: "/icons/apple-icon.png",
     tag: payload.tag,
     requireInteraction: payload.data?.is_security === true,
-    data: {
-      url: payload.data?.url || payload.url || "/",
-    },
+    data: { url: payload.data?.url || payload.url || "/" },
   };
 
   event.waitUntil(sw.registration.showNotification(title, options));

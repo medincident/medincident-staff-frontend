@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { SessionExpiredBanner } from "@/components/auth/session-expired-banner";
 import { OfflineBanner } from "@/components/pwa/offline-banner";
 import { PushPrompt } from "@/components/pwa/push-prompt";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RolesGuard } from "@/components/auth/roles-guard";
 import { ActiveOrgProvider } from "@/lib/auth/active-org-context";
 
@@ -32,6 +33,7 @@ export default function MainLayout({
             </div>
           </div>
           <PushPrompt />
+          <ConfirmDialog />
         </div>
       </ActiveOrgProvider>
     </RolesGuard>
