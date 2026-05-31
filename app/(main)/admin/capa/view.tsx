@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { notify } from "@/lib/toast";
 import { cleanText } from "@/lib/text";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
@@ -34,7 +35,7 @@ function fmtDate(iso: string): string {
 }
 
 export function CapaView() {
-  useRequirePermission("canManageClassifiers");
+  useRequirePermission("canManageCapa");
   const { orgId } = useActiveOrgId();
   const { categories } = useIncidentClassifier(orgId);
 
@@ -200,8 +201,13 @@ export function CapaView() {
                 options={categoryOptions}
                 value={form.categoryId}
                 onChange={(v) => setForm((f) => ({ ...f, categoryId: v }))}
-                placeholder="Выберите категорию"
+                placeholder={categoryOptions.length === 0 ? "Категории не загружены" : "Выберите категорию"}
               />
+              {categoryOptions.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  В этой организации нет категорий НС. Попросите администратора добавить их в разделе «Классификатор».
+                </p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Название мероприятия</Label>
@@ -222,10 +228,20 @@ export function CapaView() {
             </div>
             <div className="grid gap-2">
               <Label>Дата ввода</Label>
-              <Input
-                type="date"
-                value={form.introducedAt}
-                onChange={(e) => setForm((f) => ({ ...f, introducedAt: e.target.value }))}
+              <DatePicker
+                value={form.introducedAt ? new Date(form.introducedAt) : undefined}
+                onChange={(d) => {
+                  if (!d) {
+                    setForm((f) => ({ ...f, introducedAt: "" }));
+                    return;
+                  }
+                  const pad = (n: number) => String(n).padStart(2, "0");
+                  setForm((f) => ({
+                    ...f,
+                    introducedAt: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+                  }));
+                }}
+                placeholder="Выберите дату"
                 className="w-fit"
               />
             </div>

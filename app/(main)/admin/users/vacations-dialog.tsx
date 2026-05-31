@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -35,25 +36,17 @@ import {
   v1VacationView,
 } from "@/lib/api-generated";
 
-// HTML <input type="date"> отдает YYYY-MM-DD. Превращаем в RFC3339 (полночь UTC),
-// чтобы бэк принял startsAt/endsAt.
-function dateInputToIso(value: string): string | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T00:00:00Z`);
-  if (isNaN(d.getTime())) return undefined;
-  return d.toISOString();
+// Бэк ждёт RFC3339 startsAt/endsAt — берём полночь UTC от выбранной даты.
+function dateToIso(d?: Date): string | undefined {
+  if (!d) return undefined;
+  const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  return utc.toISOString();
 }
 
-function isoToDateInput(iso?: string): string {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  } catch {
-    return "";
-  }
+function isoToDate(iso?: string): Date | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? undefined : d;
 }
 
 function fmtDate(iso?: string): string {
@@ -97,15 +90,15 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
   const [isMutating, setIsMutating] = useState(false);
 
   // Form: schedule new vacation
-  const [scheduleStart, setScheduleStart] = useState("");
-  const [scheduleEnd, setScheduleEnd] = useState("");
+  const [scheduleStart, setScheduleStart] = useState<Date | undefined>(undefined);
+  const [scheduleEnd, setScheduleEnd] = useState<Date | undefined>(undefined);
 
   // Form: start now
-  const [startNowEnd, setStartNowEnd] = useState("");
+  const [startNowEnd, setStartNowEnd] = useState<Date | undefined>(undefined);
 
   // Edit end date
   const [editingVacation, setEditingVacation] = useState<v1VacationView | null>(null);
-  const [editEndDate, setEditEndDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState<Date | undefined>(undefined);
 
   const loadVacations = async (empId: string) => {
     setIsLoading(true);
@@ -130,9 +123,9 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
 
   useEffect(() => {
     if (!open || !employeeId) return;
-    setScheduleStart("");
-    setScheduleEnd("");
-    setStartNowEnd("");
+    setScheduleStart(undefined);
+    setScheduleEnd(undefined);
+    setStartNowEnd(undefined);
     setEditingVacation(null);
     void loadVacations(employeeId);
   }, [open, employeeId]);
@@ -154,12 +147,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     setIsMutating(true);
     try {
       await MembershipCommandService.membershipCommandScheduleVacation(employeeId, {
-        startsAt: dateInputToIso(scheduleStart)!,
-        endsAt: dateInputToIso(scheduleEnd),
+        startsAt: dateToIso(scheduleStart)!,
+        endsAt: dateToIso(scheduleEnd),
       });
       notify.mutationSuccess("Отпуск запланирован", "");
-      setScheduleStart("");
-      setScheduleEnd("");
+      setScheduleStart(undefined);
+      setScheduleEnd(undefined);
       void loadVacations(employeeId);
     } catch (e) {
       console.error(e);
@@ -180,10 +173,10 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     setIsMutating(true);
     try {
       await MembershipCommandService.membershipCommandStartVacationNow(employeeId, {
-        endsAt: dateInputToIso(startNowEnd),
+        endsAt: dateToIso(startNowEnd),
       });
       notify.mutationSuccess("Отпуск начат", "");
-      setStartNowEnd("");
+      setStartNowEnd(undefined);
       void loadVacations(employeeId);
     } catch (e) {
       console.error(e);
@@ -237,7 +230,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
 
   const openEdit = (v: v1VacationView) => {
     setEditingVacation(v);
-    setEditEndDate(isoToDateInput(v.endsAt));
+    setEditEndDate(isoToDate(v.endsAt));
   };
 
   const handleSaveEnd = async () => {
@@ -245,7 +238,7 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
     setIsMutating(true);
     try {
       await MembershipCommandService.membershipCommandUpdateVacationEndDate(editingVacation.id, {
-        endsAt: dateInputToIso(editEndDate)!,
+        endsAt: dateToIso(editEndDate)!,
       });
       notify.mutationSuccess("Дата обновлена", "Новая дата окончания сохранена.");
       setEditingVacation(null);
@@ -353,22 +346,21 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label htmlFor="vac-start">Начало</Label>
-                        <Input
-                          id="vac-start"
-                          type="date"
+                        <Label>Начало</Label>
+                        <DatePicker
                           value={scheduleStart}
-                          onChange={(e) => setScheduleStart(e.target.value)}
+                          onChange={setScheduleStart}
+                          placeholder="Выберите дату начала"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor="vac-end">Окончание (необязательно)</Label>
-                        <Input
-                          id="vac-end"
-                          type="date"
+                        <Label>Окончание (необязательно)</Label>
+                        <DatePicker
                           value={scheduleEnd}
-                          onChange={(e) => setScheduleEnd(e.target.value)}
-                          min={scheduleStart || undefined}
+                          onChange={setScheduleEnd}
+                          placeholder="Без даты окончания"
+                          fromDate={scheduleStart}
+                          clearable
                         />
                       </div>
                     </div>
@@ -391,12 +383,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
                       Начать прямо сейчас
                     </h3>
                     <div className="space-y-1.5">
-                      <Label htmlFor="vac-now-end">Окончание (необязательно)</Label>
-                      <Input
-                        id="vac-now-end"
-                        type="date"
+                      <Label>Окончание (необязательно)</Label>
+                      <DatePicker
                         value={startNowEnd}
-                        onChange={(e) => setStartNowEnd(e.target.value)}
+                        onChange={setStartNowEnd}
+                        placeholder="Без даты окончания"
+                        clearable
                       />
                       <p className="text-[11px] text-muted-foreground">
                         Если оставить пустым — отпуск без явной даты окончания. Завершить можно вручную.
@@ -455,13 +447,12 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-1.5">
-            <Label htmlFor="vac-edit-end">Новая дата окончания</Label>
-            <Input
-              id="vac-edit-end"
-              type="date"
+            <Label>Новая дата окончания</Label>
+            <DatePicker
               value={editEndDate}
-              onChange={(e) => setEditEndDate(e.target.value)}
-              min={editingVacation ? isoToDateInput(editingVacation.startsAt) : undefined}
+              onChange={setEditEndDate}
+              placeholder="Выберите дату"
+              fromDate={editingVacation ? isoToDate(editingVacation.startsAt) : undefined}
             />
           </div>
           <DialogFooter>

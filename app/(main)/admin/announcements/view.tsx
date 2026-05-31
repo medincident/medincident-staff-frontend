@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import {
   Dialog,
   DialogContent,
@@ -66,41 +67,31 @@ function fmtDate(iso?: string): string {
   }
 }
 
-// HTML datetime-local format: YYYY-MM-DDTHH:mm. На входе ожидаем ISO,
-// на выходе тоже ISO; промежуточный формат — для <input type="datetime-local">.
-function isoToInput(iso?: string): string {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "";
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch {
-    return "";
-  }
+// На бэк уходят ISO startsAt/endsAt; в форме держим Date | undefined.
+function isoToDate(iso?: string): Date | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? undefined : d;
 }
 
-function inputToIso(value: string): string | undefined {
-  if (!value) return undefined;
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return undefined;
-  return d.toISOString();
+function dateToIso(d?: Date): string | undefined {
+  return d ? d.toISOString() : undefined;
 }
 
 type FormState = {
   title: string;
   content: string;
   priority: commandAnnouncementV1AnnouncementPriority;
-  startsAt: string;
-  endsAt: string;
+  startsAt: Date | undefined;
+  endsAt: Date | undefined;
 };
 
 const EMPTY_FORM: FormState = {
   title: "",
   content: "",
   priority: commandAnnouncementV1AnnouncementPriority.ANNOUNCEMENT_PRIORITY_NORMAL,
-  startsAt: "",
-  endsAt: "",
+  startsAt: undefined,
+  endsAt: undefined,
 };
 
 export function AnnouncementsView() {
@@ -226,8 +217,8 @@ export function AnnouncementsView() {
       priority:
         (a.priority as unknown as commandAnnouncementV1AnnouncementPriority) ??
         commandAnnouncementV1AnnouncementPriority.ANNOUNCEMENT_PRIORITY_NORMAL,
-      startsAt: isoToInput(a.startsAt),
-      endsAt: isoToInput(a.endsAt),
+      startsAt: isoToDate(a.startsAt),
+      endsAt: isoToDate(a.endsAt),
     });
     setIsDialogOpen(true);
   };
@@ -252,8 +243,8 @@ export function AnnouncementsView() {
         await AnnouncementCommandService.announcementCommandUpdateAnnouncement(editingId, {
           title,
           content,
-          startsAt: inputToIso(form.startsAt),
-          endsAt: inputToIso(form.endsAt),
+          startsAt: dateToIso(form.startsAt),
+          endsAt: dateToIso(form.endsAt),
         });
         const original = items.find((i) => i.id === editingId);
         if (original && (original.priority as any) !== form.priority) {
@@ -268,8 +259,8 @@ export function AnnouncementsView() {
           title,
           content,
           priority: form.priority,
-          startsAt: inputToIso(form.startsAt),
-          endsAt: inputToIso(form.endsAt),
+          startsAt: dateToIso(form.startsAt),
+          endsAt: dateToIso(form.endsAt),
         });
         notify.mutationSuccess("Объявление создано", "Сотрудники увидят его на дашборде.");
       }
@@ -465,21 +456,22 @@ export function AnnouncementsView() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="ann-starts-at">Начало (необязательно)</Label>
-                <Input
-                  id="ann-starts-at"
-                  type="datetime-local"
+                <Label>Начало (необязательно)</Label>
+                <DateTimePicker
                   value={form.startsAt}
-                  onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                  onChange={(d) => setForm({ ...form, startsAt: d })}
+                  placeholder="Сразу"
+                  clearable
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ann-ends-at">Окончание (необязательно)</Label>
-                <Input
-                  id="ann-ends-at"
-                  type="datetime-local"
+                <Label>Окончание (необязательно)</Label>
+                <DateTimePicker
                   value={form.endsAt}
-                  onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+                  onChange={(d) => setForm({ ...form, endsAt: d })}
+                  placeholder="Без срока"
+                  fromDate={form.startsAt}
+                  clearable
                 />
               </div>
             </div>

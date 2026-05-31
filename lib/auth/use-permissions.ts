@@ -229,15 +229,17 @@ export function usePermissions(): Permissions {
     canSeeAllRequests: orgWideRead,
     canSeeClinicRequests: clinicWideRead,
     canSeeDepartmentRequests: deptWideRead,
-    canSeeOwnRequests: isMember || isSystemAdmin,
-    canCreateRequest: isMember,
+    // Создание/просмотр своих — любой сотрудник орги + sysadmin/orgadmin
+    // как универсальные override'ы (если они не имеют employment).
+    canSeeOwnRequests: isMember || isSystemAdmin || isOrgAdmin,
+    canCreateRequest: isMember || isSystemAdmin || isOrgAdmin,
     canAssignRequestExecutor: deptWideRead,
 
     canSeeAllIncidents: orgWideRead,
     canSeeClinicIncidents: clinicWideRead,
     canSeeDepartmentIncidents: deptWideRead,
-    canSeeOwnIncidents: isMember || isSystemAdmin,
-    canCreateIncident: isMember,
+    canSeeOwnIncidents: isMember || isSystemAdmin || isOrgAdmin,
+    canCreateIncident: isMember || isSystemAdmin || isOrgAdmin,
     canAssignIncidentResponsible: deptWideRead,
 
     canManageOrganizations: isSystemAdmin,
@@ -248,14 +250,10 @@ export function usePermissions(): Permissions {
     canManageDepartmentSettings:
       isSystemAdmin || isOrgAdmin || isClinicHead || isDepartmentResponsible,
     canManageClassifiers: isSystemAdmin || isOrgAdmin,
-    // CAPA — управление качеством (785н). Доступно всем уровням руководства,
-    // которые могут принимать и контролировать корректирующие мероприятия.
-    canManageCapa:
-      isSystemAdmin ||
-      isOrgAdmin ||
-      isOrgHead ||
-      isClinicHead ||
-      isDepartmentResponsible,
+    // CAPA — управление качеством (785н). Право выдаётся по тем же
+    // условиям, что и создание НС: любой сотрудник орги, плюс sysadmin
+    // и админ орги универсально.
+    canManageCapa: isMember || isSystemAdmin || isOrgAdmin,
     canManageAnnouncements: isSystemAdmin || isOrgAdmin,
 
     canViewReports: !isGuest,
