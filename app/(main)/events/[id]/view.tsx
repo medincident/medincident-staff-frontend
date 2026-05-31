@@ -50,6 +50,7 @@ import {
   v1ServiceRequest
 } from "@/lib/api-generated";
 import { fetchAllPages } from "@/lib/api/paginate";
+import { useRequestClassifier } from "@/lib/classifiers/request-classifier-store";
 
 interface EventDetailsViewProps {
   eventId: string;
@@ -67,6 +68,7 @@ function DetailsSection({
   onReopen,
   isMutating,
   linkedRequests,
+  requestTypeNames,
   canManage,
 }: {
   event: v1IncidentView;
@@ -80,6 +82,7 @@ function DetailsSection({
   onReopen: () => void;
   isMutating: boolean;
   linkedRequests: v1ServiceRequest[];
+  requestTypeNames: Record<string, string>;
   canManage: boolean;
 }) {
   const isCancelled = status === "cancelled";
@@ -180,7 +183,9 @@ function DetailsSection({
           <Separator className="bg-primary/10" />
 
           <div className="flex flex-col sm:flex-row gap-2">
-            {isFinished ? (
+            {isFinished || isCancelled ? (
+              // Завершённое или отменённое — даём «открыть повторно»: бэк
+              // создаст новое событие со ссылкой reopenedFromIncidentId на это.
               <Button
                 type="button"
                 variant="outline"
@@ -189,9 +194,9 @@ function DetailsSection({
                 disabled={isMutating}
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Открыть повторно
+                {isCancelled ? "Возобновить (создать новое)" : "Открыть повторно"}
               </Button>
-            ) : !isCancelled ? (
+            ) : (
               <Button
                 type="button"
                 variant="outline"
@@ -202,7 +207,7 @@ function DetailsSection({
                 <Ban className="mr-2 h-4 w-4" />
                 Отменить событие
               </Button>
-            ) : null}
+            )}
           </div>
 
           {isCancelled && (
@@ -257,7 +262,7 @@ function DetailsSection({
                           </Badge>
                         </div>
                         <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2 break-words">
-                          {req.typeId}
+                          {requestTypeNames[req.typeId ?? ""] || "Без типа"}
                         </p>
                         <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                           {req.description}
@@ -300,6 +305,15 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
   const [categories, setCategories] = useState<v1Category[]>([]);
   const [types, setTypes] = useState<classifierV1Type[]>([]);
   const [linkedRequests, setLinkedRequests] = useState<v1ServiceRequest[]>([]);
+
+  // Типы заявок — для резолва имени в карточке «Связанные заявки».
+  // Берём из общего zustand-кеша по organization_id события (не дёргаем повторно).
+  const { types: requestTypes } = useRequestClassifier(event?.organizationId);
+  const requestTypeNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const t of requestTypes) if (t.id && t.name) map[t.id] = t.name;
+    return map;
+  }, [requestTypes]);
   const [status, setStatus] = useState<EventStatus>("created");
   const [priority, setPriority] = useState<string>("normal");
 
@@ -623,6 +637,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
               onReopen={handleReopen}
               isMutating={isMutating}
               linkedRequests={linkedRequests}
+              requestTypeNames={requestTypeNames}
               canManage={canManage}
             />
           </TabsContent>
@@ -649,6 +664,7 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
             onReopen={handleReopen}
             isMutating={isMutating}
             linkedRequests={linkedRequests}
+            requestTypeNames={requestTypeNames}
             canManage={canManage}
           />
 
