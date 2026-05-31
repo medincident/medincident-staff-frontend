@@ -455,7 +455,7 @@ async function main() {
 function randomBusinessDate(): string {
   const now = Date.now();
   const sixMo = now - 180 * 24 * 3600 * 1000;
-  let t = sixMo + Math.random() * (now - sixMo);
+  const t = sixMo + Math.random() * (now - sixMo);
   const d = new Date(t);
   if (d.getDay() === 0 || d.getDay() === 6) {
     // Смещаем 80% выходных событий на следующий понедельник.

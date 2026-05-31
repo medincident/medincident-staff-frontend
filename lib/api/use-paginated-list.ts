@@ -38,7 +38,9 @@ export function usePaginatedList<T>(
   // Сам fetcher держим в ref — иначе пришлось бы зависеть от него
   // в useEffect, а в каждом рендере он новый и эффект бы зацикливался.
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  });
 
   // Первая страница.
   useEffect(() => {
