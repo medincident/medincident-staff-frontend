@@ -30,6 +30,7 @@ import {
   classifierV1Type,
   v1IncidentView
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useRequirePermission } from "@/lib/auth/use-require-permission";
@@ -92,16 +93,16 @@ export function EventForm({ eventId }: EventFormProps) {
         }
 
         if (currentOrgId) {
-          const [catsRes, typesRes] = await Promise.all([
-            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(currentOrgId, 100),
-            IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(currentOrgId, 100)
+          const [cats, types] = await Promise.all([
+            fetchAllPages<v1Category>((cursor) =>
+              IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(currentOrgId, 200, cursor),
+            ),
+            fetchAllPages<classifierV1Type>((cursor) =>
+              IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(currentOrgId, 200, cursor),
+            ),
           ]);
-          if (catsRes && "items" in catsRes && catsRes.items) {
-            setCategories(catsRes.items);
-          }
-          if (typesRes && "items" in typesRes && typesRes.items) {
-            setTypes(typesRes.items);
-          }
+          setCategories(cats);
+          setTypes(types);
         }
 
         if (isEditMode && eventId) {

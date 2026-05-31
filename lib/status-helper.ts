@@ -14,9 +14,9 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
   minor: "muted",
 
   // --- Информационные (Синие) ---
-  processed: "info",
   check: "info",
   normal: "info",
+  pending_review: "info", // заявка: ждёт проверки/приёмки
 
   // --- Внимание (Желтые) ---
   in_work: "warning",
@@ -27,8 +27,8 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
   moderate: "warning",
 
   // --- Ожидание/Спец (Фиолетовые) ---
-  purchase: "purple",
   measures: "purple",
+  on_hold: "purple", // заявка: приостановлена
 
   // --- Успех (Зеленые) ---
   completed: "success",
@@ -41,7 +41,6 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
   deactivated: "muted",
 
   // --- Опасность/Отказ (Красные) ---
-  refused: "destructive",
   rejected: "destructive", // НС: отклонено
   cancelled: "destructive",
   critical: "destructive",

@@ -42,6 +42,7 @@ import {
   RequestClassifierCommandService,
   v1RequestType,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { invalidateRequestClassifier } from "@/lib/classifiers/request-classifier-store";
 import { cleanText } from "@/lib/text";
@@ -75,14 +76,10 @@ export function RequestTypesView() {
   const loadTypes = async (orgId: string) => {
     setIsLoading(true);
     try {
-      const res = showInactive
-        ? await RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200)
-        : await RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200);
-      if (res && "items" in res && Array.isArray(res.items)) {
-        setTypes(res.items);
-      } else {
-        setTypes([]);
-      }
+      const items = await fetchAllPages<v1RequestType>((cursor) =>
+        RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200, cursor),
+      );
+      setTypes(items);
       // Все мутации типов заявок проходят через loadTypes — сбрасываем
       // общий кеш, чтобы список заявок подтянул свежие типы.
       invalidateRequestClassifier(orgId);

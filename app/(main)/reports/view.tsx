@@ -84,7 +84,8 @@ type PeriodValue = (typeof PERIODS)[number]["value"];
 const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
   "created",
   "in_work",
-  "purchase",
+  "on_hold",
+  "pending_review",
 ];
 const ACTIVE_EVENT_STATUSES: EventStatus[] = [
   "created",

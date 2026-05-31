@@ -177,7 +177,7 @@ export function DashboardView() {
 
   const activeRequests = requests.filter(r => {
       const s = (r.status || "").toLowerCase();
-      return !s.includes("completed") && !s.includes("cancelled") && !s.includes("refused");
+      return !s.includes("completed") && !s.includes("cancelled");
   });
 
   const recentEvents = events.slice(0, 3);

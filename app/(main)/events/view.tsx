@@ -10,7 +10,8 @@ import {
   User,
   ChevronRight,
   Search,
-  Filter
+  Filter,
+  Link2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,8 +42,13 @@ import { EventStatus } from "@/lib/types";
 
 import {
   IncidentQueryService,
+  ServiceRequestQueryService,
   v1IncidentView,
+  v1ServiceRequest,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
+import { usePaginatedList } from "@/lib/api/use-paginated-list";
+import { InfiniteScrollSentinel } from "@/components/ui/infinite-scroll-sentinel";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { useIncidentClassifier } from "@/lib/classifiers/incident-classifier-store";
@@ -68,36 +74,34 @@ export function EventsListView() {
   const { data: session } = useSession();
   const { orgId: activeOrgId, isResolving: isOrgResolving } = useActiveOrgId();
   const perms = usePermissions();
-  const [events, setEvents] = useState<v1IncidentView[]>([]);
+  // incidentId → количество привязанных к этому НС заявок. Подгружаем один
+  // раз пагинацией в фоне — нужно для бейджа на карточках/строках.
+  const [linkedRequestsCount, setLinkedRequestsCount] = useState<Record<string, number>>({});
   // Категории/типы НС — из общего zustand-кеша (см. incident-classifier-store).
   const { categories, types } = useIncidentClassifier(activeOrgId);
-  const [isLoading, setIsLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const userId = (session?.user as { id?: string } | undefined)?.id;
 
-  useEffect(() => {
-    // Ждём perms.isLoading — главврач с пустыми флагами попал бы в «вижу только своё».
-    if (isOrgResolving || perms.isLoading) return;
-    if (!userId) return;
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        const orgId = activeOrgId ?? "";
+  const statusesParam =
+    statusFilter !== "all"
+      ? [`INCIDENT_STATUS_${statusFilter.toUpperCase()}`]
+      : undefined;
 
-        // Фильтр на бэк, иначе при пагинации часть событий уйдёт за окно.
-        const statusesParam =
-          statusFilter !== "all"
-            ? [`INCIDENT_STATUS_${statusFilter.toUpperCase()}`]
-            : undefined;
-
-        // У ListMyIncidents серверного фильтра нет, статус доберём в filteredEvents.
-        let incidentsRes;
-        if (perms.canSeeAllIncidents && orgId) {
-          incidentsRes = await IncidentQueryService.incidentQueryListIncidents(
-            orgId,
+  // Постраничная загрузка с курсором: первая страница 30 НС, дальше — по кнопке.
+  const {
+    items: events,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
+  } = usePaginatedList<v1IncidentView>(
+    (cursor) =>
+      perms.canSeeAllIncidents && activeOrgId
+        ? IncidentQueryService.incidentQueryListIncidents(
+            activeOrgId,
             statusesParam,
             undefined,
             undefined,
@@ -106,23 +110,41 @@ export function EventsListView() {
             undefined,
             undefined,
             undefined,
-            100,
-          );
-        } else {
-          incidentsRes = await IncidentQueryService.incidentQueryListMyIncidents(100);
-        }
+            30,
+            cursor,
+          )
+        : IncidentQueryService.incidentQueryListMyIncidents(30, cursor),
+    {
+      deps: [userId, activeOrgId, perms.canSeeAllIncidents, statusFilter, isOrgResolving, perms.isLoading],
+      enabled: !!userId && !isOrgResolving && !perms.isLoading,
+    },
+  );
 
-        if (incidentsRes && "items" in incidentsRes && incidentsRes.items) {
-          setEvents(incidentsRes.items);
+  // Счётчик линковок заявок к НС подгружаем один раз, fetchAll: эта мапа
+  // нужна сразу для всех видимых карточек, иначе бейджи будут мигать при
+  // подгрузке новых страниц.
+  useEffect(() => {
+    if (!activeOrgId || isOrgResolving) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const requests = await fetchAllPages<v1ServiceRequest>((cursor) =>
+          ServiceRequestQueryService.serviceRequestQueryListServiceRequests(activeOrgId, 200, cursor),
+        );
+        if (cancelled) return;
+        const counts: Record<string, number> = {};
+        for (const r of requests) {
+          if (r.incidentId) counts[r.incidentId] = (counts[r.incidentId] ?? 0) + 1;
         }
-      } catch (error) {
-        console.error("Failed to load events:", error);
-      } finally {
-        setIsLoading(false);
+        setLinkedRequestsCount(counts);
+      } catch (e) {
+        if (!cancelled) console.warn("[events] failed to load linked-requests counts", e);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    loadData();
-  }, [userId, activeOrgId, isOrgResolving, perms.isLoading, perms.canSeeAllIncidents, statusFilter]);
+  }, [activeOrgId, isOrgResolving]);
 
   const { typeNamesMap, categoryNamesMap } = useMemo(() => {
     const typeMap: Record<string, string> = {};
@@ -269,8 +291,20 @@ export function EventsListView() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col max-w-87.5">
-                        <span className="font-semibold text-foreground truncate">
-                          {typeNamesMap[event.typeId || ""] || event.typeId}
+                        <span className="font-semibold text-foreground truncate inline-flex items-center gap-1.5">
+                          <span className="truncate">
+                            {typeNamesMap[event.typeId || ""] || event.typeId}
+                          </span>
+                          {!!linkedRequestsCount[event.id || ""] && (
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 h-5 px-1.5 text-[10px] font-medium border-info/30 text-info bg-info/5 inline-flex items-center gap-0.5"
+                              title={`Связано заявок: ${linkedRequestsCount[event.id || ""]}`}
+                            >
+                              <Link2 className="h-2.5 w-2.5" />
+                              {linkedRequestsCount[event.id || ""]}
+                            </Badge>
+                          )}
                         </span>
                         <span className="truncate text-xs text-muted-foreground line-clamp-1">
                           {event.description}
@@ -385,6 +419,15 @@ export function EventsListView() {
                           {EVENT_STATUS_MAP[evtStatusStr as EventStatus] || event.status}
                         </Badge>
                         <PriorityBadge priority={event.priority} />
+                        {!!linkedRequestsCount[event.id || ""] && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] h-5 px-2 font-medium border-info/30 text-info bg-info/5 inline-flex items-center gap-1"
+                          >
+                            <Link2 className="h-2.5 w-2.5" />
+                            {linkedRequestsCount[event.id || ""]} заявок
+                          </Badge>
+                        )}
                         <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border">
                           {categoryNamesMap[event.categoryId || ""] || event.categoryId}
                         </span>
@@ -431,6 +474,17 @@ export function EventsListView() {
           </div>
         )}
       </div>
+
+      {/* Бесконечный скролл: sentinel в конце общего контейнера для обеих
+          вёрсток. Прячем при активном поиске — фильтр работает по уже
+          подгруженному, нет смысла тянуть остальное. */}
+      {!isLoading && !searchQuery && (
+        <InfiniteScrollSentinel
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={loadMore}
+        />
+      )}
     </div>
   );
 }

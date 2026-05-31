@@ -49,6 +49,7 @@ import {
   classifierV1Type,
   v1ServiceRequest
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 
 interface EventDetailsViewProps {
   eventId: string;
@@ -333,27 +334,26 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
 
         // Загружаем связанные заявки
         try {
-          const reqs = await ServiceRequestQueryService.serviceRequestQueryListServiceRequestsByIncident(eventId, 100);
-          if (reqs && "items" in reqs && reqs.items) {
-            setLinkedRequests(reqs.items);
-          }
+          const reqs = await fetchAllPages<v1ServiceRequest>((cursor) =>
+            ServiceRequestQueryService.serviceRequestQueryListServiceRequestsByIncident(eventId, 200, cursor),
+          );
+          setLinkedRequests(reqs);
         } catch (e) {
           console.warn("Could not load linked requests", e);
         }
 
         // Получаем организацию для загрузки классификаторов (если есть organizationId в событии)
         if (foundEvent.organizationId) {
-          const [catsRes, typesRes] = await Promise.all([
-            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(foundEvent.organizationId, 100),
-            IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(foundEvent.organizationId, 100)
+          const [cats, types] = await Promise.all([
+            fetchAllPages<v1Category>((cursor) =>
+              IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(foundEvent.organizationId!, 200, cursor),
+            ),
+            fetchAllPages<classifierV1Type>((cursor) =>
+              IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(foundEvent.organizationId!, 200, cursor),
+            ),
           ]);
-
-          if (catsRes && "items" in catsRes && catsRes.items) {
-            setCategories(catsRes.items);
-          }
-          if (typesRes && "items" in typesRes && typesRes.items) {
-            setTypes(typesRes.items);
-          }
+          setCategories(cats);
+          setTypes(types);
         }
       } catch (error) {
         console.error("Failed to load event:", error);

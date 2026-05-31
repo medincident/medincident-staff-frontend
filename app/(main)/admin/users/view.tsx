@@ -42,6 +42,7 @@ import {
   OrgStructureQueryService,
 } from "@/lib/api-generated";
 import type { v1EmployeeCardView, v1ZitadelUserView } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { getBadgeColor } from "@/lib/status-helper";
 import { useSession } from "next-auth/react";
@@ -128,56 +129,55 @@ export function UsersView() {
 
       // Системные админы — глобальная роль, не зависит от orgId, но всё равно
       // запрашиваем в той же пачке, чтобы UI имел один источник истины.
-      const [usersListRes, adminsRes, headsRes, dispatchersRes, sysAdminsRes] = await Promise.all([
-        MembershipQueryService.membershipQuerySearchEmployeesByOrganization(orgId, search || undefined, 50),
-        MembershipQueryService.membershipQueryListOrgAdmins(orgId, 100),
-        MembershipQueryService.membershipQueryListOrgHeads(orgId, 100),
-        MembershipQueryService.membershipQueryListOrgDispatchers(orgId, 100),
-        MembershipQueryService.membershipQueryListSystemAdmins(100),
+      const [usersList, adminsArr, headsArr, dispatchersArr, sysAdminsArr] = await Promise.all([
+        fetchAllPages<v1EmployeeCardView>((cursor) =>
+          MembershipQueryService.membershipQuerySearchEmployeesByOrganization(orgId, search || undefined, 200, cursor),
+        ),
+        fetchAllPages<any>((cursor) =>
+          MembershipQueryService.membershipQueryListOrgAdmins(orgId, 200, cursor),
+        ),
+        fetchAllPages<any>((cursor) =>
+          MembershipQueryService.membershipQueryListOrgHeads(orgId, 200, cursor),
+        ),
+        fetchAllPages<any>((cursor) =>
+          MembershipQueryService.membershipQueryListOrgDispatchers(orgId, 200, cursor),
+        ),
+        fetchAllPages<any>((cursor) =>
+          MembershipQueryService.membershipQueryListSystemAdmins(200, cursor),
+        ),
       ]);
 
-      if (usersListRes && "items" in usersListRes && usersListRes.items) {
-        setUsers(usersListRes.items as v1EmployeeCardView[]);
-      }
+      setUsers(usersList);
 
       // ListOrg{Admins,Heads,Dispatchers} возвращают RoleAssignment{ holder, deputy }
       // — где employeeId зашит внутри holder. Раньше брали a.employeeId напрямую,
       // из-за чего все ряды получали undefined и в UI у каждого светилось «Сотрудник».
-      if (adminsRes && "items" in adminsRes && adminsRes.items) {
-        const arr = adminsRes.items as any[];
-        setAdmins(arr.map((a) => a.holder?.employeeId).filter(Boolean));
-        // У орг-роли может быть один заместитель: берём первый с deputy.
-        const withDeputy = arr.find((a) => a.deputy?.employeeId);
-        setOrgAdminDeputyId(withDeputy?.deputy?.employeeId ?? null);
-      }
+      setAdmins(adminsArr.map((a: any) => a.holder?.employeeId).filter(Boolean));
+      // У орг-роли может быть один заместитель: берём первый с deputy.
+      const adminWithDeputy = adminsArr.find((a: any) => a.deputy?.employeeId);
+      setOrgAdminDeputyId(adminWithDeputy?.deputy?.employeeId ?? null);
 
-      if (headsRes && "items" in headsRes && headsRes.items) {
-        const arr = headsRes.items as any[];
-        setOrgHeads(arr.map((a) => a.holder?.employeeId).filter(Boolean));
-        const withDeputy = arr.find((a) => a.deputy?.employeeId);
-        setOrgHeadDeputyId(withDeputy?.deputy?.employeeId ?? null);
-      }
+      setOrgHeads(headsArr.map((a: any) => a.holder?.employeeId).filter(Boolean));
+      const headWithDeputy = headsArr.find((a: any) => a.deputy?.employeeId);
+      setOrgHeadDeputyId(headWithDeputy?.deputy?.employeeId ?? null);
 
-      if (dispatchersRes && "items" in dispatchersRes && dispatchersRes.items) {
-        const arr = dispatchersRes.items as any[];
-        setOrgDispatchers(arr.map((a) => a.holder?.employeeId).filter(Boolean));
-        const withDeputy = arr.find((a) => a.deputy?.employeeId);
-        setOrgDispatcherDeputyId(withDeputy?.deputy?.employeeId ?? null);
-      }
+      setOrgDispatchers(dispatchersArr.map((a: any) => a.holder?.employeeId).filter(Boolean));
+      const dispWithDeputy = dispatchersArr.find((a: any) => a.deputy?.employeeId);
+      setOrgDispatcherDeputyId(dispWithDeputy?.deputy?.employeeId ?? null);
 
-      if (sysAdminsRes && "items" in sysAdminsRes && sysAdminsRes.items) {
-        setSysAdmins((sysAdminsRes.items as any[]).map((a: any) => a.zitadelUserId).filter(Boolean));
-      }
+      setSysAdmins(sysAdminsArr.map((a: any) => a.zitadelUserId).filter(Boolean));
 
       if (clinics.length === 0) {
-        const clinicsRes = await OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(orgId, 100);
-        if (clinicsRes && "items" in clinicsRes && clinicsRes.items) {
-          const builtClinics = await Promise.all((clinicsRes.items as any[]).map(async (clinic: any) => {
-            const deptsRes = await OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 100);
-            return { ...clinic, departments: (deptsRes as any).items || [] };
-          }));
-          setClinics(builtClinics);
-        }
+        const clinicsList = await fetchAllPages<any>((cursor) =>
+          OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(orgId, 200, cursor),
+        );
+        const builtClinics = await Promise.all(clinicsList.map(async (clinic: any) => {
+          const departments = await fetchAllPages<any>((cursor) =>
+            OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 200, cursor),
+          );
+          return { ...clinic, departments };
+        }));
+        setClinics(builtClinics);
       }
     } catch (error) {
       console.error("Failed to load users data:", error);
@@ -335,19 +335,17 @@ export function UsersView() {
     if (!organizationId) return;
     setIsLoadingCandidates(true);
     try {
-      // Берём с запасом — реальный лимит подстрахует пагинация (вряд ли в
-      // одной организации будет 500+ незанятых аккаунтов).
-      const res = await MembershipQueryService.membershipQueryListCandidatesForHire(
-        organizationId,
-        undefined,
-        undefined,
-        500,
+      // Тянем всех кандидатов (полный список нужен для выпадающего селекта найма).
+      // Сигнатура нестандартная: (orgId, query, after, limit) — after третий.
+      const items = await fetchAllPages<v1ZitadelUserView>((cursor) =>
+        MembershipQueryService.membershipQueryListCandidatesForHire(
+          organizationId,
+          undefined,
+          cursor,
+          200,
+        ),
       );
-      if (res && "items" in res && Array.isArray(res.items)) {
-        setHireCandidates(res.items);
-      } else {
-        setHireCandidates([]);
-      }
+      setHireCandidates(items);
     } catch (e) {
       notify.apiError(e, "Не удалось загрузить список кандидатов");
       setHireCandidates([]);

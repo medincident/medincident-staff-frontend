@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
@@ -42,6 +42,8 @@ import {
   ServiceRequestQueryService,
   v1ServiceRequest,
 } from "@/lib/api-generated";
+import { usePaginatedList } from "@/lib/api/use-paginated-list";
+import { InfiniteScrollSentinel } from "@/components/ui/infinite-scroll-sentinel";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useRequestClassifier } from "@/lib/classifiers/request-classifier-store";
 
@@ -49,41 +51,28 @@ export function RequestsListView() {
   const { data: session } = useSession();
   const { orgId, isResolving: isOrgResolving } = useActiveOrgId();
   
-  const [requests, setRequests] = useState<v1ServiceRequest[]>([]);
   // Типы заявок — из общего zustand-кеша (не дёргаем эндпоинт повторно).
   const { types: requestTypes } = useRequestClassifier(orgId);
-  const [isLoading, setIsLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const userId = (session?.user as { id?: string } | undefined)?.id;
 
-  useEffect(() => {
-    if (isOrgResolving) return;
-    if (!userId) return;
-    const fetchRequests = async () => {
-      try {
-        setIsLoading(true);
-        if (!orgId) {
-          setRequests([]);
-          return;
-        }
-        // Типы заявок тянет useRequestClassifier (общий кеш) — здесь
-        // запрашиваем только сами заявки.
-        const reqRes =
-          await ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId, 100);
-
-        if (reqRes && "items" in reqRes && reqRes.items) setRequests(reqRes.items);
-      } catch (error) {
-        console.error("Failed to load requests:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRequests();
-  }, [userId, orgId, isOrgResolving]);
+  const {
+    items: requests,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
+  } = usePaginatedList<v1ServiceRequest>(
+    (cursor) =>
+      ServiceRequestQueryService.serviceRequestQueryListServiceRequests(orgId!, 30, cursor),
+    {
+      deps: [userId, orgId, isOrgResolving],
+      enabled: !!userId && !!orgId && !isOrgResolving,
+    },
+  );
 
   const filteredData = useMemo(() => {
     return requests.filter((req) => {
@@ -338,6 +327,14 @@ export function RequestsListView() {
           </div>
         )}
       </div>
+
+      {!isLoading && !searchTerm && (
+        <InfiniteScrollSentinel
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={loadMore}
+        />
+      )}
     </div>
   );
 }

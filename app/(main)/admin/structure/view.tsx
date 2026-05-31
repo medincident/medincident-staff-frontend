@@ -56,6 +56,7 @@ import {
   StatsQueryService,
 } from "@/lib/api-generated";
 import type { v1EmployeeCardView } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { cleanText } from "@/lib/text";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 
@@ -132,24 +133,28 @@ export function StructureView() {
     try {
       setIsLoading(true);
 
-      const usersRes = await MembershipQueryService.membershipQueryListEmployeesByOrganization(selectedOrgId, 100);
-      setUsers((usersRes as any).items || []);
+      const usersList = await fetchAllPages<v1EmployeeCardView>((cursor) =>
+        MembershipQueryService.membershipQueryListEmployeesByOrganization(selectedOrgId, 200, cursor),
+      );
+      setUsers(usersList);
 
-      const clinicsRes = await OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(selectedOrgId, 100);
-      const clinicsItems = (clinicsRes as any).items || [];
+      const clinicsItems = await fetchAllPages<any>((cursor) =>
+        OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(selectedOrgId, 200, cursor),
+      );
 
       const filteredClinics = search
         ? clinicsItems.filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()))
         : clinicsItems;
 
       const builtClinics = await Promise.all(filteredClinics.map(async (clinic: any) => {
-        const [deptsRes, cHeadRes, statsRes] = await Promise.all([
-          OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 100),
+        const [deptsItems, cHeadRes, statsRes] = await Promise.all([
+          fetchAllPages<any>((cursor) =>
+            OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 200, cursor),
+          ),
           MembershipQueryService.membershipQueryGetClinicHead(clinic.id).catch(() => null),
           StatsQueryService.statsQueryGetClinicStats(clinic.id).catch(() => null),
         ]);
 
-        const deptsItems = (deptsRes as any).items || [];
         const cHeadAssignment = (cHeadRes as any)?.assignment;
         const clinicHeadId = cHeadAssignment?.holder?.employeeId;
         const clinicDeputyId = cHeadAssignment?.deputy?.employeeId;

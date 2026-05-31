@@ -12,14 +12,15 @@ export const THEME_COLORS = {
   dark: "#1f1f23",
 } as const;
 
+// Бэк (domain.request_status): created, in_work, on_hold, pending_review,
+// completed, cancelled.
 export const STATUS_MAP: Record<string, string> = {
   created: "Принята",
-  processed: "Обработана",
   in_work: "В работе",
-  purchase: "Закупка запчастей",
+  on_hold: "Приостановлена",
+  pending_review: "На проверке",
   completed: "Выполнена",
-  refused: "Отказ",
-  cancelled: "Отмена",
+  cancelled: "Отменена",
 };
 
 export const PRIORITY_MAP: Record<Priority, string> = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   Plus,
@@ -49,6 +49,9 @@ import {
   commandAnnouncementV1AnnouncementPriority,
   v1AnnouncementView,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
+import { usePaginatedList } from "@/lib/api/use-paginated-list";
+import { InfiniteScrollSentinel } from "@/components/ui/infinite-scroll-sentinel";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { cleanText } from "@/lib/text";
 
@@ -98,10 +101,8 @@ export function AnnouncementsView() {
   const { orgId: organizationId, isResolving: isOrgResolving } = useActiveOrgId();
   const confirm = useConfirm();
 
-  const [items, setItems] = useState<v1AnnouncementView[]>([]);
   const [includeArchived, setIncludeArchived] = useState(true);
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   // Скоуп: за всю орг (default) или по конкретной клинике/отделению.
   // value хранится как `org` | `clinic:<id>` | `dept:<id>`.
   const [scope, setScope] = useState<string>("org");
@@ -112,46 +113,57 @@ export function AnnouncementsView() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
 
-  const loadAnnouncements = async (orgId: string) => {
-    setIsLoading(true);
-    try {
-      let res: unknown;
+  // Bump-токен для перезагрузки списка после CRUD.
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Постраничная загрузка. Скоуп выбирает соответствующий list-эндпоинт.
+  const {
+    items,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    loadMore,
+  } = usePaginatedList<v1AnnouncementView>(
+    (cursor) => {
+      if (!organizationId) return Promise.resolve({ items: [], nextCursor: undefined });
       if (scope.startsWith("clinic:")) {
         const clinicId = scope.slice("clinic:".length);
-        res = await AnnouncementQueryService.announcementQueryListAnnouncementsForClinic(
+        return AnnouncementQueryService.announcementQueryListAnnouncementsForClinic(
           clinicId,
           includeArchived,
           "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
-          100,
+          20,
+          cursor,
         );
-      } else if (scope.startsWith("dept:")) {
+      }
+      if (scope.startsWith("dept:")) {
         const deptId = scope.slice("dept:".length);
-        res = await AnnouncementQueryService.announcementQueryListAnnouncementsForDepartment(
+        return AnnouncementQueryService.announcementQueryListAnnouncementsForDepartment(
           deptId,
           includeArchived,
           "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
-          100,
-        );
-      } else {
-        res = await AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(
-          orgId,
-          includeArchived,
-          "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
-          100,
+          20,
+          cursor,
         );
       }
-      if (res && typeof res === "object" && "items" in res && Array.isArray((res as { items: unknown }).items)) {
-        setItems((res as { items: v1AnnouncementView[] }).items);
-      } else {
-        setItems([]);
-      }
-    } catch (e) {
-      console.error("Failed to load announcements", e);
-      notify.error("Ошибка", "Не удалось загрузить список объявлений.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return AnnouncementQueryService.announcementQueryListAnnouncementsForOrganization(
+        organizationId,
+        includeArchived,
+        "ANNOUNCEMENT_PRIORITY_UNSPECIFIED",
+        20,
+        cursor,
+      );
+    },
+    {
+      deps: [organizationId, includeArchived, scope, refreshTick],
+      enabled: !!organizationId && !isOrgResolving,
+    },
+  );
+
+  const loadAnnouncements = useCallback(
+    (_orgId?: string) => setRefreshTick((t) => t + 1),
+    [],
+  );
 
   // Подгружаем структуру орги один раз для select-фильтра. Объявления внутри
   // отделения принадлежат конкретному dept, поэтому раскрываем clinics → depts.
@@ -163,12 +175,14 @@ export function AnnouncementsView() {
     let cancelled = false;
     (async () => {
       try {
-        const cRes = await OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(organizationId, 100);
-        const cItems = (cRes && typeof cRes === "object" && "items" in cRes ? (cRes as { items: { id: string; name: string }[] }).items : []) ?? [];
+        const cItems = await fetchAllPages<{ id: string; name: string }>((cursor) =>
+          OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(organizationId, 200, cursor),
+        );
         const built = await Promise.all(
           cItems.map(async (c) => {
-            const dRes = await OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(c.id, 100).catch(() => null);
-            const dItems = (dRes && typeof dRes === "object" && "items" in dRes ? (dRes as { items: { id: string; name: string }[] }).items : []) ?? [];
+            const dItems = await fetchAllPages<{ id: string; name: string }>((cursor) =>
+              OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(c.id, 200, cursor),
+            ).catch(() => [] as { id: string; name: string }[]);
             return { id: c.id, name: c.name, departments: dItems };
           }),
         );
@@ -181,17 +195,6 @@ export function AnnouncementsView() {
       cancelled = true;
     };
   }, [organizationId]);
-
-  useEffect(() => {
-    if (isOrgResolving) return;
-    if (organizationId) {
-      void loadAnnouncements(organizationId);
-    } else {
-      setItems([]);
-      setIsLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, includeArchived, isOrgResolving, scope]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -393,6 +396,13 @@ export function AnnouncementsView() {
               onUnarchive={() => handleUnarchive(a)}
             />
           ))}
+          {!search && (
+            <InfiniteScrollSentinel
+              hasMore={hasMore}
+              isLoadingMore={isLoadingMore}
+              onLoadMore={loadMore}
+            />
+          )}
         </div>
       )}
 

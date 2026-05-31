@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Shield, Building, Users, UserCheck, Network, Megaphone, ClipboardCheck, Loader2 } from "lucide-react";
+import { Shield, Building, Users, UserCheck, Network, Megaphone, ClipboardCheck, Inbox, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -24,6 +24,7 @@ const adminTabs: AdminTab[] = [
   { href: "/admin/organizations", label: "Организации", icon: Network, can: "canManageOrganizations" },
   { href: "/admin/classifier", label: "Классификатор", icon: Shield, can: "canManageClassifiers" },
   { href: "/admin/capa", label: "Мероприятия", icon: ClipboardCheck, can: "canManageCapa" },
+  { href: "/admin/patient-incidents", label: "Заявки пациентов", icon: Inbox, can: "canReviewPatientIncidents" },
   { href: "/admin/department", label: "Подразделение", icon: UserCheck, can: "canManageDepartmentSettings" },
   { href: "/admin/structure", label: "Структура", icon: Building, can: "canManageOrgStructure" },
   { href: "/admin/announcements", label: "Объявления", icon: Megaphone, can: "canManageAnnouncements" },

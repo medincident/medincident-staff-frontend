@@ -46,6 +46,7 @@ import {
   MembershipCommandService,
   StatsQueryService,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { cleanText } from "@/lib/text";
 import { useSession } from "next-auth/react";
 
@@ -66,8 +67,9 @@ export function OrganizationsView() {
   const loadOrganizations = async () => {
     try {
       setIsLoading(true);
-      const res = await OrgStructureQueryService.orgStructureQueryListOrganizations(100);
-      const items = (res as any).items || [];
+      const items = await fetchAllPages<any>((cursor) =>
+        OrgStructureQueryService.orgStructureQueryListOrganizations(200, cursor),
+      );
 
       const filtered = search
         ? items.filter((o: any) => o.name?.toLowerCase().includes(search.toLowerCase()))

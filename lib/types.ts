@@ -1,9 +1,9 @@
 export type RequestStatus =
   | "created"
   | "in_work"
-  | "purchase"
+  | "on_hold"
+  | "pending_review"
   | "completed"
-  | "refused"
   | "cancelled";
 
 export type Priority = "normal" | "high" | "critical";

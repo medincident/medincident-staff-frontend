@@ -7,6 +7,7 @@ import {
   RequestClassifierQueryService,
   v1RequestType,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 
 // Общий кеш активных типов заявок по orgId. invalidateRequestClassifier() после мутаций.
 
@@ -32,12 +33,13 @@ export const useRequestClassifierStore = create<State>((set, get) => ({
 
     const p = (async () => {
       try {
-        const res =
-          await RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(
+        const types = await fetchAllPages<v1RequestType>((cursor) =>
+          RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(
             orgId,
             200,
-          );
-        const types = res && "items" in res && res.items ? res.items : [];
+            cursor,
+          ),
+        );
         set((st) => ({ byOrg: { ...st.byOrg, [orgId]: types } }));
       } finally {
         set((st) => ({ inflight: { ...st.inflight, [orgId]: undefined } }));

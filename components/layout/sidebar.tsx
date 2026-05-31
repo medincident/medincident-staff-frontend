@@ -15,6 +15,7 @@ import {
   Network,
   Wrench,
   ClipboardCheck,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,12 @@ const ADMIN_LINKS: NavLink[] = [
     label: "Мероприятия",
     icon: ClipboardCheck,
     can: "canManageCapa",
+  },
+  {
+    href: "/admin/patient-incidents",
+    label: "Заявки пациентов",
+    icon: Inbox,
+    can: "canReviewPatientIncidents",
   },
   {
     href: "/admin/announcements",

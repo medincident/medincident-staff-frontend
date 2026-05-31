@@ -24,6 +24,7 @@ import {
   IncidentClassifierQueryService,
   IncidentClassifierCommandService,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { invalidateIncidentClassifier } from "@/lib/classifiers/incident-classifier-store";
 import { cleanText } from "@/lib/text";
@@ -67,8 +68,9 @@ export function IncidentClassifierView() {
     if (!organizationId) return;
     try {
       setIsLoading(true);
-      const result = await IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(organizationId, 100);
-      const fetchedCats = (result as any).items || [];
+      const fetchedCats = await fetchAllPages<any>((cursor) =>
+        IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(organizationId, 200, cursor),
+      );
 
       const filtered = search
         ? fetchedCats.filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()))
@@ -78,8 +80,10 @@ export function IncidentClassifierView() {
 
       const typesResults = await Promise.all(
         filtered.map((cat: any) =>
-          IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(cat.id, 100)
-            .then(res => ({ id: cat.id, types: (res as any).items || [] }))
+          fetchAllPages<any>((cursor) =>
+            IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(cat.id, 200, cursor),
+          )
+            .then(types => ({ id: cat.id, types }))
             .catch(() => ({ id: cat.id, types: [] }))
         )
       );
@@ -232,8 +236,10 @@ export function IncidentClassifierView() {
         }
       }
 
-      const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(targetCategoryId, 100);
-      setTypesMap(prev => ({ ...prev, [targetCategoryId!]: (typesResult as any).items || [] }));
+      const types = await fetchAllPages<any>((cursor) =>
+        IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(targetCategoryId, 200, cursor),
+      );
+      setTypesMap(prev => ({ ...prev, [targetCategoryId!]: types }));
       invalidateIncidentClassifier(organizationId);
 
       notify.mutationSuccess("Сохранено", "Тип события сохранён в справочнике.");
@@ -254,8 +260,10 @@ export function IncidentClassifierView() {
         await IncidentClassifierCommandService.incidentClassifierCommandReactivateIncidentType(typeId);
         notify.mutationSuccess("Тип события активирован", "Тип снова доступен для использования.");
       }
-      const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
-      setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
+      const types = await fetchAllPages<any>((cursor) =>
+        IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 200, cursor),
+      );
+      setTypesMap(prev => ({ ...prev, [categoryId]: types }));
       invalidateIncidentClassifier(organizationId);
     } catch (e) {
       notify.apiError(e, "Не удалось обновить статус типа");
@@ -271,8 +279,10 @@ export function IncidentClassifierView() {
     if (!ok) return;
     try {
       await IncidentClassifierCommandService.incidentClassifierCommandDeleteIncidentType(typeId);
-      const typesResult = await IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 100);
-      setTypesMap(prev => ({ ...prev, [categoryId]: (typesResult as any).items || [] }));
+      const types = await fetchAllPages<any>((cursor) =>
+        IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(categoryId, 200, cursor),
+      );
+      setTypesMap(prev => ({ ...prev, [categoryId]: types }));
       invalidateIncidentClassifier(organizationId);
       notify.mutationSuccess("Тип удалён", "Запись типа события удалена из справочника.");
     } catch (e) {

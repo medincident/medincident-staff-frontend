@@ -8,6 +8,7 @@ import {
   v1Category,
   classifierV1Type,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 
 // Общий кеш справочника НС по orgId. Админка вызывает invalidate() после мутаций.
 
@@ -40,14 +41,14 @@ export const useIncidentClassifierStore = create<State>((set, get) => ({
 
     const p = (async () => {
       try {
-        const [catsRes, typesRes] = await Promise.all([
-          IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 100),
-          IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(orgId, 100),
+        const [categories, types] = await Promise.all([
+          fetchAllPages<v1Category>((cursor) =>
+            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 200, cursor),
+          ),
+          fetchAllPages<classifierV1Type>((cursor) =>
+            IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(orgId, 200, cursor),
+          ),
         ]);
-        const categories =
-          catsRes && "items" in catsRes && catsRes.items ? catsRes.items : [];
-        const types =
-          typesRes && "items" in typesRes && typesRes.items ? typesRes.items : [];
         set((st) => ({ byOrg: { ...st.byOrg, [orgId]: { categories, types } } }));
       } finally {
         set((st) => ({ inflight: { ...st.inflight, [orgId]: undefined } }));

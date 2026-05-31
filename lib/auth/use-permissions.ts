@@ -82,6 +82,10 @@ export interface Permissions {
   canManageClassifiers: boolean;
   /** /admin/capa — корректирующие/предупреждающие мероприятия (785н). */
   canManageCapa: boolean;
+  /** /admin/patient-incidents — просмотр входящих НС от пациентов. */
+  canReviewPatientIncidents: boolean;
+  /** Одобрить/отклонить заявку пациента. Бэк требует dispatcher employee record. */
+  canModeratePatientIncidents: boolean;
   /** /admin/announcements. */
   canManageAnnouncements: boolean;
 
@@ -126,6 +130,8 @@ const EMPTY: Permissions = {
   canManageDepartmentSettings: false,
   canManageClassifiers: false,
   canManageCapa: false,
+  canReviewPatientIncidents: false,
+  canModeratePatientIncidents: false,
   canManageAnnouncements: false,
   canViewReports: false,
   canViewAnalytics: false,
@@ -254,6 +260,11 @@ export function usePermissions(): Permissions {
     // условиям, что и создание НС: любой сотрудник орги, плюс sysadmin
     // и админ орги универсально.
     canManageCapa: isMember || isSystemAdmin || isOrgAdmin,
+    // Заявки от пациентов: смотрят все админ-уровни орги, а одобрять/отклонять
+    // может только диспетчер — бэк строго проверяет dispatcher employee record.
+    canReviewPatientIncidents:
+      isSystemAdmin || isOrgAdmin || isOrgHead || isOrgDispatcher,
+    canModeratePatientIncidents: isOrgDispatcher,
     canManageAnnouncements: isSystemAdmin || isOrgAdmin,
 
     canViewReports: !isGuest,

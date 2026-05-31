@@ -46,6 +46,7 @@ import {
   v1EmployeeCardView,
   ServiceRequestQueryService
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useIncidentClassifier } from "@/lib/classifiers/incident-classifier-store";
@@ -109,25 +110,25 @@ function RequestFormContent({ requestId }: RequestFormProps) {
         if (deptId) setEmployeeDeptId(deptId);
 
         if (orgId) {
-          const [typeRes, incRes, staffRes] = await Promise.all([
-            RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 100),
-            IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 100),
+          const [types, incs, staffList] = await Promise.all([
+            fetchAllPages<v1RequestType>((cursor) =>
+              RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200, cursor),
+            ),
+            fetchAllPages<v1IncidentView>((cursor) =>
+              IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 200, cursor),
+            ),
             // Кандидаты на исполнение — сотрудники того же отделения, в котором
             // создаётся заявка. Так же сделано в [id]/view.tsx для AssignExecutors.
             deptId
-              ? MembershipQueryService.membershipQueryListEmployeesByDepartment(deptId, 200)
-              : Promise.resolve(null),
+              ? fetchAllPages<v1EmployeeCardView>((cursor) =>
+                  MembershipQueryService.membershipQueryListEmployeesByDepartment(deptId, 200, cursor),
+                )
+              : Promise.resolve<v1EmployeeCardView[]>([]),
           ]);
 
-          if (typeRes && "items" in typeRes && typeRes.items) {
-            setRequestTypes(typeRes.items);
-          }
-          if (incRes && "items" in incRes && incRes.items) {
-            setIncidents(incRes.items);
-          }
-          if (staffRes && "items" in staffRes && staffRes.items) {
-            setStaff(staffRes.items as v1EmployeeCardView[]);
-          }
+          setRequestTypes(types);
+          setIncidents(incs);
+          setStaff(staffList);
         }
         
         if (requestId) {

@@ -40,6 +40,7 @@ import {
     v1RequestType,
     v1EmployeeCardView
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 
 interface RequestDetailsViewProps {
     requestId: string;
@@ -149,9 +150,14 @@ function DetailsSection({
                             </SelectContent>
                         </Select>
 
-                        {status === 'purchase' && (
+                        {status === 'on_hold' && (
                             <p className="text-[11px] text-purple bg-purple/10 p-2 rounded border border-purple/20 mt-1">
-                                Время выполнения приостановлено (ожидание запчастей).
+                                Заявка приостановлена — ожидаем внешних условий (запчасти, согласование, доставка).
+                            </p>
+                        )}
+                        {status === 'pending_review' && (
+                            <p className="text-[11px] text-info bg-info/10 p-2 rounded border border-info/20 mt-1">
+                                Заявка выполнена, ожидает приёмки/проверки автором.
                             </p>
                         )}
                     </div>
@@ -250,14 +256,15 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         setIsLoadingEmployees(true);
         (async () => {
             try {
-                const res = await MembershipQueryService.membershipQueryListEmployeesByDepartment(
-                    request.departmentId!,
-                    100,
+                const items = await fetchAllPages<v1EmployeeCardView>((cursor) =>
+                    MembershipQueryService.membershipQueryListEmployeesByDepartment(
+                        request.departmentId!,
+                        200,
+                        cursor,
+                    ),
                 );
                 if (cancelled) return;
-                if (res && "items" in res && Array.isArray(res.items)) {
-                    setDepartmentEmployees(res.items);
-                }
+                setDepartmentEmployees(items);
             } catch (e) {
                 console.warn("Failed to load department employees", e);
             } finally {

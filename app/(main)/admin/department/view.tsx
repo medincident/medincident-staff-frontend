@@ -26,6 +26,7 @@ import {
   StatsQueryService,
   v1EmployeeCardView,
 } from "@/lib/api-generated";
+import { fetchAllPages } from "@/lib/api/paginate";
 import { getMyEmployeeInOrg } from "@/lib/auth/get-my-employee";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useSession } from "next-auth/react";
@@ -74,7 +75,9 @@ export function DepartmentView() {
         // allSettled: 403 на stats для не-админа не должен валить экран.
         const [deptRes, staffRes, statsRes, headRes] = await Promise.allSettled([
           OrgStructureQueryService.orgStructureQueryGetDepartment(emp.departmentId),
-          MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId, 100),
+          fetchAllPages<v1EmployeeCardView>((cursor) =>
+            MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId!, 200, cursor),
+          ),
           StatsQueryService.statsQueryGetDepartmentStats(emp.departmentId),
           MembershipQueryService.membershipQueryGetDepartmentResponsible(emp.departmentId),
         ]);
@@ -85,8 +88,7 @@ export function DepartmentView() {
         }
 
         if (staffRes.status === "fulfilled") {
-          const staffItems = (staffRes.value as any).items as v1EmployeeCardView[] || [];
-          setStaff(staffItems);
+          setStaff(staffRes.value);
         }
 
         if (statsRes.status === "fulfilled" && statsRes.value && !("code" in statsRes.value)) {
