@@ -87,9 +87,9 @@ export function DashboardView() {
     departments: number;
     clinics: number;
   } | null>(null);
-  // Справочник категорий — из общего zustand-кеша (не дёргаем эндпоинт
+  // Справочник категорий и типов — из общего zustand-кеша (не дёргаем эндпоинт
   // повторно на каждый заход на дашборд / журнал событий).
-  const { categories: classifier } = useIncidentClassifier(orgId);
+  const { categories: classifier, types: typeClassifier } = useIncidentClassifier(orgId);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -174,6 +174,14 @@ export function DashboardView() {
     });
     return cats;
   }, [classifier]);
+
+  const typeNamesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    typeClassifier.forEach((t) => {
+      if (t.id && t.name) map[t.id] = t.name;
+    });
+    return map;
+  }, [typeClassifier]);
 
   const activeRequests = requests.filter(r => {
       const s = (r.status || "").toLowerCase();
@@ -346,6 +354,7 @@ export function DashboardView() {
                       key={evt.id}
                       evt={evt}
                       catMap={categoryNamesMap}
+                      typeMap={typeNamesMap}
                     />
                   ))}
 
@@ -474,9 +483,17 @@ export function DashboardView() {
   );
 }
 
-function EventItem({ evt, catMap }: { evt: v1IncidentView; catMap: Record<string, string> }) {
-  const typeName = evt.typeId || "Неизвестный тип";
-  const categoryName = catMap[evt.categoryId || ""] || evt.categoryId || "Неизвестная категория";
+function EventItem({
+  evt,
+  catMap,
+  typeMap,
+}: {
+  evt: v1IncidentView;
+  catMap: Record<string, string>;
+  typeMap: Record<string, string>;
+}) {
+  const typeName = typeMap[evt.typeId || ""] || "Без типа";
+  const categoryName = catMap[evt.categoryId || ""] || "Без категории";
 
   return (
     <Link

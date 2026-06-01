@@ -1,7 +1,14 @@
 /// <reference lib="webworker" />
 
 import { defaultCache } from "@serwist/next/worker";
-import { Serwist, NetworkOnly, type PrecacheEntry } from "serwist";
+import {
+  Serwist,
+  NetworkFirst,
+  StaleWhileRevalidate,
+  ExpirationPlugin,
+  type PrecacheEntry,
+  type RouteHandler,
+} from "serwist";
 
 declare global {
   // Serwist подставляет сюда precache-манифест при сборке. Ссылка должна
@@ -10,17 +17,90 @@ declare global {
   var __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
 }
 
+// Кастомный handler для /api/auth/*: try/catch с гарантированным Response.
+// На iOS Safari чистый NetworkOnly при отказе сети reject'ит промис в
+// respondWith → «FetchEvent.respondWith received an error: no response url».
+const authNetworkOnly: RouteHandler = async ({ request }) => {
+  try {
+    return await fetch(request);
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "offline", message: "Нет соединения с сервером" }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      },
+    );
+  }
+};
+
+// Navigation: быстрый таймаут на сеть (3 сек), потом из кеша, иначе /offline.
+// На iOS Safari дефолтный NetworkFirst ждёт до зависания TCP — приложение
+// «висит» при потере связи десятками секунд. С networkTimeoutSeconds=3
+// при оффлайне страница отдаётся из кеша мгновенно.
+const navigationHandler = new NetworkFirst({
+  cacheName: "navigation-cache",
+  networkTimeoutSeconds: 3,
+  plugins: [
+    new ExpirationPlugin({
+      maxEntries: 64,
+      maxAgeSeconds: 7 * 24 * 60 * 60,
+    }),
+  ],
+});
+
+// /api/* (GET) — те же 3 секунды + долгий кеш для оффлайн-просмотра.
+const apiGetHandler = new NetworkFirst({
+  cacheName: "api-cache",
+  networkTimeoutSeconds: 3,
+  plugins: [
+    new ExpirationPlugin({
+      maxEntries: 200,
+      maxAgeSeconds: 7 * 24 * 60 * 60,
+    }),
+  ],
+});
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
+  // Фолбэк для navigation-запросов: если страница недоступна в кеше и сеть
+  // упала, отдаём /offline вместо «no response url» на iOS.
+  fallbacks: {
+    entries: [
+      {
+        url: "/offline",
+        matcher: ({ request }) => request.destination === "document",
+      },
+    ],
+  },
   runtimeCaching: [
-    // /api/auth/* — только сеть: повторный fetch одного auth-кода в Zitadel
-    // ловит Errors.AuthRequest.NoCode.
+    // /api/auth/* — особый случай (см. authNetworkOnly).
     {
       matcher: ({ url }) => url.pathname.startsWith("/api/auth"),
-      handler: new NetworkOnly(),
+      handler: authNetworkOnly,
+    },
+    // /api/v1/* GET — кешируем для оффлайн-просмотра.
+    {
+      matcher: ({ url, request, sameOrigin }) =>
+        sameOrigin &&
+        url.pathname.startsWith("/api/") &&
+        request.method === "GET",
+      handler: apiGetHandler,
+      method: "GET",
+    },
+    // Все navigation-запросы — короткий таймаут + кеш.
+    {
+      matcher: ({ request }) => request.mode === "navigate",
+      handler: navigationHandler,
+    },
+    // RSC prefetch и динамические данные Next.js — StaleWhileRevalidate
+    // быстрее, чем NetworkFirst дефолтного defaultCache.
+    {
+      matcher: ({ url }) => url.pathname.startsWith("/_next/data"),
+      handler: new StaleWhileRevalidate({ cacheName: "next-data" }),
     },
     ...defaultCache,
   ],

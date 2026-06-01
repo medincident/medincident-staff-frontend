@@ -26,6 +26,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // notch / Dynamic Island на iPhone — иначе safe-area-inset не работает.
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -43,8 +45,16 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    // black-translucent позволяет содержимому уходить под статус-бар на
+    // iPhone в standalone-режиме PWA (с safe-area-inset снизу/сверху).
+    statusBarStyle: "black-translucent",
     title: APP_CONFIG.name,
+  },
+  // Для iOS Safari в standalone указываем формат, в котором приложение
+  // обрабатывает ссылки — без этого фокус-листенеры теряют состояние при
+  // глубоких ссылках из push-уведомлений.
+  formatDetection: {
+    telephone: false,
   },
 };
 

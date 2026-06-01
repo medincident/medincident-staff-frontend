@@ -15,20 +15,29 @@ function pickToken(session: any): string {
   return "";
 }
 
-// Конфиг на уровне модуля — useEffect срабатывает позже первых запросов.
+// Кэш токена. Раньше OpenAPI.TOKEN на каждый запрос звал getSession() →
+// /api/auth/session. На странице админки с 5–7 параллельными вызовами
+// это давало бесконечную ленту session-запросов и каскад перерендеров.
+let cachedToken = "";
+
 if (typeof window !== "undefined") {
   OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
   OpenAPI.WITH_CREDENTIALS = true;
-  OpenAPI.TOKEN = async () => pickToken(await getSession());
+  OpenAPI.TOKEN = async () => cachedToken;
   // Общий Zitadel — тот же JWT валиден для notifications-сервиса.
-  NotificationsOpenAPI.TOKEN = async () => pickToken(await getSession());
+  NotificationsOpenAPI.TOKEN = async () => cachedToken;
 
   // Без timeout fetch в офлайне на iOS висит десятки секунд.
   axios.defaults.timeout = 10000;
 }
 
 export function ApiProvider({ children }: { children: ReactNode }) {
-  useSession();
+  const { data: session } = useSession();
+
+  // Обновляем кэшированный токен при каждом валидном изменении сессии.
+  useEffect(() => {
+    cachedToken = pickToken(session);
+  }, [session]);
 
   useEffect(() => {
     const responseInterceptor = axios.interceptors.response.use(
@@ -40,11 +49,12 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
           originalRequest._retry = true;
-          const refreshedToken = pickToken(await getSession());
-          if (refreshedToken) {
+          const refreshed = pickToken(await getSession());
+          if (refreshed) {
+            cachedToken = refreshed;
             originalRequest.headers = {
               ...(originalRequest.headers || {}),
-              Authorization: `Bearer ${refreshedToken}`,
+              Authorization: `Bearer ${refreshed}`,
             };
             return axios.request(originalRequest);
           }

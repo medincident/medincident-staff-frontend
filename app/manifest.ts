@@ -3,10 +3,15 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: APP_CONFIG.name,
     short_name: APP_CONFIG.name,
     description: APP_CONFIG.description,
-    start_url: "/dashboard",
+    // iOS открывает PWA по start_url из standalone-режима; /dashboard
+    // редиректит на Zitadel при отсутствии cookie → оффлайн-юзер видит
+    // ошибку. С корнем "/" Next отдаёт страницу-маршрутизатор, и SW
+    // подставит /offline, если сети нет.
+    start_url: "/",
     scope: "/",
     display: "standalone",
     background_color: THEME_COLORS.dark,

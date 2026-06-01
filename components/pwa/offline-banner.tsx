@@ -31,7 +31,7 @@ export function OfflineBanner() {
         <WifiOff className="h-4 w-4 shrink-0" />
         <span className="font-medium">Нет подключения к сети.</span>
         <span className="text-muted-foreground hidden sm:inline">
-          Данные могут быть устаревшими. Действия сохранятся и отправятся при восстановлении связи.
+          Доступны ранее загруженные страницы. Новые действия выполните после восстановления связи.
         </span>
       </div>
     </div>
