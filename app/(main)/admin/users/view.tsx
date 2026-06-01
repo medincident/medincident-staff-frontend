@@ -131,19 +131,19 @@ export function UsersView() {
       // запрашиваем в той же пачке, чтобы UI имел один источник истины.
       const [usersList, adminsArr, headsArr, dispatchersArr, sysAdminsArr] = await Promise.all([
         fetchAllPages<v1EmployeeCardView>((cursor) =>
-          MembershipQueryService.membershipQuerySearchEmployeesByOrganization(orgId, search || undefined, 1000, cursor),
+          MembershipQueryService.membershipQuerySearchEmployeesByOrganization(orgId, search || undefined, 200, cursor),
         ),
         fetchAllPages<any>((cursor) =>
-          MembershipQueryService.membershipQueryListOrgAdmins(orgId, 1000, cursor),
+          MembershipQueryService.membershipQueryListOrgAdmins(orgId, 200, cursor),
         ),
         fetchAllPages<any>((cursor) =>
-          MembershipQueryService.membershipQueryListOrgHeads(orgId, 1000, cursor),
+          MembershipQueryService.membershipQueryListOrgHeads(orgId, 200, cursor),
         ),
         fetchAllPages<any>((cursor) =>
-          MembershipQueryService.membershipQueryListOrgDispatchers(orgId, 1000, cursor),
+          MembershipQueryService.membershipQueryListOrgDispatchers(orgId, 200, cursor),
         ),
         fetchAllPages<any>((cursor) =>
-          MembershipQueryService.membershipQueryListSystemAdmins(1000, cursor),
+          MembershipQueryService.membershipQueryListSystemAdmins(200, cursor),
         ),
       ]);
 
@@ -169,11 +169,11 @@ export function UsersView() {
 
       if (clinics.length === 0) {
         const clinicsList = await fetchAllPages<any>((cursor) =>
-          OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(orgId, 1000, cursor),
+          OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(orgId, 200, cursor),
         );
         const builtClinics = await Promise.all(clinicsList.map(async (clinic: any) => {
           const departments = await fetchAllPages<any>((cursor) =>
-            OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 1000, cursor),
+            OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 200, cursor),
           );
           return { ...clinic, departments };
         }));

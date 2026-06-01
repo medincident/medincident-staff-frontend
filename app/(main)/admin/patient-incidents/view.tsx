@@ -149,12 +149,12 @@ export function PatientIncidentsView() {
     (async () => {
       try {
         const cItems = await fetchAllPages<{ id: string; name: string }>((cursor) =>
-          OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(orgId, 1000, cursor),
+          OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(orgId, 200, cursor),
         );
         const built = await Promise.all(
           cItems.map(async (c) => {
             const dItems = await fetchAllPages<{ id: string; name: string }>((cursor) =>
-              OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(c.id, 1000, cursor),
+              OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(c.id, 200, cursor),
             ).catch(() => [] as { id: string; name: string }[]);
             return { id: c.id, name: c.name, departments: dItems };
           }),

@@ -134,12 +134,12 @@ export function StructureView() {
       setIsLoading(true);
 
       const usersList = await fetchAllPages<v1EmployeeCardView>((cursor) =>
-        MembershipQueryService.membershipQueryListEmployeesByOrganization(selectedOrgId, 1000, cursor),
+        MembershipQueryService.membershipQueryListEmployeesByOrganization(selectedOrgId, 200, cursor),
       );
       setUsers(usersList);
 
       const clinicsItems = await fetchAllPages<any>((cursor) =>
-        OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(selectedOrgId, 1000, cursor),
+        OrgStructureQueryService.orgStructureQueryListClinicsByOrganization(selectedOrgId, 200, cursor),
       );
 
       const filteredClinics = search
@@ -149,7 +149,7 @@ export function StructureView() {
       const builtClinics = await Promise.all(filteredClinics.map(async (clinic: any) => {
         const [deptsItems, cHeadRes, statsRes] = await Promise.all([
           fetchAllPages<any>((cursor) =>
-            OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 1000, cursor),
+            OrgStructureQueryService.orgStructureQueryListDepartmentsByClinic(clinic.id, 200, cursor),
           ),
           MembershipQueryService.membershipQueryGetClinicHead(clinic.id).catch(() => null),
           StatsQueryService.statsQueryGetClinicStats(clinic.id).catch(() => null),

@@ -112,16 +112,16 @@ function RequestFormContent({ requestId }: RequestFormProps) {
         if (orgId) {
           const [types, incs, staffList] = await Promise.all([
             fetchAllPages<v1RequestType>((cursor) =>
-              RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 1000, cursor),
+              RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200, cursor),
             ),
             fetchAllPages<v1IncidentView>((cursor) =>
-              IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 1000, cursor),
+              IncidentQueryService.incidentQueryListIncidents(orgId, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 200, cursor),
             ),
             // Кандидаты на исполнение — сотрудники того же отделения, в котором
             // создаётся заявка. Так же сделано в [id]/view.tsx для AssignExecutors.
             deptId
               ? fetchAllPages<v1EmployeeCardView>((cursor) =>
-                  MembershipQueryService.membershipQueryListEmployeesByDepartment(deptId, 1000, cursor),
+                  MembershipQueryService.membershipQueryListEmployeesByDepartment(deptId, 200, cursor),
                 )
               : Promise.resolve<v1EmployeeCardView[]>([]),
           ]);

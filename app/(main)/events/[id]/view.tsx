@@ -360,10 +360,10 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         if (foundEvent.organizationId) {
           const [cats, types] = await Promise.all([
             fetchAllPages<v1Category>((cursor) =>
-              IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(foundEvent.organizationId!, 1000, cursor),
+              IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(foundEvent.organizationId!, 200, cursor),
             ),
             fetchAllPages<classifierV1Type>((cursor) =>
-              IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(foundEvent.organizationId!, 1000, cursor),
+              IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(foundEvent.organizationId!, 200, cursor),
             ),
           ]);
           setCategories(cats);

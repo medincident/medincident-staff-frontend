@@ -42,7 +42,7 @@ export const useIncidentClassifierStore = create<State>((set, get) => ({
     // Справочники подгружаются один раз на сессию. Чем крупнее страница,
     // тем меньше последовательных RTT — для типов НС, которых в крупном НМИЦ
     // легко 3–5 тыс., page=200 даёт 15–25 последовательных запросов.
-    const PAGE = 1000;
+    const PAGE = 200;
     const p = (async () => {
       try {
         const [categories, types] = await Promise.all([

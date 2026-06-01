@@ -77,7 +77,7 @@ export function RequestTypesView() {
     setIsLoading(true);
     try {
       const items = await fetchAllPages<v1RequestType>((cursor) =>
-        RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 1000, cursor),
+        RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(orgId, 200, cursor),
       );
       setTypes(items);
       // Все мутации типов заявок проходят через loadTypes — сбрасываем

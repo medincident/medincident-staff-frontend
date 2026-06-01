@@ -74,10 +74,10 @@ export function IncidentClassifierView() {
       // на клиенте.
       const [fetchedCats, allTypes] = await Promise.all([
         fetchAllPages<any>((cursor) =>
-          IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(organizationId, 1000, cursor),
+          IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(organizationId, 200, cursor),
         ),
         fetchAllPages<any>((cursor) =>
-          IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(organizationId, 1000, cursor),
+          IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(organizationId, 200, cursor),
         ),
       ]);
 

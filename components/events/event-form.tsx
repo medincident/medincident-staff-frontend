@@ -95,10 +95,10 @@ export function EventForm({ eventId }: EventFormProps) {
         if (currentOrgId) {
           const [cats, types] = await Promise.all([
             fetchAllPages<v1Category>((cursor) =>
-              IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(currentOrgId, 1000, cursor),
+              IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(currentOrgId, 200, cursor),
             ),
             fetchAllPages<classifierV1Type>((cursor) =>
-              IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(currentOrgId, 1000, cursor),
+              IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(currentOrgId, 200, cursor),
             ),
           ]);
           setCategories(cats);
