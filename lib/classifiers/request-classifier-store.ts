@@ -31,12 +31,15 @@ export const useRequestClassifierStore = create<State>((set, get) => ({
     const running = s.inflight[orgId];
     if (running) return running;
 
+    // см. incident-classifier-store: при крупных справочниках page=200
+    // превращается в 15–25 последовательных RTT.
+    const PAGE = 1000;
     const p = (async () => {
       try {
         const types = await fetchAllPages<v1RequestType>((cursor) =>
           RequestClassifierQueryService.requestClassifierQueryListRequestTypesByOrganization(
             orgId,
-            200,
+            PAGE,
             cursor,
           ),
         );

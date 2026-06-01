@@ -68,7 +68,7 @@ export function OrganizationsView() {
     try {
       setIsLoading(true);
       const items = await fetchAllPages<any>((cursor) =>
-        OrgStructureQueryService.orgStructureQueryListOrganizations(200, cursor),
+        OrgStructureQueryService.orgStructureQueryListOrganizations(1000, cursor),
       );
 
       const filtered = search

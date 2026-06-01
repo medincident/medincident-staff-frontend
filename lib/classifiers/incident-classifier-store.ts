@@ -39,14 +39,18 @@ export const useIncidentClassifierStore = create<State>((set, get) => ({
     const running = s.inflight[orgId];
     if (running) return running; // запрос уже идёт — переиспользуем
 
+    // Справочники подгружаются один раз на сессию. Чем крупнее страница,
+    // тем меньше последовательных RTT — для типов НС, которых в крупном НМИЦ
+    // легко 3–5 тыс., page=200 даёт 15–25 последовательных запросов.
+    const PAGE = 1000;
     const p = (async () => {
       try {
         const [categories, types] = await Promise.all([
           fetchAllPages<v1Category>((cursor) =>
-            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, 200, cursor),
+            IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(orgId, PAGE, cursor),
           ),
           fetchAllPages<classifierV1Type>((cursor) =>
-            IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(orgId, 200, cursor),
+            IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(orgId, PAGE, cursor),
           ),
         ]);
         set((st) => ({ byOrg: { ...st.byOrg, [orgId]: { categories, types } } }));

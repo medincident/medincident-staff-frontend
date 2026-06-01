@@ -68,9 +68,18 @@ export function IncidentClassifierView() {
     if (!organizationId) return;
     try {
       setIsLoading(true);
-      const fetchedCats = await fetchAllPages<any>((cursor) =>
-        IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(organizationId, 200, cursor),
-      );
+      // Раньше типы тянулись для каждой категории отдельным запросом
+      // (12 категорий → 12 параллельных GET'ов /incident-types-by-category).
+      // Тянем все типы организации одним запросом и группируем по categoryId
+      // на клиенте.
+      const [fetchedCats, allTypes] = await Promise.all([
+        fetchAllPages<any>((cursor) =>
+          IncidentClassifierQueryService.incidentClassifierQueryListCategoriesByOrganization(organizationId, 1000, cursor),
+        ),
+        fetchAllPages<any>((cursor) =>
+          IncidentClassifierQueryService.incidentClassifierQueryListTypesByOrganization(organizationId, 1000, cursor),
+        ),
+      ]);
 
       const filtered = search
         ? fetchedCats.filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()))
@@ -78,18 +87,13 @@ export function IncidentClassifierView() {
 
       setCategories(filtered);
 
-      const typesResults = await Promise.all(
-        filtered.map((cat: any) =>
-          fetchAllPages<any>((cursor) =>
-            IncidentClassifierQueryService.incidentClassifierQueryListTypesByCategory(cat.id, 200, cursor),
-          )
-            .then(types => ({ id: cat.id, types }))
-            .catch(() => ({ id: cat.id, types: [] }))
-        )
-      );
-
       const newTypesMap: Record<string, any[]> = {};
-      typesResults.forEach(res => { newTypesMap[res.id] = res.types; });
+      filtered.forEach((cat: any) => { newTypesMap[cat.id] = []; });
+      allTypes.forEach((t: any) => {
+        if (t.categoryId && newTypesMap[t.categoryId]) {
+          newTypesMap[t.categoryId].push(t);
+        }
+      });
       setTypesMap(newTypesMap);
       // Админ зашёл/изменил справочник — сбрасываем общий кеш, чтобы
       // Dashboard/журнал подтянули свежие категории/типы при след. заходе.

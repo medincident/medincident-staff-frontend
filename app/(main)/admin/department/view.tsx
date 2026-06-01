@@ -76,7 +76,7 @@ export function DepartmentView() {
         const [deptRes, staffRes, statsRes, headRes] = await Promise.allSettled([
           OrgStructureQueryService.orgStructureQueryGetDepartment(emp.departmentId),
           fetchAllPages<v1EmployeeCardView>((cursor) =>
-            MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId!, 200, cursor),
+            MembershipQueryService.membershipQueryListEmployeesByDepartment(emp.departmentId!, 1000, cursor),
           ),
           StatsQueryService.statsQueryGetDepartmentStats(emp.departmentId),
           MembershipQueryService.membershipQueryGetDepartmentResponsible(emp.departmentId),

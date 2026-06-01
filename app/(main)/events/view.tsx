@@ -129,7 +129,7 @@ export function EventsListView() {
     (async () => {
       try {
         const requests = await fetchAllPages<v1ServiceRequest>((cursor) =>
-          ServiceRequestQueryService.serviceRequestQueryListServiceRequests(activeOrgId, 200, cursor),
+          ServiceRequestQueryService.serviceRequestQueryListServiceRequests(activeOrgId, 1000, cursor),
         );
         if (cancelled) return;
         const counts: Record<string, number> = {};
