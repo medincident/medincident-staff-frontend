@@ -675,39 +675,54 @@ export function ReportsView() {
     };
   }, [forecastFrequency]);
 
-  // Маркеры CAPA: только выбранной категории (или все при «Все категории»),
-  // привязанные к бакету, в который попадает дата ввода.
+  // Маркеры CAPA: только когда выбрана конкретная категория — на «Все
+  // категории» они без контекста и зашумляют общий график.
   // Сравнение по локальной дате (YYYY-MM-DD), а не таймстампам — иначе
   // CAPA с `introducedAt: "YYYY-MM-DD"` (парсится как UTC 00:00) уезжает
   // на день в часовых поясах + и не попадает ни в один локальный бакет.
+  // Учитываем и прогнозную часть графика (4 недели / 7 дней вперёд):
+  // если дата CAPA лежит в прогнозной зоне — мапим на прогнозный тик.
   const capaMarkers = useMemo(() => {
+    if (forecastCategory === "all") return [];
+
     const ymd = (d: Date) => {
       const pad = (n: number) => String(n).padStart(2, "0");
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     };
     const size = forecastFrequency.bucketSizeMs;
+    const histBuckets = forecastFrequency.buckets;
+    const allTicks: Array<{ name: string; startYmd: string; endYmd: string }> = [];
+    histBuckets.forEach((b) => {
+      const start = new Date(b.bucketEndMs - size);
+      const end = new Date(b.bucketEndMs - 1);
+      allTicks.push({ name: b.name, startYmd: ymd(start), endYmd: ymd(end) });
+    });
+    if (histBuckets.length > 0) {
+      const horizon = forecastFrequency.useWeekly ? 4 : 7;
+      const lastMs = histBuckets[histBuckets.length - 1].bucketEndMs;
+      for (let h = 0; h < horizon; h++) {
+        const endMs = lastMs + (h + 1) * size;
+        const start = new Date(endMs - size);
+        const end = new Date(endMs - 1);
+        allTicks.push({
+          name: formatDateShort(new Date(endMs)),
+          startYmd: ymd(start),
+          endYmd: ymd(end),
+        });
+      }
+    }
+
     return capaEntries
-      .filter((c) => forecastCategory === "all" || c.categoryId === forecastCategory)
+      .filter((c) => c.categoryId === forecastCategory)
       .map((c) => {
-        // introducedAt всегда "YYYY-MM-DD" по форме админки — не парсим
-        // через Date, чтобы не получить UTC-сдвиг.
         const capaYmd = String(c.introducedAt).slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(capaYmd)) return null;
-
-        const bucket = forecastFrequency.buckets.find((b) => {
-          // bucket покрывает [bucketEndMs - size, bucketEndMs) в локальном времени.
-          // Берём НАЧАЛО бакета как локальную дату и сравниваем по ymd.
-          const startD = new Date(b.bucketEndMs - size);
-          const endD = new Date(b.bucketEndMs - 1);
-          if (size > 24 * 3600 * 1000) {
-            // Недельные бакеты: попадает любой день между startD и endD.
-            return capaYmd >= ymd(startD) && capaYmd <= ymd(endD);
-          }
-          return ymd(startD) === capaYmd;
-        });
-        if (!bucket) return null;
+        const tick = allTicks.find(
+          (t) => capaYmd >= t.startYmd && capaYmd <= t.endYmd,
+        );
+        if (!tick) return null;
         const short = c.title.length > 22 ? c.title.slice(0, 21) + "…" : c.title;
-        return { name: bucket.name, color: "#10b981", label: `КАПА: ${short}` };
+        return { name: tick.name, color: "#10b981", label: `КАПА: ${short}` };
       })
       .filter((m): m is { name: string; color: string; label: string } => m !== null);
   }, [capaEntries, forecastCategory, forecastFrequency]);
