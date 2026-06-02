@@ -677,16 +677,34 @@ export function ReportsView() {
 
   // Маркеры CAPA: только выбранной категории (или все при «Все категории»),
   // привязанные к бакету, в который попадает дата ввода.
+  // Сравнение по локальной дате (YYYY-MM-DD), а не таймстампам — иначе
+  // CAPA с `introducedAt: "YYYY-MM-DD"` (парсится как UTC 00:00) уезжает
+  // на день в часовых поясах + и не попадает ни в один локальный бакет.
   const capaMarkers = useMemo(() => {
+    const ymd = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
     const size = forecastFrequency.bucketSizeMs;
     return capaEntries
       .filter((c) => forecastCategory === "all" || c.categoryId === forecastCategory)
       .map((c) => {
-        const t = new Date(c.introducedAt).getTime();
-        if (Number.isNaN(t)) return null;
-        const bucket = forecastFrequency.buckets.find(
-          (b) => t >= b.bucketEndMs - size && t < b.bucketEndMs,
-        );
+        // introducedAt всегда "YYYY-MM-DD" по форме админки — не парсим
+        // через Date, чтобы не получить UTC-сдвиг.
+        const capaYmd = String(c.introducedAt).slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(capaYmd)) return null;
+
+        const bucket = forecastFrequency.buckets.find((b) => {
+          // bucket покрывает [bucketEndMs - size, bucketEndMs) в локальном времени.
+          // Берём НАЧАЛО бакета как локальную дату и сравниваем по ymd.
+          const startD = new Date(b.bucketEndMs - size);
+          const endD = new Date(b.bucketEndMs - 1);
+          if (size > 24 * 3600 * 1000) {
+            // Недельные бакеты: попадает любой день между startD и endD.
+            return capaYmd >= ymd(startD) && capaYmd <= ymd(endD);
+          }
+          return ymd(startD) === capaYmd;
+        });
         if (!bucket) return null;
         const short = c.title.length > 22 ? c.title.slice(0, 21) + "…" : c.title;
         return { name: bucket.name, color: "#10b981", label: `КАПА: ${short}` };
