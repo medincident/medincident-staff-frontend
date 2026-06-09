@@ -223,7 +223,6 @@ export function IncidentClassifierView() {
           name,
           ...(description !== undefined ? { description } : {}),
         });
-        // Обновляем разрешение для пациентов отдельным вызовом
         if (newItemPatientCanReport) {
           await IncidentClassifierCommandService.incidentClassifierCommandAllowIncidentTypeForPatients(editingItem.id).catch(() => {});
         } else {

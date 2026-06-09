@@ -42,14 +42,12 @@ export function SettingsView() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        // Simulate network delay for UX
         await new Promise(resolve => setTimeout(resolve, 300));
-        
+
         const saved = localStorage.getItem("medincident_settings");
         if (saved) {
           setSettings(JSON.parse(saved));
         } else {
-          // Default settings
           setSettings({
             emailNotification: true,
             quietMode: {

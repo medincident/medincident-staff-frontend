@@ -112,7 +112,6 @@ serwist.addEventListeners();
 // для push-API приводим через unknown-cast (литеральный self нужен только выше).
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
-// ─── Push ────────────────────────────────────────────────────────────────
 interface PushPayload {
   title?: string;
   body?: string;

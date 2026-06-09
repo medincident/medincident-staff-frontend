@@ -73,8 +73,6 @@ export const useIncidentClassifierStore = create<State>((set, get) => ({
 
 const EMPTY: OrgClassifier = { categories: [], types: [] };
 
-// Хук-обёртка: подтягивает справочник для активной орги (один раз на orgId),
-// возвращает категории/типы и флаг загрузки.
 export function useIncidentClassifier(orgId: OrgId) {
   const ensureLoaded = useIncidentClassifierStore((s) => s.ensureLoaded);
   const data = useIncidentClassifierStore((s) =>
@@ -95,8 +93,6 @@ export function useIncidentClassifier(orgId: OrgId) {
   };
 }
 
-// Хелпер для админки/мутаций: сбросить кеш, чтобы Dashboard/журнал
-// подтянули свежий справочник при следующем заходе.
 export function invalidateIncidentClassifier(orgId?: OrgId) {
   useIncidentClassifierStore.getState().invalidate(orgId);
 }

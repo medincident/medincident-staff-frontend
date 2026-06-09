@@ -112,7 +112,6 @@ export function DynamicChart({
       <div style={{ height }} className="w-full font-sans text-xs">
         <ResponsiveContainer width="100%" height="100%">
           
-          {/* === ГОРИЗОНТАЛЬНЫЕ СТОЛБЦЫ === */}
           {type === "bar" || type === "bar-horizontal" ? (
             <BarChart
               data={data}
@@ -152,7 +151,6 @@ export function DynamicChart({
               ))}
             </BarChart>
 
-          /* === ВЕРТИКАЛЬНЫЕ СТОЛБЦЫ === */
           ) : type === "bar-vertical" ? (
             <BarChart
               data={data}
@@ -199,7 +197,6 @@ export function DynamicChart({
               ))}
             </BarChart>
 
-          /* === ОБЛАСТЬ/ЛИНЕЙНЫЙ (AREA) === */
           ) : type === "area" ? (
             <AreaChart 
               data={data} 
@@ -247,7 +244,6 @@ export function DynamicChart({
               })}
             </AreaChart>
 
-          /* === КРУГОВЫЕ (PIE / DONUT) === */
           ) : (
             <PieChart>
               <Pie

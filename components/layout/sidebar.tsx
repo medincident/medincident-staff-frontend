@@ -118,7 +118,6 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex w-64 flex-col border-r bg-card h-screen sticky top-0 z-20 transition-colors duration-300">
 
-      {/* Логотип */}
       <div className="h-14 flex items-center px-4 border-b">
         <div className="h-9 w-9 flex items-center justify-center">
             <MedIncidentLogo className="h-7 w-7 text-primary-foreground" />
@@ -126,7 +125,6 @@ export function Sidebar() {
         <span className="font-bold text-lg text-foreground tracking-tight">{APP_CONFIG.name}</span>
       </div>
 
-      {/* Активная организация (workspace switcher) */}
       <div className="px-3 py-3 border-b">
         <p className="px-1 mb-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           Организация
@@ -136,7 +134,6 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-8">
 
-        {/* ОСНОВНОЕ МЕНЮ */}
         <div>
           <h3 className="mb-2 px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
             Основное
@@ -165,7 +162,6 @@ export function Sidebar() {
           </nav>
         </div>
 
-        {/* АДМИН ПАНЕЛЬ */}
         {showAdminSection && (
           <div>
              <h3 className="mb-2 px-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
@@ -197,7 +193,6 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* ФУТЕР */}
       <div className="p-4 text-center border-t">
         <p className="text-[10px] text-muted-foreground">
             {APP_CONFIG.name} {APP_CONFIG.version}

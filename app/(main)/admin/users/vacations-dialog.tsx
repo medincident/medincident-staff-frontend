@@ -89,14 +89,11 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
 
-  // Form: schedule new vacation
   const [scheduleStart, setScheduleStart] = useState<Date | undefined>(undefined);
   const [scheduleEnd, setScheduleEnd] = useState<Date | undefined>(undefined);
 
-  // Form: start now
   const [startNowEnd, setStartNowEnd] = useState<Date | undefined>(undefined);
 
-  // Edit end date
   const [editingVacation, setEditingVacation] = useState<v1VacationView | null>(null);
   const [editEndDate, setEditEndDate] = useState<Date | undefined>(undefined);
 
@@ -337,7 +334,6 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
                   </section>
                 )}
 
-                {/* Запланировать новый */}
                 {active.length === 0 && (
                   <section className="space-y-3 border rounded-lg p-3 bg-muted/30">
                     <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -375,7 +371,6 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
                   </section>
                 )}
 
-                {/* Начать прямо сейчас — если нет активного */}
                 {active.length === 0 && (
                   <section className="space-y-3 border rounded-lg p-3 bg-muted/30">
                     <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -435,7 +430,6 @@ export function VacationsDialog({ open, onOpenChange, employeeId, employeeName }
         </DialogContent>
       </Dialog>
 
-      {/* Подмодалка — изменение даты окончания */}
       <Dialog open={!!editingVacation} onOpenChange={(o) => !o && setEditingVacation(null)}>
         <DialogContent className="min-w-0">
           <DialogHeader>

@@ -128,7 +128,6 @@ export function NotificationsView() {
     }
   };
 
-  // Группировка по дате создания
   const grouped = notifications.reduce((acc, n) => {
     const date = n.createdAt ? formatDateLabel(n.createdAt) : "Без даты";
     if (!acc[date]) acc[date] = [];
@@ -140,7 +139,6 @@ export function NotificationsView() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-20">
-      {/* HEADER */}
       <div className="flex items-center justify-between gap-2 sticky top-0 bg-background/80 backdrop-blur-md py-4 z-10 border-b md:static md:border-none md:bg-transparent md:py-0 px-4 md:px-0 min-w-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="hover:bg-muted shrink-0">

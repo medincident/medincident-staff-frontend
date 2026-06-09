@@ -99,7 +99,6 @@ export function RequestsListView() {
   return (
     <div className="space-y-6 pb-20">
 
-      {/* HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Заявки на обслуживание</h1>
@@ -116,10 +115,8 @@ export function RequestsListView() {
         </PermissionGate>
       </div>
 
-      {/* FILTERS */}
       <div className="flex flex-col md:flex-row gap-3">
         {isLoading ? (
-          /* SKELETON FILTERS */
           <>
              <Skeleton className="h-9 flex-1 rounded-md" />
              <div className="flex gap-3 w-full md:w-auto">
@@ -127,7 +124,6 @@ export function RequestsListView() {
              </div>
           </>
         ) : (
-          /* REAL FILTERS */
           <>
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -156,7 +152,6 @@ export function RequestsListView() {
         )}
       </div>
 
-      {/* DESKTOP TABLE */}
       <div className="hidden 2xl:block bg-card rounded-xl border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50 border-b">
@@ -170,7 +165,6 @@ export function RequestsListView() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               /* DESKTOP SKELETON ROWS */
                Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i} className="border-b last:border-0">
                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -235,10 +229,8 @@ export function RequestsListView() {
         </Table>
       </div>
 
-      {/* MOBILE VIEW (CARDS) */}
       <div className="2xl:hidden space-y-4">
         {isLoading ? (
-           /* MOBILE SKELETON CARDS */
            Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="border rounded-xl bg-card overflow-hidden">
                  <div className="p-4 space-y-3">
@@ -302,7 +294,6 @@ export function RequestsListView() {
                   </Card>
                 </Link>
 
-                {/* EDIT ICON FOR MOBILE */}
                 <div className="absolute top-2 right-2">
                    <PermissionGate can="canAssignRequestExecutor">
                      <Link href={`/requests/${req.id}/edit`}>

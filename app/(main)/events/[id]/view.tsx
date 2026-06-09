@@ -346,7 +346,6 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
         const evtPriority = (foundEvent.priority || "").toLowerCase().replace("incident_priority_", "");
         setPriority(evtPriority || "normal");
 
-        // Загружаем связанные заявки
         try {
           const reqs = await fetchAllPages<v1ServiceRequest>((cursor) =>
             ServiceRequestQueryService.serviceRequestQueryListServiceRequestsByIncident(eventId, 200, cursor),
@@ -356,7 +355,6 @@ export function EventDetailsView({ eventId }: EventDetailsViewProps) {
           console.warn("Could not load linked requests", e);
         }
 
-        // Получаем организацию для загрузки классификаторов (если есть organizationId в событии)
         if (foundEvent.organizationId) {
           const [cats, types] = await Promise.all([
             fetchAllPages<v1Category>((cursor) =>

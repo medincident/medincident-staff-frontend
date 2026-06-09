@@ -75,10 +75,8 @@ export function HelpView() {
         </div>
       </div>
 
-      {/* CONTENT BLOCK */}
       <div className="space-y-6">
 
-        {/* FAQ Section */}
         <Card className="bg-card pb-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-3 text-lg text-foreground">
@@ -93,7 +91,6 @@ export function HelpView() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-               /* FAQ SKELETONS */
                <div className="space-y-1">
                   {[1, 2, 3, 4, 5].map((i) => (
                      <div key={i} className="flex items-center justify-between py-4 px-1 border-b last:border-0">
@@ -103,7 +100,6 @@ export function HelpView() {
                   ))}
                </div>
             ) : (
-               /* REAL FAQ */
                <Accordion type="single" collapsible className="w-full">
                  {faqItems.map((item, index) => (
                    <AccordionItem key={index} value={`item-${index}`} className="border-b last:border-0 border-border">
@@ -120,7 +116,6 @@ export function HelpView() {
           </CardContent>
         </Card>
 
-        {/* Documentation Section */}
         <Card className="bg-card">
           <CardHeader>
             <CardTitle className="text-lg text-foreground flex items-center gap-3">
@@ -135,7 +130,6 @@ export function HelpView() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-               /* DOCS SKELETONS */
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {[1, 2].map((i) => (
                      <div key={i} className="flex items-start p-4 border rounded-md h-auto gap-4 bg-background">
@@ -148,7 +142,6 @@ export function HelpView() {
                   ))}
                </div>
             ) : (
-               /* REAL DOCS */
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Button variant="outline" className="justify-start h-auto p-4 bg-background hover:bg-muted/50 group border-border min-w-0">
                     <div className="p-2.5 bg-muted rounded-lg text-muted-foreground mr-4 shrink-0 transition-colors group-hover:text-foreground">

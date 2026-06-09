@@ -113,7 +113,6 @@ export function PatientIncidentsView() {
     { id: string; name: string; departments: { id: string; name: string }[] }[]
   >([]);
 
-  // Диалог одобрения.
   const [publishTarget, setPublishTarget] = useState<v1BufferEntryView | null>(null);
   const [publishDept, setPublishDept] = useState<string>("");
   const [publishCategory, setPublishCategory] = useState<string>("");

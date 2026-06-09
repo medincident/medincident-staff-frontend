@@ -139,7 +139,6 @@ export function Header() {
   return (
     <header className="bg-card border-b sticky top-0 z-30 h-14 px-4 flex justify-between items-center transition-colors duration-300">
 
-      {/* ЛОГОТИП / НАЗВАНИЕ */}
       <div className="flex items-center gap-3">
         <div className="flex md:hidden items-center">
           <div className="h-9 w-9 flex items-center justify-center">
@@ -154,7 +153,6 @@ export function Header() {
 
       <div className="flex items-center gap-1 sm:gap-2">
 
-        {/* --- УВЕДОМЛЕНИЯ --- */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
@@ -230,7 +228,6 @@ export function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* --- ПОЛЬЗОВАТЕЛЬ --- */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-muted transition-colors">

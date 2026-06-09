@@ -45,7 +45,6 @@ function entityHref(entityType?: string, entityId?: string): string | undefined 
 export function displayNotification(n: v1Notification): NotificationDisplay {
   const href = entityHref(n.entityType, n.entityId);
   switch (n.type) {
-    // ---- Incident ----
     case v1NotificationType.NOTIFICATION_TYPE_INCIDENT_CREATED:
       return { title: "Новое нежелательное событие", intent: "warning", icon: AlertTriangle, href };
     case v1NotificationType.NOTIFICATION_TYPE_INCIDENT_STATUS_CHANGED:
@@ -55,7 +54,6 @@ export function displayNotification(n: v1Notification): NotificationDisplay {
     case v1NotificationType.NOTIFICATION_TYPE_INCIDENT_DESCRIPTION_UPDATED:
       return { title: "Описание НС обновлено", intent: "muted", icon: AlertTriangle, href };
 
-    // ---- Service request ----
     case v1NotificationType.NOTIFICATION_TYPE_SERVICE_REQUEST_CREATED:
       return { title: "Новая заявка на обслуживание", intent: "info", icon: Wrench, href };
     case v1NotificationType.NOTIFICATION_TYPE_SERVICE_REQUEST_STATUS_CHANGED:
@@ -65,7 +63,6 @@ export function displayNotification(n: v1Notification): NotificationDisplay {
     case v1NotificationType.NOTIFICATION_TYPE_SERVICE_REQUEST_EXECUTOR_REMOVED:
       return { title: "Исполнитель снят", intent: "muted", icon: Briefcase, href };
 
-    // ---- Vacation ----
     case v1NotificationType.NOTIFICATION_TYPE_VACATION_SCHEDULED:
       return { title: "Запланирован отпуск", intent: "info", icon: Plane };
     case v1NotificationType.NOTIFICATION_TYPE_VACATION_STARTED:
@@ -77,7 +74,6 @@ export function displayNotification(n: v1Notification): NotificationDisplay {
     case v1NotificationType.NOTIFICATION_TYPE_VACATION_END_DATE_CHANGED:
       return { title: "Дата окончания отпуска изменена", intent: "info", icon: Plane };
 
-    // ---- Employee ----
     case v1NotificationType.NOTIFICATION_TYPE_EMPLOYEE_HIRED:
       return { title: "Принят на работу", intent: "success", icon: UserPlus };
     case v1NotificationType.NOTIFICATION_TYPE_EMPLOYEE_TERMINATED:
@@ -87,19 +83,16 @@ export function displayNotification(n: v1Notification): NotificationDisplay {
     case v1NotificationType.NOTIFICATION_TYPE_EMPLOYEE_POSITION_CHANGED:
       return { title: "Изменилась должность", intent: "info", icon: Briefcase };
 
-    // ---- Role ----
     case v1NotificationType.NOTIFICATION_TYPE_ROLE_ASSIGNED:
       return { title: "Назначена роль", intent: "success", icon: Shield };
     case v1NotificationType.NOTIFICATION_TYPE_ROLE_REVOKED:
       return { title: "Роль отозвана", intent: "muted", icon: Shield };
 
-    // ---- System admin ----
     case v1NotificationType.NOTIFICATION_TYPE_SYSTEM_ADMIN_GRANTED:
       return { title: "Выданы права системного администратора", intent: "warning", icon: ShieldAlert };
     case v1NotificationType.NOTIFICATION_TYPE_SYSTEM_ADMIN_REVOKED:
       return { title: "Права системного администратора отозваны", intent: "muted", icon: ShieldAlert };
 
-    // ---- Security ----
     case v1NotificationType.NOTIFICATION_TYPE_SECURITY_NEW_LOGIN:
       return { title: "Вход в систему с нового устройства", intent: "warning", icon: LogIn };
     case v1NotificationType.NOTIFICATION_TYPE_SECURITY_EMAIL_CHANGED:

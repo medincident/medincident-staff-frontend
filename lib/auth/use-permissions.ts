@@ -9,30 +9,15 @@ import { useMyClinicRole } from "./use-my-clinic-role";
 import { useMyDeptRole } from "./use-my-dept-role";
 import { getMyEmployeeInOrg } from "./get-my-employee";
 
-// Ролевые флаги и permissions для UI.
 // Композиция: SelfQuery {Identity, OrgRole, ClinicRole, DeptRole} + employment в активной орге.
-//
-// Сопоставление с моделью продуктовых ролей:
-//   System admin                 → isSystemAdmin
-//   Org admin                    → isOrgAdmin
-//   Org head (рук-ль организации)→ isOrgHead    (read-only org-wide)
-//   Org dispatcher (заявки + НС) → isOrgDispatcher
-//   Зав клиникой                 → isClinicHead
-//   Руководитель отделения       → isDepartmentResponsible
-//   Работник                     → isMember
 //
 // TODO бэкенда (флаги пока всегда false):
 //   - Гость
 //   - Ответственный за конкретный тип НС
 //   - Ответственный за конкретный тип заявки
 //   - Раздельные диспетчеры (заявки vs НС) — сейчас один общий
-//
-// Когда бэк появится, надо:
-//   1) добавить запросы в соответствующие use-my-*-role хуки или сюда;
-//   2) поменять флаги ниже с `false` на реальное значение.
 
 export interface Permissions {
-  // ─── Сырые роли ───────────────────────────────────────────────
   isSystemAdmin: boolean;
   isOrgAdmin: boolean;
   isOrgHead: boolean;
@@ -42,12 +27,10 @@ export interface Permissions {
   /** Любой сотрудник в активной орге. */
   isMember: boolean;
 
-  // ─── TODO бэка ────────────────────────────────────────────────
   isGuest: boolean;
   isIncidentTypeResponsible: boolean;
   isRequestTypeResponsible: boolean;
 
-  // ─── Заявки ───────────────────────────────────────────────────
   /** Видеть все заявки в орге. */
   canSeeAllRequests: boolean;
   /** Видеть заявки своей клиники. */
@@ -61,7 +44,6 @@ export interface Permissions {
   /** Назначать исполнителя / менять статус. */
   canAssignRequestExecutor: boolean;
 
-  // ─── Нежелательные события ────────────────────────────────────
   canSeeAllIncidents: boolean;
   canSeeClinicIncidents: boolean;
   canSeeDepartmentIncidents: boolean;
@@ -69,7 +51,6 @@ export interface Permissions {
   canCreateIncident: boolean;
   canAssignIncidentResponsible: boolean;
 
-  // ─── Управление ───────────────────────────────────────────────
   /** /admin/organizations — только sysadmin. */
   canManageOrganizations: boolean;
   /** /admin/structure — клиники, отделения. */
@@ -89,12 +70,10 @@ export interface Permissions {
   /** /admin/announcements. */
   canManageAnnouncements: boolean;
 
-  // ─── Просмотр ─────────────────────────────────────────────────
   canViewReports: boolean;
   canViewAnalytics: boolean;
   canViewAnnouncements: boolean;
 
-  // ─── Мета ─────────────────────────────────────────────────────
   /** true пока хоть один из источников ещё не отдал ответ. */
   isLoading: boolean;
   /** true, если у юзера вообще есть какая-то «полезная» роль. */
@@ -199,7 +178,6 @@ export function usePermissions(): Permissions {
   const isLoading =
     identityLoading || orgRoleLoading || empLoading || clinicLoading || deptLoading;
 
-  // ── Сырые роли ──
   const isSystemAdmin = !!identity?.isSystemAdmin;
   const isOrgAdmin = orgRole.isOrgAdmin;
   const isOrgHead = orgRole.isOrgHead;
@@ -213,8 +191,6 @@ export function usePermissions(): Permissions {
   const isIncidentTypeResponsible = false;
   const isRequestTypeResponsible = false;
 
-  // ── Скоупы (от широкого к узкому) ──
-  // Видимость уровня орги: sysadmin или любая орг-роль.
   const orgWideRead = isSystemAdmin || isOrgAdmin || isOrgHead || isOrgDispatcher;
   const clinicWideRead = orgWideRead || isClinicHead;
   const deptWideRead = clinicWideRead || isDepartmentResponsible;

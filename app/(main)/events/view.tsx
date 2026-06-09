@@ -184,8 +184,7 @@ export function EventsListView() {
 
   return (
     <div className="space-y-6 pb-20">
-      
-      {/* HEADER */}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Журнал событий</h1>
@@ -203,7 +202,6 @@ export function EventsListView() {
         </PermissionGate>
       </div>
 
-      {/* FILTERS TOOLBAR */}
       <div className="flex flex-col sm:flex-row gap-3">
         {isLoading ? (
           <>
@@ -244,7 +242,6 @@ export function EventsListView() {
         )}
       </div>
 
-      {/* TABLE (DESKTOP) */}
       <div className="hidden 2xl:block bg-card rounded-xl border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50 border-b">
@@ -363,7 +360,6 @@ export function EventsListView() {
         </Table>
       </div>
 
-      {/* CARDS (MOBILE) */}
       <div className="2xl:hidden space-y-4">
         {isLoading ? (
            Array.from({ length: 3 }).map((_, i) => (

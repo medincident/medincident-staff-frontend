@@ -218,7 +218,6 @@ export function EntityHistory({
     };
   }, [entityType, entityId]);
 
-  // Сортируем по убыванию даты — последние события сверху
   const sortedItems = useMemo(
     () =>
       [...items].sort(

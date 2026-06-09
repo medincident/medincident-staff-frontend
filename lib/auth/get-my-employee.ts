@@ -3,9 +3,6 @@ import {
   v1EmployeeCardView,
 } from "@/lib/api-generated";
 
-// SelfQueryService.ListMyOrganizations + GetMyEmployment по каждой orgId.
-// Кэш в sessionStorage по zitadelUserId.
-
 const CACHE_KEY_PREFIX = "myEmployees:";
 
 function readCache(zitadelUserId: string): v1EmployeeCardView[] | null {

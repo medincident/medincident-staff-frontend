@@ -41,7 +41,6 @@ export const useConfirmStore = create<State>((set, get) => ({
   },
 }));
 
-// Хук для вызова из любого компонента: const confirm = useConfirm();
 export function useConfirm() {
   return useConfirmStore((s) => s.ask);
 }

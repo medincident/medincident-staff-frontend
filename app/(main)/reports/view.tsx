@@ -727,6 +727,80 @@ export function ReportsView() {
       .filter((m): m is { name: string; color: string; label: string } => m !== null);
   }, [capaEntries, forecastCategory, forecastFrequency]);
 
+  // Контр-факт КАПА: «что было бы, если бы тренд из истории сохранился».
+  // Берём САМУЮ РАННЮЮ КАПА в выбранной категории (даёт максимальный
+  // пост-период для сравнения), обучаем Holt только на бакетах до даты ввода,
+  // пробрасываем прогноз на всю оставшуюся часть графика — включая прогнозную
+  // зону, чтобы было видно, расходится ли «без КАПА» с реальностью.
+  // Требуем ≥ 3 бакета до КАПА — иначе Holt получает мусорный тренд.
+  const capaCounterfactual = useMemo(() => {
+    if (forecastCategory === "all") return null;
+    const myCapa = capaEntries
+      .filter((c) => c.categoryId === forecastCategory)
+      .filter((c) => /^\d{4}-\d{2}-\d{2}/.test(String(c.introducedAt)))
+      .sort((a, b) =>
+        String(a.introducedAt).slice(0, 10).localeCompare(String(b.introducedAt).slice(0, 10)),
+      );
+    if (myCapa.length === 0) return null;
+    const capa = myCapa[0];
+    const capaYmd = String(capa.introducedAt).slice(0, 10);
+
+    const ymd = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    const buckets = forecastFrequency.buckets;
+    const size = forecastFrequency.bucketSizeMs;
+
+    // Индекс первого бакета, чей КОНЕЦ ≥ дате КАПА. С этого бакета и далее
+    // считаем «после КАПА».
+    const capaIdx = buckets.findIndex((b) => ymd(new Date(b.bucketEndMs - 1)) >= capaYmd);
+    if (capaIdx < 0) return null;
+    if (capaIdx < 3) return null; // мало данных до КАПА для тренда
+
+    const preSeries = buckets.slice(0, capaIdx).map((b) => b["Инциденты"]);
+    const postCount = buckets.length - capaIdx;
+    const forecastHorizon = forecastFrequency.useWeekly ? 4 : 7;
+    const totalHorizon = postCount + forecastHorizon;
+    if (totalHorizon === 0) return null;
+
+    const cf = forecastHolt(preSeries, totalHorizon);
+
+    // Имена бакетов, к которым клеим контр-факт (post + forecast).
+    const names: string[] = [];
+    for (let i = capaIdx; i < buckets.length; i++) names.push(buckets[i].name);
+    if (buckets.length > 0) {
+      const lastMs = buckets[buckets.length - 1].bucketEndMs;
+      for (let h = 0; h < forecastHorizon; h++) {
+        names.push(formatDateShort(new Date(lastMs + (h + 1) * size)));
+      }
+    }
+
+    // Средние для бейджа — только по фактическим post-CAPA бакетам, где
+    // есть и прогноз, и реальность.
+    const actualPost = buckets.slice(capaIdx).map((b) => b["Инциденты"]);
+    const predictedPost = cf.points.slice(0, actualPost.length).map((p) => p.mean);
+    const actualMean = actualPost.length
+      ? actualPost.reduce((s, v) => s + v, 0) / actualPost.length
+      : 0;
+    const predictedMean = predictedPost.length
+      ? predictedPost.reduce((s, v) => s + v, 0) / predictedPost.length
+      : 0;
+    const deltaPct =
+      predictedMean === 0 ? null : ((actualMean - predictedMean) / predictedMean) * 100;
+
+    return {
+      capa,
+      capaIdx,
+      names,
+      points: cf.points,
+      actualMean,
+      predictedMean,
+      deltaPct,
+      postCount: actualPost.length,
+    };
+  }, [capaEntries, forecastCategory, forecastFrequency]);
+
   const forecastSeriesKey = useMemo(() => {
     // Ключ для кеша LSTM — меняется только при изменении рядов.
     return (
@@ -794,6 +868,8 @@ export function ReportsView() {
       "Инциденты_прогноз"?: number | null;
       "Заявки_ДИ"?: [number, number] | null;
       "Инциденты_ДИ"?: [number, number] | null;
+      "Инциденты_capa_прогноз"?: number | null;
+      "Инциденты_capa_ДИ"?: [number, number] | null;
       isForecast?: boolean;
     }> = forecastFrequency.buckets.map((b, i, arr) => {
       const isLast = i === arr.length - 1;
@@ -836,6 +912,34 @@ export function ReportsView() {
       }
     }
 
+    // Контр-факт КАПА — клеим по именам бакетов. Включаем «якорь»: ставим
+    // последнюю pre-CAPA точку (фактическое значение) в качестве первой точки
+    // призрачной линии, чтобы visual-разрыв между линиями не сбивал с толку.
+    if (capaCounterfactual) {
+      const byName = new Map<string, number>();
+      chartData.forEach((row, idx) => byName.set(row.name, idx));
+      capaCounterfactual.names.forEach((name, i) => {
+        const idx = byName.get(name);
+        if (idx == null) return;
+        const p = capaCounterfactual.points[i];
+        if (!p) return;
+        chartData[idx]["Инциденты_capa_прогноз"] = p.mean;
+        chartData[idx]["Инциденты_capa_ДИ"] = [p.lower, p.upper];
+      });
+      // Якорная точка — на бакет ПЕРЕД КАПА: ставим в неё фактическое
+      // последнее значение, чтобы линия выходила из истории, а не висла.
+      const anchorBucketIdx = capaCounterfactual.capaIdx - 1;
+      if (anchorBucketIdx >= 0) {
+        const anchorName = forecastFrequency.buckets[anchorBucketIdx].name;
+        const idx = byName.get(anchorName);
+        if (idx != null) {
+          const v = forecastFrequency.buckets[anchorBucketIdx]["Инциденты"];
+          chartData[idx]["Инциденты_capa_прогноз"] = v;
+          chartData[idx]["Инциденты_capa_ДИ"] = [v, v];
+        }
+      }
+    }
+
     return {
       requests: reqRes,
       events: evtRes,
@@ -847,7 +951,7 @@ export function ReportsView() {
       forecastStartName,
       activeMethod: useLstm ? ("lstm" as const) : ("holt" as const),
     };
-  }, [forecastFrequency, forecastMethod, forecastSeriesKey, lstmResult]);
+  }, [forecastFrequency, forecastMethod, forecastSeriesKey, lstmResult, capaCounterfactual]);
 
   const distributions = useMemo(() => {
     const byReqStatus = Object.entries(
@@ -1196,7 +1300,65 @@ export function ReportsView() {
                     <span className="inline-block w-4 h-2 bg-muted/50 border border-muted-foreground/30 rounded-[2px]" />
                     95% ДИ
                   </span>
+                  {capaCounterfactual && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="inline-block w-4 border-t-[1.5px] border-dashed"
+                        style={{ borderColor: "#64748b" }}
+                      />
+                      без КАПА (контр-факт)
+                    </span>
+                  )}
                 </p>
+              )}
+              {capaCounterfactual && capaCounterfactual.postCount > 0 && (
+                <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5">
+                  <div className="text-[11px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400 font-semibold">
+                    Эффект КАПА
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5 mb-2 line-clamp-2 break-words">
+                    {capaCounterfactual.capa.title}
+                    {" · "}
+                    <span className="whitespace-nowrap">
+                      с {String(capaCounterfactual.capa.introducedAt).slice(0, 10)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+                    <span>
+                      Прогноз без КАПА:{" "}
+                      <span className="font-semibold text-foreground">
+                        {capaCounterfactual.predictedMean.toFixed(1)}
+                      </span>{" "}
+                      <span className="text-muted-foreground">
+                        {forecast.unit === "неделю" ? "НС/нед." : "НС/день"}
+                      </span>
+                    </span>
+                    <span>
+                      Фактически:{" "}
+                      <span className="font-semibold text-foreground">
+                        {capaCounterfactual.actualMean.toFixed(1)}
+                      </span>{" "}
+                      <span className="text-muted-foreground">
+                        {forecast.unit === "неделю" ? "НС/нед." : "НС/день"}
+                      </span>
+                    </span>
+                    {capaCounterfactual.deltaPct !== null && (
+                      <span
+                        className={
+                          "font-semibold " +
+                          (capaCounterfactual.deltaPct < 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : capaCounterfactual.deltaPct > 0
+                            ? "text-destructive"
+                            : "text-muted-foreground")
+                        }
+                      >
+                        Δ {capaCounterfactual.deltaPct > 0 ? "+" : ""}
+                        {capaCounterfactual.deltaPct.toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">

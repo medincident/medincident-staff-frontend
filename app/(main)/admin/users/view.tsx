@@ -91,10 +91,8 @@ export function UsersView() {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  // Vacations dialog
   const [vacationsTarget, setVacationsTarget] = useState<v1EmployeeCardView | null>(null);
 
-  // Hire-сотрудника
   const [isHireDialogOpen, setIsHireDialogOpen] = useState(false);
   const [hireForm, setHireForm] = useState({
     zitadelUserId: "",
@@ -408,7 +406,6 @@ export function UsersView() {
         />
       </div>
 
-      {/* Desktop table */}
       <div className="hidden lg:block bg-card rounded-lg border overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
@@ -502,7 +499,6 @@ export function UsersView() {
         </Table>
       </div>
 
-      {/* Mobile cards */}
       <div className="lg:hidden space-y-3">
         {isLoading && users.length === 0 && Array.from({ length: 3 }).map((_, i) => (
           <Card key={`skel-mob-${i}`} className="overflow-hidden p-0 border">

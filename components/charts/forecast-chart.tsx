@@ -26,6 +26,11 @@ export type ForecastChartPoint = {
   // 95% ДИ
   "Заявки_ДИ"?: [number, number] | null;
   "Инциденты_ДИ"?: [number, number] | null;
+  // Контр-факт: что прогнозировал Holt по данным ДО ввода КАПА,
+  // если бы тренд сохранился. Рисуется поверх фактической линии — позволяет
+  // визуально сравнить «прогноз vs реальность» после интервенции.
+  "Инциденты_capa_прогноз"?: number | null;
+  "Инциденты_capa_ДИ"?: [number, number] | null;
   // Флаг, по которому определяем начало прогноза
   isForecast?: boolean;
 };
@@ -103,6 +108,21 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     }
   });
 
+  const capaMean = byKey["Инциденты_capa_прогноз"];
+  const capaCi = byKey["Инциденты_capa_ДИ"];
+  if (capaMean && capaMean.value != null) {
+    const ciVal = capaCi?.value as [number, number] | undefined;
+    rows.push({
+      label: "Без КАПА (прогноз)",
+      value:
+        ciVal && Array.isArray(ciVal)
+          ? `${Number(capaMean.value).toFixed(1)} (${ciVal[0].toFixed(1)}–${ciVal[1].toFixed(1)})`
+          : Number(capaMean.value).toFixed(1),
+      color: capaMean.color || capaMean.stroke,
+      isForecast: true,
+    });
+  }
+
   return (
     <div className="bg-popover border border-border text-popover-foreground rounded-lg p-3 min-w-[170px] shadow-sm">
       {label && <p className="text-sm font-semibold mb-1.5">{label}</p>}
@@ -172,7 +192,6 @@ export function ForecastChart({
           <Tooltip content={<CustomTooltip />} />
           <Legend content={<Legend_ />} verticalAlign="top" />
 
-          {/* 95% ДИ — серые зоны для каждой метрики */}
           {showRequests && (
             <Area
               type="monotone"
@@ -198,7 +217,19 @@ export function ForecastChart({
             connectNulls
           />
 
-          {/* Исторические области */}
+          {/* Контр-факт КАПА: 95% ДИ — нейтральная серая зона. */}
+          <Area
+            type="monotone"
+            dataKey="Инциденты_capa_ДИ"
+            name="95% ДИ (без КАПА)"
+            legendType="none"
+            stroke="none"
+            fill="#64748b"
+            fillOpacity={0.07}
+            isAnimationActive={false}
+            connectNulls
+          />
+
           {showRequests && (
             <Area
               type="monotone"
@@ -222,7 +253,6 @@ export function ForecastChart({
             isAnimationActive={false}
           />
 
-          {/* Линии прогноза — пунктир */}
           {showRequests && (
             <Line
               type="monotone"
@@ -247,6 +277,21 @@ export function ForecastChart({
             strokeDasharray="5 4"
             dot={{ r: 2, fill: evtColor }}
             connectNulls={false}
+            isAnimationActive={false}
+          />
+
+          {/* Призрачная линия контр-факта: «что было бы без КАПА». */}
+          <Line
+            type="monotone"
+            dataKey="Инциденты_capa_прогноз"
+            name="Без КАПА (прогноз)"
+            legendType="none"
+            stroke="#64748b"
+            strokeWidth={1.5}
+            strokeDasharray="2 5"
+            strokeOpacity={0.75}
+            dot={false}
+            connectNulls
             isAnimationActive={false}
           />
 

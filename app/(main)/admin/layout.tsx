@@ -122,7 +122,6 @@ export default function AdminLayout({
         ))}
       </div>
 
-      {/* Контент страницы */}
       {children}
     </div>
   );

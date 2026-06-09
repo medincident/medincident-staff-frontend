@@ -79,7 +79,6 @@ export function detectChangePoints(
   const n = values.length;
   if (n < minSegment * 2) return points;
 
-  // Стек сегментов для рекурсивной бинарной сегментации
   const queue: Array<[number, number]> = [[0, n]];
 
   while (queue.length && points.length < maxPoints) {

@@ -196,7 +196,6 @@ export function NotificationSettingsView() {
 
   return (
     <div className="max-w-3xl mx-auto pb-20 space-y-6">
-      {/* HEADER */}
       <div className="flex items-center gap-2 mb-2">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
@@ -226,7 +225,6 @@ export function NotificationSettingsView() {
         </div>
       ) : (
         <>
-          {/* QUIET HOURS */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -281,7 +279,6 @@ export function NotificationSettingsView() {
             </CardContent>
           </Card>
 
-          {/* TYPE SETTINGS */}
           {TYPE_GROUPS.map((group) => {
             const isSecurity = group.title === "Безопасность";
             return (

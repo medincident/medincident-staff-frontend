@@ -7,18 +7,15 @@ type ColorIntent =
   | "destructive";
 
 const STATUS_INTENTS: Record<string, ColorIntent> = {
-  // --- Нейтральные (Синие/Серые) ---
   created: "muted",
   pending: "muted", // НС: зарегистрировано, ждёт рассмотрения
   low: "muted", // приоритет: низкий
   minor: "muted",
 
-  // --- Информационные (Синие) ---
   check: "info",
   normal: "info",
   pending_review: "info", // заявка: ждёт проверки/приёмки
 
-  // --- Внимание (Желтые) ---
   in_work: "warning",
   investigation: "warning",
   in_progress: "warning", // НС: в работе
@@ -26,27 +23,22 @@ const STATUS_INTENTS: Record<string, ColorIntent> = {
   urgent: "warning",
   moderate: "warning",
 
-  // --- Ожидание/Спец (Фиолетовые) ---
   measures: "purple",
   on_hold: "purple", // заявка: приостановлена
 
-  // --- Успех (Зеленые) ---
   completed: "success",
   closed: "success",
   done: "success", // НС: решено
 
-  // --- Статусы активности ---
   active: "success",
   inactive: "muted",
   deactivated: "muted",
 
-  // --- Опасность/Отказ (Красные) ---
   rejected: "destructive", // НС: отклонено
   cancelled: "destructive",
   critical: "destructive",
   severe: "destructive",
 
-  // --- Типы уведомлений (Generic) ---
   info: "info",
   success: "success",
   error: "destructive",
@@ -137,25 +129,21 @@ export const getCardBorderColor = (key: string) => {
 };
 
 export const CHART_COLORS: Record<string, string> = {
-  // Статусы
   Новые: "hsl(var(--info))",
   "В работе": "hsl(var(--warning))",
   Завершены: "hsl(var(--success))",
   Отменены: "hsl(var(--destructive))",
 
-  // Активность
   Активна: "hsl(var(--success))",
   Активные: "hsl(var(--success))",
   Неактивна: "hsl(var(--muted-foreground))",
   Неактивные: "hsl(var(--muted-foreground))",
 
-  // Тяжесть / Приоритет
   Легкий: "hsl(var(--success))",
   Средний: "hsl(var(--warning))",
   Тяжелый: "hsl(var(--purple))",
   Критический: "hsl(var(--destructive))",
 
-  // Общие
   Низкий: "hsl(var(--muted-foreground))",
   Высокий: "hsl(var(--primary))",
 

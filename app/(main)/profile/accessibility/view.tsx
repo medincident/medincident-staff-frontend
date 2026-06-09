@@ -86,7 +86,6 @@ export function AccessibilityView() {
         </Button>
       </div>
 
-      {/* ЧЁРНО-БЕЛЫЙ РЕЖИМ */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -123,7 +122,6 @@ export function AccessibilityView() {
         </CardContent>
       </Card>
 
-      {/* РАЗМЕР ШРИФТА */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -178,7 +176,6 @@ export function AccessibilityView() {
             })}
           </div>
 
-          {/* Превью */}
           <div className="mt-6 rounded-lg border bg-muted/30 p-4 space-y-2">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
               Превью

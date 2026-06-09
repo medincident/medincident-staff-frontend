@@ -1,10 +1,5 @@
-// Парсер ошибок бэка под формат `v1ErrorResponse`:
-//   { code: string, message: string, details?: { violations: [...] } }
-// (см. medincident.swagger.json и docs/services бэка)
-//
-// `code` — машинно-читаемая строка, например "validation_failed",
-// "employee_not_found", "permission_denied", "zitadel_user_not_found".
-// `details.violations` присутствуют только при code = "validation_failed".
+// Парсер бэк-ошибок v1ErrorResponse: { code, message, details?.violations[] }.
+// `details.violations` приходят только при code = "validation_failed".
 
 import type { ApiError } from "@/lib/api-generated";
 
@@ -22,7 +17,6 @@ export interface BackendErrorPayload {
   status?: number;
 }
 
-// Сборник дружелюбных русских заголовков для часто встречающихся code'ов.
 // Если code не в словаре — fallback на пришедший с бэка `message`.
 const CODE_TITLES: Record<string, string> = {
   validation_failed: "Проверьте поля",
@@ -64,8 +58,6 @@ const RULE_LABELS: Record<string, string> = {
   url: "некорректный URL",
 };
 
-// Читает axios-error / fetch-error / ApiError из сгенерированного клиента
-// и приводит к общему виду. Если форма не та — отдаёт null.
 export function parseBackendError(e: unknown): BackendErrorPayload | null {
   if (!e || typeof e !== "object") return null;
 
@@ -105,9 +97,7 @@ export function formatViolation(v: FieldViolation): string {
   return v.message?.trim() ? `${fieldName}: ${v.message}` : `${fieldName}: ${ruleLabel}${param}`;
 }
 
-// Заголовок тоста: словарный заголовок по code → сам code (raw машинный) →
-// HTTP-статус (если ни code, ни словаря нет) → fallback. Текст из message
-// в title не утекает — он живёт в description, иначе обе строки тоста дублируются.
+// message не пускаем в title: он живёт в description, иначе title и description дублируются.
 export function errorTitle(payload: BackendErrorPayload | null, fallback = "Ошибка"): string {
   if (!payload) return fallback;
   const dictTitle = CODE_TITLES[payload.code];
@@ -117,8 +107,6 @@ export function errorTitle(payload: BackendErrorPayload | null, fallback = "Ош
   return fallback;
 }
 
-// Описание тоста: violations списком (для validation_failed) или сам message.
-// Если message пустой — fallback (а не дубль title).
 export function errorDescription(
   payload: BackendErrorPayload | null,
   fallback?: string,

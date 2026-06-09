@@ -2,14 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// Хук для постраничной загрузки списков с курсором.
-// Идея: при изменении deps сбрасывает список и грузит первую страницу.
-// Кнопка/триггер «Загрузить ещё» вызывает loadMore() — дотягивает следующую
-// страницу и аппендит к items.
-//
-// Бэк-формат ответа везде одинаковый: `{ items?: T[]; nextCursor?: string }`.
-// fetcher принимает курсор (undefined для первой страницы) и должен дёргать
-// API со своими параметрами + cursor последним аргументом.
+// Курсорный пагинатор: бэк-формат `{ items?: T[]; nextCursor?: string }`.
+// При смене deps сбрасывает список; loadMore() аппендит следующую страницу.
 
 interface CursorPage<T> {
   items?: T[];
@@ -42,7 +36,6 @@ export function usePaginatedList<T>(
     fetcherRef.current = fetcher;
   });
 
-  // Первая страница.
   useEffect(() => {
     if (!enabled) {
       setItems([]);
