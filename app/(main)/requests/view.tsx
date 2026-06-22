@@ -61,7 +61,6 @@ export function RequestsListView() {
 
   const userId = (session?.user as { id?: string } | undefined)?.id;
   const perms = usePermissions();
-  const { employee } = useMyEmployee();
 
   const {
     items: requests,
@@ -77,6 +76,10 @@ export function RequestsListView() {
       enabled: !!userId && !!orgId && !isOrgResolving,
     },
   );
+
+  const { employee, isLoading: isEmployeeLoading } = useMyEmployee();
+  
+  const isListLoading = isLoading || perms.isLoading || isEmployeeLoading;
 
   const filteredData = useMemo(() => {
     return requests.filter((req) => {
@@ -125,8 +128,8 @@ export function RequestsListView() {
         </div>
         
         <PermissionGate can="canCreateRequest">
-          <Link href="/requests/new" className={isLoading ? "pointer-events-none" : ""}>
-            <Button className="font-semibold" disabled={isLoading}>
+          <Link href="/requests/new" className={isListLoading ? "pointer-events-none" : ""}>
+            <Button className="font-semibold" disabled={isListLoading}>
               <Plus className="mr-2 h-4 w-4" />
               Создать заявку
             </Button>
@@ -135,7 +138,7 @@ export function RequestsListView() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-3">
-        {isLoading ? (
+        {isListLoading ? (
           <>
              <Skeleton className="h-9 flex-1 rounded-md" />
              <div className="flex gap-3 w-full md:w-auto">
@@ -183,7 +186,7 @@ export function RequestsListView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {isListLoading ? (
                Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i} className="border-b last:border-0">
                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -249,7 +252,7 @@ export function RequestsListView() {
       </div>
 
       <div className="2xl:hidden space-y-4">
-        {isLoading ? (
+        {isListLoading ? (
            Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="border rounded-xl bg-card overflow-hidden">
                  <div className="p-4 space-y-3">
@@ -338,7 +341,7 @@ export function RequestsListView() {
         )}
       </div>
 
-      {!isLoading && !searchTerm && (
+      {!isListLoading && !searchTerm && (
         <InfiniteScrollSentinel
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
