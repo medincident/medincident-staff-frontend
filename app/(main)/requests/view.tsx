@@ -83,7 +83,7 @@ export function RequestsListView() {
       if (!perms.canSeeAllRequests) {
         let canSee = false;
         
-        const isAuthor = employee?.employeeId && req.authorEmployeeId === employee.employeeId;
+        const isAuthor = userId && req.authorId === userId;
         const isExecutor = employee?.employeeId && req.executors?.some(e => e.employeeId === employee.employeeId);
         
         if (isAuthor || isExecutor) {
