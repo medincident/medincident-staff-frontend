@@ -28,24 +28,38 @@ export function ChatContainer({
         
         await new Promise((resolve) => setTimeout(resolve, 600));
         
-        const initialMessages: ChatMessage[] = [
-          {
-            id: 1,
-            sender: "Система",
-            text: entityType === "events" 
-              ? "Событие успешно зарегистрировано в системе. Ожидайте назначения ответственного."
-              : "Заявка принята в работу. Инженер скоро свяжется с вами.",
-            time: "10:00",
-            isMe: false
-          },
-          {
-            id: 2,
-            sender: "Иванов И.И.",
-            text: "Взял в работу. Буду на месте через 15 минут.",
-            time: "10:15",
-            isMe: false
+        const storageKey = `chat_${entityType}_${entityId}`;
+        const savedData = localStorage.getItem(storageKey);
+        
+        let initialMessages: ChatMessage[] = [];
+        if (savedData) {
+          try {
+            initialMessages = JSON.parse(savedData);
+          } catch (e) {
+            console.error("Failed to parse chat from local storage", e);
           }
-        ];
+        }
+        
+        if (initialMessages.length === 0) {
+          initialMessages = [
+            {
+              id: 1,
+              sender: "Система",
+              text: entityType === "events" 
+                ? "Событие успешно зарегистрировано в системе. Ожидайте назначения ответственного."
+                : "Заявка принята в работу. Инженер скоро свяжется с вами.",
+              time: "10:00",
+              isMe: false
+            },
+            {
+              id: 2,
+              sender: "Иванов И.И.",
+              text: "Взял в работу. Буду на месте через 15 минут.",
+              time: "10:15",
+              isMe: false
+            }
+          ];
+        }
 
         setMessages(initialMessages);
       } catch (error) {
@@ -70,14 +84,23 @@ export function ChatContainer({
       isMe: true
     };
 
-    setMessages((prev) => [...prev, newMsg]);
+    const storageKey = `chat_${entityType}_${entityId}`;
+    setMessages((prev) => {
+      const newMessages = [...prev, newMsg];
+      localStorage.setItem(storageKey, JSON.stringify(newMessages));
+      return newMessages;
+    });
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 400));
       
     } catch (error) {
       notify.apiError(error, "Не удалось отправить сообщение.");
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMessages((prev) => {
+        const reverted = prev.filter((m) => m.id !== tempId);
+        localStorage.setItem(storageKey, JSON.stringify(reverted));
+        return reverted;
+      });
     }
   };
 

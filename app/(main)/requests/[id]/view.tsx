@@ -313,16 +313,16 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         setStatus(newStatus);
 
         try {
-            let apiStatus = newStatus.toUpperCase();
-            if (!apiStatus.startsWith("SERVICE_REQUEST_STATUS_")) {
-                apiStatus = `SERVICE_REQUEST_STATUS_${apiStatus}`;
+            let localStatus = newStatus.toUpperCase();
+            if (!localStatus.startsWith("SERVICE_REQUEST_STATUS_")) {
+                localStatus = `SERVICE_REQUEST_STATUS_${localStatus}`;
             }
 
             await ServiceRequestCommandService.serviceRequestCommandUpdateServiceRequestStatus(request.id, {
-                newStatus: apiStatus as any
+                newStatus: newStatus.toLowerCase() as any
             });
 
-            const updatedRequest = { ...request, status: apiStatus };
+            const updatedRequest = { ...request, status: localStatus as any };
             setRequest(updatedRequest);
 
             notify.mutationSuccess(
