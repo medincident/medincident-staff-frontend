@@ -37,9 +37,11 @@ import {
     RequestClassifierQueryService,
     MembershipQueryService,
     IncidentCommandService,
+    OrgStructureQueryService,
     v1ServiceRequest,
     v1RequestType,
-    v1EmployeeCardView
+    v1EmployeeCardView,
+    v1Department
 } from "@/lib/api-generated";
 import { fetchAllPages } from "@/lib/api/paginate";
 
@@ -53,6 +55,7 @@ function DetailsSection({
     status,
     onStatusChange,
     departmentEmployees,
+    department,
     isLoadingEmployees,
     onAssignExecutors,
     isAssigningExecutors,
@@ -63,6 +66,7 @@ function DetailsSection({
     status: string;
     onStatusChange: (s: string) => void;
     departmentEmployees: v1EmployeeCardView[];
+    department: v1Department | null;
     isLoadingEmployees: boolean;
     onAssignExecutors: (employeeIds: string[]) => Promise<void>;
     isAssigningExecutors: boolean;
@@ -164,8 +168,15 @@ function DetailsSection({
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-muted-foreground ml-1">Исполнитель</label>
-                            <Select
+                        <div className="flex items-center justify-between ml-1">
+                            <label className="text-xs font-medium text-muted-foreground">Исполнитель</label>
+                            {department && (
+                                <span className="text-[10px] text-muted-foreground font-mono bg-muted/40 px-1.5 py-0.5 rounded">
+                                    Отдел: {department.name}
+                                </span>
+                            )}
+                        </div>
+                        <Select
                                 value={request.executors?.[0]?.employeeId ?? "__none__"}
                                 disabled={isLoadingEmployees || isAssigningExecutors}
                                 onValueChange={(v) => {
@@ -213,6 +224,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
     const [status, setStatus] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
     const [departmentEmployees, setDepartmentEmployees] = useState<v1EmployeeCardView[]>([]);
+    const [department, setDepartment] = useState<v1Department | null>(null);
     const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
     const [isAssigningExecutors, setIsAssigningExecutors] = useState(false);
 
@@ -257,15 +269,20 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         setIsLoadingEmployees(true);
         (async () => {
             try {
-                const items = await fetchAllPages<v1EmployeeCardView>((cursor) =>
-                    MembershipQueryService.membershipQueryListEmployeesByDepartment(
-                        request.departmentId!,
-                        200,
-                        cursor,
+                const [items, deptRes] = await Promise.all([
+                    fetchAllPages<v1EmployeeCardView>((cursor) =>
+                        MembershipQueryService.membershipQueryListEmployeesByDepartment(
+                            request.departmentId!,
+                            200,
+                            cursor,
+                        ),
                     ),
-                );
+                    OrgStructureQueryService.orgStructureQueryGetDepartment(request.departmentId!).catch(() => null)
+                ]);
+                
                 if (cancelled) return;
                 setDepartmentEmployees(items);
+                if (deptRes && deptRes.department) setDepartment(deptRes.department);
             } catch (e) {
                 console.warn("Failed to load department employees", e);
             } finally {
@@ -422,12 +439,13 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                             requestType={requestType}
                             status={status}
                             onStatusChange={handleStatusChange}
-                            departmentEmployees={departmentEmployees}
-                            isLoadingEmployees={isLoadingEmployees}
-                            onAssignExecutors={handleAssignExecutors}
-                            isAssigningExecutors={isAssigningExecutors}
-                            canManage={canManage}
-                        />
+                        departmentEmployees={departmentEmployees}
+                        department={department}
+                        isLoadingEmployees={isLoadingEmployees}
+                        onAssignExecutors={handleAssignExecutors}
+                        isAssigningExecutors={isAssigningExecutors}
+                        canManage={canManage}
+                    />
                     </TabsContent>
                     <TabsContent value="history" className="flex-1 overflow-y-auto mt-0">
                         <EntityHistory entityType="request" entityId={requestId} />
@@ -446,6 +464,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                         status={status}
                         onStatusChange={handleStatusChange}
                         departmentEmployees={departmentEmployees}
+                        department={department}
                         isLoadingEmployees={isLoadingEmployees}
                         onAssignExecutors={handleAssignExecutors}
                         isAssigningExecutors={isAssigningExecutors}
