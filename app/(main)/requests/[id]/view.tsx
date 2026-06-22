@@ -36,6 +36,7 @@ import {
     ServiceRequestCommandService,
     RequestClassifierQueryService,
     MembershipQueryService,
+    IncidentCommandService,
     v1ServiceRequest,
     v1RequestType,
     v1EmployeeCardView
@@ -96,7 +97,7 @@ function DetailsSection({
                                 </span>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
                                     Эта работа выполняется для устранения последствий события
-                                    <span className="font-mono font-bold mx-1 opacity-90 text-foreground">#{request.incidentId?.substring(0,8)}</span>.
+                                    <span className="font-mono font-bold mx-1 opacity-90 text-foreground">#{request.incidentId?.substring(0, 8)}</span>.
                                 </p>
                                 <Button
                                     variant="link"
@@ -129,74 +130,74 @@ function DetailsSection({
             </Card>
 
             {canManage && (
-            <Card className="border-primary/20 bg-primary/5 gap-1">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Управление заявкой
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 space-y-4">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
-                        <Select value={status} onValueChange={(v) => onStatusChange(v)}>
-                            <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="border">
-                                {Object.entries(STATUS_MAP).map(([key, label]) => (
-                                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                <Card className="border-primary/20 bg-primary/5 gap-1">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Управление заявкой
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0 space-y-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground ml-1">Текущий статус</label>
+                            <Select value={status} onValueChange={(v) => onStatusChange(v)}>
+                                <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="border">
+                                    {Object.entries(STATUS_MAP).map(([key, label]) => (
+                                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                        {status === 'on_hold' && (
-                            <p className="text-[11px] text-purple bg-purple/10 p-2 rounded border border-purple/20 mt-1">
-                                Заявка приостановлена — ожидаем внешних условий (запчасти, согласование, доставка).
-                            </p>
-                        )}
-                        {status === 'pending_review' && (
-                            <p className="text-[11px] text-info bg-info/10 p-2 rounded border border-info/20 mt-1">
-                                Заявка выполнена, ожидает приёмки/проверки автором.
-                            </p>
-                        )}
-                    </div>
+                            {status === 'on_hold' && (
+                                <p className="text-[11px] text-purple bg-purple/10 p-2 rounded border border-purple/20 mt-1">
+                                    Заявка приостановлена — ожидаем внешних условий (запчасти, согласование, доставка).
+                                </p>
+                            )}
+                            {status === 'pending_review' && (
+                                <p className="text-[11px] text-info bg-info/10 p-2 rounded border border-info/20 mt-1">
+                                    Заявка выполнена, ожидает приёмки/проверки автором.
+                                </p>
+                            )}
+                        </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground ml-1">Исполнитель</label>
-                        <Select
-                            value={request.executors?.[0]?.employeeId ?? "__none__"}
-                            disabled={isLoadingEmployees || isAssigningExecutors}
-                            onValueChange={(v) => {
-                                const ids = v === "__none__" ? [] : [v];
-                                void onAssignExecutors(ids);
-                            }}
-                        >
-                            <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
-                                <SelectValue placeholder={isLoadingEmployees ? "Загрузка..." : "Не назначен"} />
-                            </SelectTrigger>
-                            <SelectContent className="border max-h-[40vh]">
-                                <SelectItem value="__none__">Не назначен</SelectItem>
-                                {departmentEmployees.map((emp) => (
-                                    <SelectItem key={emp.employeeId!} value={emp.employeeId!}>
-                                        <div className="flex flex-col">
-                                            <span className="text-sm">{emp.displayName || `${emp.firstName ?? ""} ${emp.lastName ?? ""}`.trim() || emp.email}</span>
-                                            {emp.position && (
-                                                <span className="text-xs text-muted-foreground">{emp.position}</span>
-                                            )}
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {!isLoadingEmployees && departmentEmployees.length === 0 && (
-                            <p className="text-[11px] text-muted-foreground">
-                                В отделе нет сотрудников для назначения.
-                            </p>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground ml-1">Исполнитель</label>
+                            <Select
+                                value={request.executors?.[0]?.employeeId ?? "__none__"}
+                                disabled={isLoadingEmployees || isAssigningExecutors}
+                                onValueChange={(v) => {
+                                    const ids = v === "__none__" ? [] : [v];
+                                    void onAssignExecutors(ids);
+                                }}
+                            >
+                                <SelectTrigger className="w-full bg-background border-primary/20 text-foreground">
+                                    <SelectValue placeholder={isLoadingEmployees ? "Загрузка..." : "Не назначен"} />
+                                </SelectTrigger>
+                                <SelectContent className="border max-h-[40vh]">
+                                    <SelectItem value="__none__">Не назначен</SelectItem>
+                                    {departmentEmployees.map((emp) => (
+                                        <SelectItem key={emp.employeeId!} value={emp.employeeId!}>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm">{emp.displayName || `${emp.firstName ?? ""} ${emp.lastName ?? ""}`.trim() || emp.email}</span>
+                                                {emp.position && (
+                                                    <span className="text-xs text-muted-foreground">{emp.position}</span>
+                                                )}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {!isLoadingEmployees && departmentEmployees.length === 0 && (
+                                <p className="text-[11px] text-muted-foreground">
+                                    В отделе нет сотрудников для назначения.
+                                </p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
             )}
         </div>
     );
@@ -219,12 +220,12 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
         const fetchData = async () => {
             try {
                 setIsLoading(true);
-                
+
                 const reqRes = await ServiceRequestQueryService.serviceRequestQueryGetServiceRequest(requestId);
                 if (reqRes && "serviceRequest" in reqRes && reqRes.serviceRequest) {
                     const foundRequest = reqRes.serviceRequest;
                     setRequest(foundRequest);
-                    
+
                     const reqStatus = (foundRequest.status || "").toLowerCase().replace("service_request_status_", "");
                     setStatus(reqStatus);
 
@@ -329,6 +330,32 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                 "Статус обновлён",
                 `Заявка переведена в статус "${STATUS_MAP[newStatus as RequestStatus]}".`,
             );
+
+            if (newStatus.toLowerCase() === 'completed' && request.incidentId) {
+                try {
+                    const reqs = await fetchAllPages<v1ServiceRequest>((cursor) =>
+                        ServiceRequestQueryService.serviceRequestQueryListServiceRequestsByIncident(request.incidentId!, 200, cursor)
+                    );
+
+                    const hasUnfinished = reqs.some(req => {
+                        if (req.id === request.id) return false;
+                        const reqStatus = (req.status || "").toLowerCase().replace("service_request_status_", "");
+                        return reqStatus !== "completed" && reqStatus !== "cancelled";
+                    });
+
+                    if (!hasUnfinished) {
+                        await IncidentCommandService.incidentCommandUpdateIncidentStatus(request.incidentId, {
+                            newStatus: 'INCIDENT_STATUS_DONE' as any
+                        });
+                        notify.success(
+                            "Событие закрыто",
+                            "Все заявки по инциденту выполнены. Инцидент автоматически завершен."
+                        );
+                    }
+                } catch (e) {
+                    console.error("Не удалось проверить/закрыть связанный инцидент", e);
+                }
+            }
         } catch (error) {
             console.error(error);
             setStatus(prevStatus);
@@ -370,7 +397,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <h1 className="text-lg font-bold text-foreground line-clamp-2 break-words min-w-0">
-                            Заявка #{request.id?.substring(0,8)}
+                            Заявка #{request.id?.substring(0, 8)}
                         </h1>
                         <Badge variant="outline" className={`shrink-0 ${getBadgeColor(status as RequestStatus)}`}>
                             {STATUS_MAP[status as RequestStatus] || status}
@@ -414,16 +441,16 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
             <div className="hidden md:grid grid-cols-3 gap-6 items-start">
                 <div className="col-span-2 space-y-6">
                     <DetailsSection
-                            request={request}
-                            requestType={requestType}
-                            status={status}
-                            onStatusChange={handleStatusChange}
-                            departmentEmployees={departmentEmployees}
-                            isLoadingEmployees={isLoadingEmployees}
-                            onAssignExecutors={handleAssignExecutors}
-                            isAssigningExecutors={isAssigningExecutors}
-                            canManage={canManage}
-                        />
+                        request={request}
+                        requestType={requestType}
+                        status={status}
+                        onStatusChange={handleStatusChange}
+                        departmentEmployees={departmentEmployees}
+                        isLoadingEmployees={isLoadingEmployees}
+                        onAssignExecutors={handleAssignExecutors}
+                        isAssigningExecutors={isAssigningExecutors}
+                        canManage={canManage}
+                    />
 
                     <EntityHistory entityType="request" entityId={requestId} />
                 </div>
