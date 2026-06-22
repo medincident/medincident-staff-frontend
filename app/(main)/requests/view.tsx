@@ -46,8 +46,6 @@ import { usePaginatedList } from "@/lib/api/use-paginated-list";
 import { InfiniteScrollSentinel } from "@/components/ui/infinite-scroll-sentinel";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useRequestClassifier } from "@/lib/classifiers/request-classifier-store";
-import { usePermissions } from "@/lib/auth/use-permissions";
-import { useMyEmployee } from "@/lib/auth/use-my-employee";
 
 export function RequestsListView() {
   const { data: session } = useSession();
@@ -60,7 +58,6 @@ export function RequestsListView() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const userId = (session?.user as { id?: string } | undefined)?.id;
-  const perms = usePermissions();
 
   const {
     items: requests,
@@ -77,27 +74,8 @@ export function RequestsListView() {
     },
   );
 
-  const { employee, isLoading: isEmployeeLoading } = useMyEmployee();
-  
-  const isListLoading = isLoading || perms.isLoading || isEmployeeLoading;
-
   const filteredData = useMemo(() => {
     return requests.filter((req) => {
-      if (!perms.canSeeAllRequests) {
-        let canSee = false;
-        
-        const isAuthor = userId && req.authorId === userId;
-        const isExecutor = employee?.employeeId && req.executors?.some(e => e.employeeId === employee.employeeId);
-        
-        if (isAuthor || isExecutor) {
-          canSee = true;
-        } else if (perms.canSeeDepartmentRequests && employee?.departmentId && req.departmentId === employee.departmentId) {
-          canSee = true;
-        }
-        
-        if (!canSee) return false;
-      }
-
       const typeObj = requestTypes.find(t => t.id === req.typeId);
       const typeLabel = (typeObj?.name || req.typeId || "").toLowerCase();
       const desc = (req.description || "").toLowerCase();
@@ -111,7 +89,7 @@ export function RequestsListView() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [requests, requestTypes, searchTerm, statusFilter, perms, employee]);
+  }, [requests, requestTypes, searchTerm, statusFilter]);
 
   const getTypeName = (typeId?: string) => {
     const t = requestTypes.find(x => x.id === typeId);
@@ -128,8 +106,8 @@ export function RequestsListView() {
         </div>
         
         <PermissionGate can="canCreateRequest">
-          <Link href="/requests/new" className={isListLoading ? "pointer-events-none" : ""}>
-            <Button className="font-semibold" disabled={isListLoading}>
+          <Link href="/requests/new" className={isLoading ? "pointer-events-none" : ""}>
+            <Button className="font-semibold" disabled={isLoading}>
               <Plus className="mr-2 h-4 w-4" />
               Создать заявку
             </Button>
@@ -138,7 +116,7 @@ export function RequestsListView() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-3">
-        {isListLoading ? (
+        {isLoading ? (
           <>
              <Skeleton className="h-9 flex-1 rounded-md" />
              <div className="flex gap-3 w-full md:w-auto">
@@ -186,7 +164,7 @@ export function RequestsListView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isListLoading ? (
+            {isLoading ? (
                Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i} className="border-b last:border-0">
                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -252,7 +230,7 @@ export function RequestsListView() {
       </div>
 
       <div className="2xl:hidden space-y-4">
-        {isListLoading ? (
+        {isLoading ? (
            Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="border rounded-xl bg-card overflow-hidden">
                  <div className="p-4 space-y-3">
@@ -341,7 +319,7 @@ export function RequestsListView() {
         )}
       </div>
 
-      {!isListLoading && !searchTerm && (
+      {!isLoading && !searchTerm && (
         <InfiniteScrollSentinel
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
