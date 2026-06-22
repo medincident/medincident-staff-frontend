@@ -282,7 +282,7 @@ export function RequestDetailsView({ requestId }: RequestDetailsViewProps) {
                 
                 if (cancelled) return;
                 setDepartmentEmployees(items);
-                if (deptRes && deptRes.department) setDepartment(deptRes.department);
+                if (deptRes && "department" in deptRes && deptRes.department) setDepartment(deptRes.department);
             } catch (e) {
                 console.warn("Failed to load department employees", e);
             } finally {
