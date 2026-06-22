@@ -46,6 +46,8 @@ import { usePaginatedList } from "@/lib/api/use-paginated-list";
 import { InfiniteScrollSentinel } from "@/components/ui/infinite-scroll-sentinel";
 import { useActiveOrgId } from "@/lib/auth/active-org-context";
 import { useRequestClassifier } from "@/lib/classifiers/request-classifier-store";
+import { usePermissions } from "@/lib/auth/use-permissions";
+import { useMyEmployee } from "@/lib/auth/use-my-employee";
 
 export function RequestsListView() {
   const { data: session } = useSession();
@@ -58,6 +60,8 @@ export function RequestsListView() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const userId = (session?.user as { id?: string } | undefined)?.id;
+  const perms = usePermissions();
+  const { employee } = useMyEmployee();
 
   const {
     items: requests,
@@ -76,6 +80,21 @@ export function RequestsListView() {
 
   const filteredData = useMemo(() => {
     return requests.filter((req) => {
+      if (!perms.canSeeAllRequests) {
+        let canSee = false;
+        
+        const isAuthor = employee?.employeeId && req.authorEmployeeId === employee.employeeId;
+        const isExecutor = employee?.employeeId && req.executors?.some(e => e.employeeId === employee.employeeId);
+        
+        if (isAuthor || isExecutor) {
+          canSee = true;
+        } else if (perms.canSeeDepartmentRequests && employee?.departmentId && req.departmentId === employee.departmentId) {
+          canSee = true;
+        }
+        
+        if (!canSee) return false;
+      }
+
       const typeObj = requestTypes.find(t => t.id === req.typeId);
       const typeLabel = (typeObj?.name || req.typeId || "").toLowerCase();
       const desc = (req.description || "").toLowerCase();
@@ -89,7 +108,7 @@ export function RequestsListView() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [requests, requestTypes, searchTerm, statusFilter]);
+  }, [requests, requestTypes, searchTerm, statusFilter, perms, employee]);
 
   const getTypeName = (typeId?: string) => {
     const t = requestTypes.find(x => x.id === typeId);
